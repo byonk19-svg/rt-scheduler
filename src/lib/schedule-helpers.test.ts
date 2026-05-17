@@ -115,6 +115,14 @@ describe('schedule feedback messaging', () => {
       '2 required work dates could not be honored automatically (manager Will work or therapist must work).'
     )
   })
+
+  it('uses Schedule Block language for duplicate assignment feedback', () => {
+    const feedback = getScheduleFeedback({ error: 'duplicate_shift' })
+
+    expect(feedback?.variant).toBe('error')
+    expect(feedback?.message).toContain('Schedule Block')
+    expect(feedback?.message).not.toContain('this cycle')
+  })
 })
 
 describe('pickTherapistForDate', () => {

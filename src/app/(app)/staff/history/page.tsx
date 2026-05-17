@@ -402,7 +402,7 @@ export default async function StaffSwapHistoryPage({
                       <td className="px-4 py-2.5">
                         {st === 'day' || st === 'night' ? (
                           <span
-                            className="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                            className="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold"
                             style={{
                               borderColor:
                                 st === 'day' ? 'var(--info-border)' : 'var(--warning-border)',
@@ -411,7 +411,7 @@ export default async function StaffSwapHistoryPage({
                               color: st === 'day' ? 'var(--info-text)' : 'var(--warning-text)',
                             }}
                           >
-                            {st}
+                            {st === 'day' ? 'Day shift' : 'Night shift'}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>

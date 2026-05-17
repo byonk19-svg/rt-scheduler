@@ -24,7 +24,7 @@ const baseProps = {
   ],
   pendingRequests: 5,
   approvalsWaiting: 5,
-  currentCycleStatus: 'Draft cycle',
+  currentCycleStatus: 'Draft Schedule Block',
   currentCycleDetail: 'Publish by Apr 27',
   nextCycleLabel: 'Collect availability Mar 17',
   nextCycleDetail: 'Publish by Apr 27',
@@ -49,12 +49,12 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('What needs to be fixed or approved right now.')
     expect(html).toContain('Facility')
     expect(html).toContain('Riverside Medical Center')
-    expect(html).toContain('Current cycle')
+    expect(html).toContain('Current Schedule Block')
     expect(html).toContain('Mar 17 - Apr 13')
     expect(html).toContain('Shift context')
     expect(html).toContain('Day / Night / Both')
     expect(html).toContain('Schedule status')
-    expect(html).toContain('Draft cycle')
+    expect(html).toContain('Draft Schedule Block')
 
     const attentionIndex = html.indexOf('Needs your attention')
     const staffingIndex = html.indexOf('Today&#x27;s staffing')
@@ -72,7 +72,7 @@ describe('ManagerTriageDashboard', () => {
 
     expect(html).toContain('5 approvals waiting')
     expect(html).toContain('Review requests')
-    expect(html).toContain('9 open shifts in this cycle')
+    expect(html).toContain('9 open shifts in this Schedule Block')
     expect(html).toContain('Fill open shifts')
     expect(html).toContain('2 coverage safety issues')
     expect(html).toContain('View schedule')
@@ -89,11 +89,11 @@ describe('ManagerTriageDashboard', () => {
   it('shows day and night staffing with lead, workers, open count, and status', () => {
     const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
 
-    expect(html).toContain('Day Shift')
+    expect(html).toContain('Day shift')
     expect(html).toContain('Lead: ')
     expect(html).toContain('Adrienne S.')
     expect(html).toContain('Alyce L., Brianna K.')
-    expect(html).toContain('Night Shift')
+    expect(html).toContain('Night shift')
     expect(html).toContain('Barbara J.')
     expect(html).toContain('Open: ')
     expect(html).toContain('Needs attention')
@@ -101,7 +101,7 @@ describe('ManagerTriageDashboard', () => {
     expect(html).not.toContain('Today / This week')
   })
 
-  it('renders the compact current cycle card instead of the old workflow card', () => {
+  it('renders the compact current Schedule Block card instead of the old workflow card', () => {
     const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
 
     expect(html).toContain('Next deadline')
@@ -109,9 +109,9 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Build')
     expect(html).toContain('Review')
     expect(html).toContain('Publish')
-    expect(html).toContain('Continue cycle')
+    expect(html).toContain('Continue Schedule Block')
     expect(html).not.toContain('Scheduling workflow')
-    expect(html).not.toContain('Follow these steps each cycle')
+    expect(html).not.toContain('Follow these steps each Schedule Block')
     expect(html).not.toContain('Prepare availability')
   })
 

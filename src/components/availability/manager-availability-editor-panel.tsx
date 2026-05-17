@@ -126,7 +126,7 @@ export function ManagerAvailabilityEditorPanel({
               </h3>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                 You are entering availability on behalf of {therapist.full_name}. Select dates in
-                the 6-week cycle grid, choose the state to apply, and save when ready.
+                the Schedule Block grid, choose the state to apply, and save when ready.
               </p>
             </div>
 
@@ -205,7 +205,7 @@ export function ManagerAvailabilityEditorPanel({
             </div>
           ) : (
             <p className="mt-3 text-sm text-muted-foreground">
-              Select dates in the cycle grid to start editing.
+              Select dates in the Schedule Block grid to start editing.
             </p>
           )}
         </section>

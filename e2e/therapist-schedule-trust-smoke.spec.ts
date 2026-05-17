@@ -249,7 +249,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await noteBox.fill(noteText)
 
     await page.getByRole('button', { name: /submit availability/i }).click()
-    await expect(page.getByText('Submitted with cycle-specific changes.')).toBeVisible({
+    await expect(page.getByText('Submitted with Schedule Block changes.')).toBeVisible({
       timeout: 45_000,
     })
 
@@ -312,7 +312,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await expect(dayBtn).toBeVisible({ timeout: 30_000 })
     await dayBtn.click()
     await expect(
-      page.getByText('Notes are only saved for days you change for this cycle.')
+      page.getByText('Notes are only saved for days you change for this Schedule Block.')
     ).toBeVisible()
     await expect(page.locator(`textarea#therapist-day-note-${iso2}`)).toBeDisabled()
   })

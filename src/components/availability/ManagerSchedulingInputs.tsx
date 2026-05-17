@@ -513,7 +513,7 @@ export function ManagerSchedulingInputs({
             cycleLabel={
               selectedCycle
                 ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
-                : 'No cycle selected'
+                : 'No Schedule Block selected'
             }
             requestRows={therapistRequestRows}
             submissionStatus={submissionStatus}

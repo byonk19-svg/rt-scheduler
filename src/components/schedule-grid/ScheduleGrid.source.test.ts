@@ -5,6 +5,11 @@ import { describe, expect, it } from 'vitest'
 
 const source = () =>
   readFileSync(resolve(process.cwd(), 'src/components/schedule-grid/ScheduleGrid.tsx'), 'utf8')
+const toolbarSource = () =>
+  readFileSync(
+    resolve(process.cwd(), 'src/components/schedule-grid/ScheduleGridToolbar.tsx'),
+    'utf8'
+  )
 
 describe('ScheduleGrid source invariants', () => {
   it('binds structural mutations to the loaded dataset shift', () => {
@@ -35,5 +40,12 @@ describe('ScheduleGrid source invariants', () => {
       'if (!activeCellTarget || !initialDataset.canManageCoverage || cellsLocked) return'
     )
     expect(handleAssignBlock).not.toContain('!initialDataset.isPublished')
+  })
+
+  it('uses explicit shift labels in the toolbar', () => {
+    const code = toolbarSource()
+
+    expect(code).toContain('{tab} shift')
+    expect(code).toContain('Schedule Block')
   })
 })

@@ -230,7 +230,7 @@ describe('therapist-workflow', () => {
     })
 
     expect(workflow.state).toBe('cycle_closed')
-    expect(workflow.stateLabel).toBe('Cycle closed')
+    expect(workflow.stateLabel).toBe('Schedule Block closed')
     expect(workflow.primaryAction.href).toBe('/staff/history')
     expect(workflow.primaryAction.label).toBe('View history')
   })

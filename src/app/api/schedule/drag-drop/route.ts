@@ -484,7 +484,7 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (cycleError || !cycle) {
-    return NextResponse.json({ error: 'Schedule cycle not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Schedule Block not found' }, { status: 404 })
   }
   if (cycle.status === 'offline' || cycle.status === 'archived' || cycle.archived_at) {
     return NextResponse.json(
@@ -506,7 +506,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing assignment data' }, { status: 400 })
     }
     if (!isDateWithinRange(payload.date, cycle.start_date, cycle.end_date)) {
-      return NextResponse.json({ error: 'Date is outside this cycle' }, { status: 400 })
+      return NextResponse.json({ error: 'Date is outside this Schedule Block' }, { status: 400 })
     }
 
     const { data: targetProfile, error: targetProfileError } = await supabase
@@ -707,7 +707,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing move data' }, { status: 400 })
     }
     if (!isDateWithinRange(payload.targetDate, cycle.start_date, cycle.end_date)) {
-      return NextResponse.json({ error: 'Date is outside this cycle' }, { status: 400 })
+      return NextResponse.json({ error: 'Date is outside this Schedule Block' }, { status: 400 })
     }
 
     const { data: shift, error: shiftError } = await supabase
@@ -717,7 +717,7 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (shiftError || !shift || shift.cycle_id !== payload.cycleId) {
-      return NextResponse.json({ error: 'Shift not found in this cycle' }, { status: 404 })
+      return NextResponse.json({ error: 'Shift not found in this Schedule Block' }, { status: 404 })
     }
     if (shift.site_id !== managerSiteId) {
       return NextResponse.json({ error: 'Shift is outside your site scope.' }, { status: 403 })
@@ -950,7 +950,7 @@ export async function POST(request: Request) {
     }
 
     if (shiftError || !shift || shift.cycle_id !== payload.cycleId) {
-      return NextResponse.json({ error: 'Shift not found in this cycle' }, { status: 404 })
+      return NextResponse.json({ error: 'Shift not found in this Schedule Block' }, { status: 404 })
     }
     if (shift.site_id !== managerSiteId) {
       return NextResponse.json({ error: 'Shift is outside your site scope.' }, { status: 403 })
@@ -1024,7 +1024,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing designated lead data' }, { status: 400 })
     }
     if (!isDateWithinRange(payload.date, cycle.start_date, cycle.end_date)) {
-      return NextResponse.json({ error: 'Date is outside this cycle' }, { status: 400 })
+      return NextResponse.json({ error: 'Date is outside this Schedule Block' }, { status: 400 })
     }
 
     const { data: therapist, error: therapistError } = await supabase

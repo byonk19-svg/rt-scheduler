@@ -31,7 +31,7 @@ export function ScheduleProgress({
   const overall = computeProgress(overallFilled, overallTotal)
   const rows = [
     {
-      label: 'Day Shifts',
+      label: 'Day shift',
       caption: 'Core daytime staffing',
       indicatorClassName: 'bg-primary',
       badgeClassName: 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]',
@@ -40,7 +40,7 @@ export function ScheduleProgress({
       total: dayTotal,
     },
     {
-      label: 'Night Shifts',
+      label: 'Night shift',
       caption: 'Overnight coverage load',
       indicatorClassName: 'bg-[var(--night)]',
       badgeClassName:

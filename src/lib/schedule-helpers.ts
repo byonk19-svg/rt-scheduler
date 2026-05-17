@@ -297,7 +297,7 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   }
   if (error === 'duplicate_shift') {
     return {
-      message: 'That therapist is already assigned on that date in this cycle.',
+      message: 'That therapist is already assigned on that date in this Schedule Block.',
       variant: 'error',
     }
   }

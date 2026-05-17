@@ -6,6 +6,7 @@ describe('getPublishedCoverageBannerContent', () => {
   it('describes published coverage as live-editable for managers', () => {
     const banner = getPublishedCoverageBannerContent()
 
+    expect(banner.title).toContain('Schedule Block')
     expect(banner.title).toContain('published')
     expect(banner.description).toContain('live changes')
     expect(banner.description).toContain('employees')

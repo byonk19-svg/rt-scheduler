@@ -346,7 +346,7 @@ export default async function TherapistSettingsPage({
           <CardTitle>Recurring Work Pattern</CardTitle>
           <CardDescription>
             This is your normal repeating schedule. Future Availability starts here and lets you
-            make cycle-only changes separately.
+            make Schedule Block-only changes separately.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -426,8 +426,8 @@ export default async function TherapistSettingsPage({
                   defaultValue={defaultCalendarView}
                   className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
-                  <option value="day">Day</option>
-                  <option value="night">Night</option>
+                  <option value="day">Day shift</option>
+                  <option value="night">Night shift</option>
                 </select>
               </div>
               <div className="space-y-1">

@@ -90,8 +90,8 @@ function parseShiftDetail(detail: string): {
 
 function buildTodayShiftSummaries(rows: Array<{ label: string; detail: string }>): ShiftSummary[] {
   const summaries: ShiftSummary[] = [
-    { key: 'day', label: 'Day Shift', lead: null, staff: [], openCount: 0 },
-    { key: 'night', label: 'Night Shift', lead: null, staff: [], openCount: 0 },
+    { key: 'day', label: 'Day shift', lead: null, staff: [], openCount: 0 },
+    { key: 'night', label: 'Night shift', lead: null, staff: [], openCount: 0 },
   ]
 
   for (const row of rows) {
@@ -124,11 +124,12 @@ function getCycleStepState(args: {
 }): Array<{ label: string; value: string; tone: 'success' | 'warning' | 'muted' }> {
   const availabilityState = args.nextCycleLabel.startsWith('Collect availability')
     ? 'Pending'
-    : args.nextCycleLabel === 'No next cycle'
+    : args.nextCycleLabel === 'No next Schedule Block'
       ? 'Not started'
       : 'Ready'
   const buildState =
-    args.currentCycleStatus === 'Draft not started' || args.currentCycleStatus === 'No active cycle'
+    args.currentCycleStatus === 'Draft not started' ||
+    args.currentCycleStatus === 'No active Schedule Block'
       ? 'Not started'
       : 'Complete'
   const reviewState =
@@ -232,7 +233,7 @@ export function ManagerTriageDashboard({
       label:
         openAssignmentCount === '--'
           ? LOADING_LABEL
-          : `${pluralize(openAssignmentCount, 'open shift')} in this cycle`,
+          : `${pluralize(openAssignmentCount, 'open shift')} in this Schedule Block`,
       detail: 'Unassigned schedule rows still need owners.',
       href: scheduleHref,
       action: 'Fill open shifts',
@@ -341,8 +342,8 @@ export function ManagerTriageDashboard({
         />
         <ContextCell
           icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />}
-          label="Current cycle"
-          value={activeCycleDateRange ?? 'Current 6-week cycle'}
+          label="Schedule Block"
+          value={activeCycleDateRange ?? 'Current Schedule Block'}
         />
         <ContextCell
           icon={<Sun className="h-4 w-4" aria-hidden="true" />}
@@ -399,7 +400,9 @@ export function ManagerTriageDashboard({
 
         <Card className="rounded-lg border-border/70 bg-card shadow-tw-float-tight">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xl font-bold text-foreground">Current cycle</CardTitle>
+            <CardTitle className="text-xl font-bold text-foreground">
+              Current Schedule Block
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 pb-4">
             <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
@@ -407,7 +410,7 @@ export function ManagerTriageDashboard({
                 Next deadline
               </p>
               <p className="mt-1 text-sm font-semibold text-foreground">
-                {nextCycleLabel === 'No next cycle' ? currentCycleDetail : nextCycleLabel}
+                {nextCycleLabel === 'No next Schedule Block' ? currentCycleDetail : nextCycleLabel}
               </p>
               <p className="text-xs text-muted-foreground">{nextCycleDetail}</p>
             </div>
@@ -419,7 +422,7 @@ export function ManagerTriageDashboard({
             {currentCycleStatus !== 'Published' ? (
               <Button variant="outline" size="sm" className="min-h-10 w-full" asChild>
                 <Link href={currentCycleCtaHref ?? scheduleHref}>
-                  Continue cycle
+                  Continue Schedule Block
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               </Button>

@@ -22,10 +22,14 @@ describe('therapist settings route', () => {
     expect(source).toContain(
       'Future Availability will start blank until you save a normal schedule.'
     )
+    expect(source).toContain('make Schedule Block-only changes separately.')
     expect(source).toContain('/therapist/recurring-pattern')
     expect(source).toContain('Schedule Preferences')
     expect(source).toContain('Max consecutive days')
     expect(source).toContain('Notification preferences')
+    expect(source).toContain('Day shift')
+    expect(source).toContain('Night shift')
+    expect(source).not.toContain('make cycle-only changes separately.')
     expect(source).not.toContain("export { default } from '../../profile/page'")
   })
 

@@ -28,7 +28,7 @@ import { createClient } from '@/lib/supabase/server'
 export const metadata: Metadata = {
   title: 'Availability Manager',
   description:
-    'Review therapist responses, follow up on missing availability, and edit cycle availability on behalf of staff.',
+    'Review therapist responses, follow up on missing availability, and edit Schedule Block availability on behalf of staff.',
 }
 
 const ManagerSchedulingInputs = dynamic(() =>
@@ -154,7 +154,7 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   if (error === 'duplicate_entry') {
     return {
       message:
-        'You already had an availability request for that date and shift in this cycle. We updated it.',
+        'You already had an availability request for that date and shift in this Schedule Block. We updated it.',
       variant: 'success',
     }
   }
@@ -167,13 +167,13 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   }
   if (error === 'submission_closed') {
     return {
-      message: 'Availability changes are closed for this cycle.',
+      message: 'Availability changes are closed for this Schedule Block.',
       variant: 'error',
     }
   }
   if (success === 'entry_submitted') {
     return {
-      message: 'Availability submitted for this cycle.',
+      message: 'Availability submitted for this Schedule Block.',
       variant: 'success',
     }
   }
@@ -215,7 +215,7 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (success === 'manager_request_deleted') {
     return {
-      message: 'Availability request removed from this cycle.',
+      message: 'Availability request removed from this Schedule Block.',
       variant: 'success',
     }
   }
@@ -239,8 +239,8 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     const count = getSearchParam(params?.copied)
     return {
       message: count
-        ? `${count} date${Number(count) === 1 ? '' : 's'} copied from the previous cycle.`
-        : 'Availability copied from the previous cycle.',
+        ? `${count} date${Number(count) === 1 ? '' : 's'} copied from the previous Schedule Block.`
+        : 'Availability copied from the previous Schedule Block.',
       variant: 'success',
     }
   }
@@ -297,7 +297,7 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (error === 'copy_nothing_new') {
     return {
-      message: 'All dates from the previous block are already planned for this cycle.',
+      message: 'All dates from the previous block are already planned for this Schedule Block.',
       variant: 'error',
     }
   }
@@ -516,7 +516,9 @@ export default async function AvailabilityPage({
       createdAt: entry.created_at,
       updatedAt: entry.updated_at ?? undefined,
       requestedBy: requester?.full_name ?? 'Unknown user',
-      cycleLabel: cycle ? formatHumanCycleRange(cycle.start_date, cycle.end_date) : 'Unknown cycle',
+      cycleLabel: cycle
+        ? formatHumanCycleRange(cycle.start_date, cycle.end_date)
+        : 'Unknown Schedule Block',
       entryType: entry.override_type,
       shiftType: entry.shift_type,
       source: (entry.source === 'manager' ? 'manager' : 'therapist') as 'manager' | 'therapist',

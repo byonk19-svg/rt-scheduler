@@ -172,9 +172,9 @@ describe('PublishHistoryPage', () => {
     expect(html).toContain('Publish email log')
     expect(html).toContain('Take offline')
     expect(html).not.toContain('Clear &amp; restart')
-    expect(html).toContain('Archive cycle')
+    expect(html).toContain('Archive block')
     expect(html).toContain('Delete history')
-    expect(html).toContain('Open cycle')
+    expect(html).toContain('Open block')
     expect(html).toContain('No longer live')
     expect(html).toContain('Live cycle')
     expect(html).toContain('Old cycle')
@@ -229,7 +229,7 @@ describe('PublishHistoryPage', () => {
       })
     )
 
-    expect(html).toContain('Cycle archived')
+    expect(html).toContain('Schedule Block archived')
     expect(html).toContain('will no longer appear in Schedule')
   })
 

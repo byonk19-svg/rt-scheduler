@@ -84,7 +84,7 @@ export function ScheduleGridToolbar({
               onClick={() => onShiftTabChange(tab)}
               disabled={isPending}
             >
-              {tab}
+              {tab} shift
             </button>
           ))}
         </div>
