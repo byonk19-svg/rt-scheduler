@@ -151,6 +151,26 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Review in Schedule')
   })
 
+  it('explains when no Schedule Block is open for therapist availability', () => {
+    const html = renderToStaticMarkup(
+      createElement(TherapistAvailabilityWorkspace, {
+        cycles: [],
+        availabilityRows: [],
+        conflicts: [],
+        initialCycleId: '',
+        todayKey: '2026-04-19',
+        hasSavedRecurringPattern: false,
+        recurringPatternSummary: 'No normal schedule saved yet.',
+        generatedBaselineByCycleId: {},
+        submissionsByCycleId: {},
+        submitTherapistAvailabilityGridAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('No upcoming Schedule Block is open for availability yet.')
+    expect(html).toContain('Check back after your manager opens the next block.')
+  })
+
   it('uses neutral manual-state language when no normal schedule exists', () => {
     const html = renderToStaticMarkup(
       createElement(TherapistAvailabilityWorkspace, {

@@ -59,6 +59,16 @@ describe('EmployeeRosterPanel', () => {
     expect(html).toContain('Bulk tools')
     expect(html).toContain('High-risk utility')
   })
+
+  it('gives a next step when the employee roster is empty', () => {
+    const tableSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/team/employee-roster-table.tsx'),
+      'utf8'
+    )
+
+    expect(tableSource).toContain('No roster entries yet.')
+    expect(tableSource).toContain('Add employees manually or use bulk import')
+  })
 })
 
 describe('Team page source contract', () => {

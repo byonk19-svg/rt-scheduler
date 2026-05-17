@@ -148,7 +148,7 @@ export function EmployeeRosterTable({
   if (roster.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-        No roster entries yet.
+        No roster entries yet. Add employees manually or use bulk import before matching accounts.
       </p>
     )
   }

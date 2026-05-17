@@ -92,6 +92,19 @@ describe('ScheduleGridTable', () => {
     expect(html).toContain('>1</span>')
   })
 
+  it('explains an empty shift roster with a next step', () => {
+    const html = renderTable(
+      makeDataset({
+        therapistRows: [],
+        dailyTotals: {},
+      })
+    )
+
+    expect(html).toContain('No day-shift therapists found for this Schedule Block.')
+    expect(html).toContain('Switch shifts or check Team roster settings')
+    expect(html).not.toContain('<table')
+  })
+
   it('lets managers assign empty cells on published schedules', () => {
     const html = renderTable(makeDataset({ isPublished: true }))
     const cell = getCellButton(html, 'u1', '2026-05-05')

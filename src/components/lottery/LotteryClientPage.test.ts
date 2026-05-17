@@ -155,4 +155,26 @@ describe('LotteryClientPage', () => {
     expect(html).not.toContain('Manager override')
     expect(html).not.toContain('Add on behalf of a therapist')
   })
+
+  it('shows a clear empty state when no published shifts can be lotteried', () => {
+    const html = renderPage(
+      buildSnapshot({
+        selectedDate: null,
+        availableDates: [],
+        workingScheduledCount: 0,
+        scheduledStaff: [],
+        requestList: [],
+        recommendationCandidates: [],
+        recommendation: null,
+        latestAppliedDecision: null,
+      })
+    )
+
+    expect(html).toContain('No published shifts are ready for Lottery.')
+    expect(html).toContain(
+      'A manager needs to publish a Schedule Block before Lottery can be used.'
+    )
+    expect(html).not.toContain('Pick the date, shift, and keep-to-work count')
+    expect(html).not.toContain('Decision context')
+  })
 })

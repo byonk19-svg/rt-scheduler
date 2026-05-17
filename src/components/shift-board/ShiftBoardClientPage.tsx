@@ -186,7 +186,7 @@ function toReviewErrorMessage(message: string): string {
               ? 'override:Lead coverage gap - approving this request would leave a shift without a lead. You can force-approve below.'
               : message.includes('Double booking')
                 ? 'Cannot approve: double booking. This therapist is already assigned to this shift.'
-                : `Could not save: ${message}`
+                : 'Could not save this request. Refresh the board and try again.'
 }
 
 export default function ShiftBoardClientPage({
@@ -474,7 +474,7 @@ export default function ShiftBoardClientPage({
         console.error('Failed to deny pickup claimant:', message)
         setRequestErrors((prev) => ({
           ...prev,
-          [requestId]: message,
+          [requestId]: 'Could not update that claimant. Refresh the board and try again.',
         }))
       } finally {
         setSavingState((current) => ({ ...current, [requestId]: false }))

@@ -135,7 +135,8 @@ describe('ManagerSchedulingInputs', () => {
       })
     )
 
-    expect(html).toContain('Create a Schedule Block before managing therapist availability.')
+    expect(html).toContain('No Schedule Block is ready for availability.')
+    expect(html).toContain('Create a Schedule Block from Schedule')
   })
 
   it('uses Next router state instead of forcing a full page reload for planner selection changes', () => {

@@ -130,7 +130,7 @@ export function ScheduleGrid({
         : undefined,
     })
     if (error) {
-      window.alert(error.message ?? 'Could not assign therapist.')
+      window.alert('Could not assign this shift. Refresh Schedule and try again.')
       return
     }
     refreshAfterMutation()
@@ -143,7 +143,7 @@ export function ScheduleGrid({
       shiftId: activeCellTarget.cell.shiftId,
     })
     if (error) {
-      window.alert(error.message ?? 'Could not unassign therapist.')
+      window.alert('Could not remove this assignment. Refresh Schedule and try again.')
       return
     }
     refreshAfterMutation()
@@ -159,7 +159,7 @@ export function ScheduleGrid({
         toCoveragePayload(status)
       )
       if (error) {
-        window.alert(error.message ?? 'Could not update status.')
+        window.alert('Could not update this shift status. Refresh Schedule and try again.')
         return
       }
       refreshAfterMutation()
@@ -176,7 +176,7 @@ export function ScheduleGrid({
       shiftType: initialDataset.shiftType,
     })
     if (error) {
-      window.alert(error.message ?? 'Could not designate lead.')
+      window.alert('Could not set the lead for this shift. Refresh Schedule and try again.')
       return
     }
     refreshAfterMutation()
