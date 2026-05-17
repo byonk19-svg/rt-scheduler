@@ -573,7 +573,10 @@ export function TeamDirectory({
 
       {filteredProfiles.length === 0 && (
         <div className="rounded-xl border border-border bg-card px-4 py-8 text-center">
-          <p className="text-sm text-muted-foreground">No people match these filters.</p>
+          <p className="text-sm font-medium text-foreground">No people match these filters.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Clear filters or search by another name to return to the full team list.
+          </p>
         </div>
       )}
 

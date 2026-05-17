@@ -59,6 +59,22 @@ export function ScheduleGridTable({
         ...therapistRows.filter((row) => row.userId !== viewerUserId),
       ]
     : therapistRows
+  const shiftLabel = dataset.shiftType === 'night' ? 'night-shift' : 'day-shift'
+
+  if (sortedRows.length === 0) {
+    return (
+      <div className="border-t border-border bg-card px-6 py-10 text-center">
+        <p className="text-base font-semibold text-foreground">
+          No {shiftLabel} therapists found for this Schedule Block.
+        </p>
+        <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          {dataset.canManageCoverage
+            ? 'Switch shifts or check Team roster settings, then return to Schedule.'
+            : 'Ask a manager to check the roster or publish the correct shift schedule.'}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="overflow-x-auto">

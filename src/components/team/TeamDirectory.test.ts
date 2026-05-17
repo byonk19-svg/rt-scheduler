@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -60,5 +63,17 @@ describe('teamMemberHasAppAccess', () => {
 
   it('keeps app access for active employees', () => {
     expect(teamMemberHasAppAccess(makeProfile({ is_active: true }))).toBe(true)
+  })
+})
+
+describe('TeamDirectory empty state copy', () => {
+  it('tells managers what to do when filters hide every person', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/team/TeamDirectory.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain('No people match these filters.')
+    expect(source).toContain('Clear filters or search by another name')
   })
 })

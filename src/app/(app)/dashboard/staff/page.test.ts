@@ -38,4 +38,10 @@ describe('staff dashboard therapist action-center copy', () => {
     expect(staffDashboardSource).toContain('Past requests and outcomes')
     expect(staffDashboardSource).toContain('resolveTherapistWorkflow')
   })
+
+  it('uses a plain no-published-shifts empty state with a next step', () => {
+    expect(staffDashboardSource).toContain('No published shifts yet.')
+    expect(staffDashboardSource).toContain('Check Schedule after the')
+    expect(staffDashboardSource).toContain('next Schedule Block is published')
+  })
 })

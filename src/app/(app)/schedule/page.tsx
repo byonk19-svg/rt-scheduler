@@ -33,10 +33,19 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
 
   if (result.status === 'no_cycle') {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-12 text-center md:px-6">
-        <p className="text-sm font-medium text-muted-foreground">
-          No active Schedule Block is available yet.
-        </p>
+      <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
+        <div className="mx-auto max-w-2xl rounded-xl border border-border bg-card px-6 py-8 text-center shadow-sm">
+          <p className="text-base font-semibold text-foreground">
+            No Schedule Block is available yet.
+          </p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Managers need to create or publish a Schedule Block before this view has shifts to show.
+            Staff will see their Team Schedule here after a block is published.
+          </p>
+          <p className="mt-4 text-xs font-medium text-muted-foreground">
+            Check with the manager if you expected a live schedule.
+          </p>
+        </div>
       </div>
     )
   }
