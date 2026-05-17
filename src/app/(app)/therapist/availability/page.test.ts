@@ -31,7 +31,7 @@ describe('therapist availability route', () => {
     expect(workspaceSource).toContain('Future Availability')
     expect(pageSource).toContain('resolveTherapistAvailabilityCycleId')
     expect(pageSource).toContain("'preliminary_snapshots'")
-    expect(pageSource).toContain('No day-level entries yet for this cycle.')
+    expect(pageSource).toContain('No day-level entries yet for this Schedule Block.')
     expect(pageSource).toContain('Once you submit, your availability will appear here.')
     expect(pageSource).not.toContain('days selected')
     expect(pageSource).toContain('therapist_availability_submissions')

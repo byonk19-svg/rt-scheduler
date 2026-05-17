@@ -95,7 +95,7 @@ test.describe.serial('therapist recurring pattern flow', () => {
     await expect(page.getByText('Recurring pattern saved.')).toBeVisible({ timeout: 45_000 })
 
     await page.goto(`/therapist/availability?cycle=${ctx!.cycleId}`)
-    await expect(page.getByText('Starting point for this cycle')).toBeVisible()
+    await expect(page.getByText('Starting point for this Schedule Block')).toBeVisible()
     await expect(page.getByText(/Repeats every 7 days starting/i)).toBeVisible()
 
     const offDayButton = page

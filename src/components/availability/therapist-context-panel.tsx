@@ -291,7 +291,7 @@ export function TherapistContextPanel({
           </div>
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
-            No therapist requests are on file for this cycle.
+            No therapist requests are on file for this Schedule Block.
           </p>
         )}
 

@@ -178,7 +178,7 @@ export function AvailabilityEntriesTable({
           </span>
           <div>
             <p className="text-sm font-semibold text-foreground">
-              {emptyMessageOverride ?? 'No day-level entries yet for this cycle.'}
+              {emptyMessageOverride ?? 'No day-level entries yet for this Schedule Block.'}
             </p>
             {descriptionOverride ? (
               <p className="mt-0.5 text-sm text-muted-foreground">{descriptionOverride}</p>
@@ -273,8 +273,8 @@ export function AvailabilityEntriesTable({
           canManageAvailability
             ? syncSearchFromPlannerFocus
               ? 'Search therapist'
-              : 'Search by requester, note, cycle, or request type'
-            : 'Search by note, cycle, or request type'
+              : 'Search by requester, note, Schedule Block, or request type'
+            : 'Search by note, Schedule Block, or request type'
         }
         statusOptions={STATUS_OPTIONS}
         showDateRange={canManageAvailability}
@@ -415,7 +415,7 @@ export function AvailabilityEntriesTable({
                         <div className="grid grid-cols-1 gap-3 py-2 md:grid-cols-3">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                              Cycle
+                              Schedule Block
                             </p>
                             <p className="text-sm text-foreground">{row.cycleLabel}</p>
                           </div>
@@ -515,11 +515,11 @@ export function AvailabilityEntriesTable({
           {descriptionOverride ??
             (canManageAvailability
               ? syncSearchFromPlannerFocus
-                ? 'Review therapist requests tied to the current planning cycle.'
+                ? 'Review therapist requests tied to the current Schedule Block.'
                 : scope === 'all-staff'
-                  ? 'Scan submitted requests before the cycle is published.'
+                  ? 'Scan submitted requests before the Schedule Block is published.'
                   : 'Review the requests you entered yourself.'
-              : 'Your saved requests for upcoming cycles.')}
+              : 'Your saved requests for upcoming Schedule Blocks.')}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">{content}</CardContent>

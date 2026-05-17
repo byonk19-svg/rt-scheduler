@@ -748,14 +748,14 @@ export default function LotteryClientPage({
                 variant={selectedShift === 'day' ? 'default' : 'outline'}
                 onClick={() => setSelectedShift('day')}
               >
-                Day
+                Day shift
               </Button>
               <Button
                 type="button"
                 variant={selectedShift === 'night' ? 'default' : 'outline'}
                 onClick={() => setSelectedShift('night')}
               >
-                Night
+                Night shift
               </Button>
             </div>
           </div>

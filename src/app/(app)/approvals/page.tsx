@@ -492,7 +492,7 @@ export default async function ApprovalsPage({
                             <p className="font-semibold text-foreground">
                               {formatCycleRange(cycle)}
                             </p>
-                            <p>Preliminary cycle</p>
+                            <p>Preliminary Schedule Block</p>
                           </div>
                         </div>
                       </div>

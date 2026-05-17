@@ -108,7 +108,7 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   if (error === 'duplicate_entry') {
     return {
       message:
-        'You already had an availability request for that date and shift in this cycle. We updated it.',
+        'You already had an availability request for that date and shift in this Schedule Block. We updated it.',
       variant: 'success',
     }
   }
@@ -121,13 +121,13 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   }
   if (error === 'submission_closed') {
     return {
-      message: 'Availability changes are closed for this cycle.',
+      message: 'Availability changes are closed for this Schedule Block.',
       variant: 'error',
     }
   }
   if (success === 'entry_submitted') {
     return {
-      message: 'Availability submitted for this cycle.',
+      message: 'Availability submitted for this Schedule Block.',
       variant: 'success',
     }
   }
@@ -337,7 +337,7 @@ export default async function TherapistAvailabilityPage({
       requestedBy: requester?.full_name ?? 'Unknown user',
       cycleLabel: cycle
         ? `${cycle.label} (${cycle.start_date} to ${cycle.end_date})`
-        : 'Unknown cycle',
+        : 'Unknown Schedule Block',
       entryType: entry.override_type,
       shiftType: entry.shift_type,
       canDelete: true,
@@ -386,7 +386,7 @@ export default async function TherapistAvailabilityPage({
         returnToPath="/therapist/availability"
         titleOverride="Submitted Availability"
         descriptionOverride="Once you submit, your availability will appear here."
-        emptyMessageOverride="No day-level entries yet for this cycle."
+        emptyMessageOverride="No day-level entries yet for this Schedule Block."
       />
     </div>
   )

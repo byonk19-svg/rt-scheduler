@@ -30,7 +30,7 @@ describe('StaffAttentionCard', () => {
           },
           cycleLabel: 'May 2026',
           cycleRangeLabel: 'May 10 - Jun 20',
-          cycleReason: 'This is the next 6-week cycle still waiting on your response.',
+          cycleReason: 'This is the next Schedule Block still waiting on your response.',
           primaryAction: {
             href: '/therapist/availability?cycle=cycle-1',
             label: 'Finish and send availability',

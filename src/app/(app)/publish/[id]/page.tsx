@@ -367,9 +367,12 @@ export default async function PublishEventDetailPage({
         <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
           {/* Left column */}
           <div className="divide-y divide-border px-5">
-            <StatRow label="Cycle" value={cycle?.label ?? event.cycle_id} />
+            <StatRow label="Schedule Block" value={cycle?.label ?? event.cycle_id} />
             {cycle && (
-              <StatRow label="Cycle range" value={`${cycle.start_date} -> ${cycle.end_date}`} />
+              <StatRow
+                label="Schedule Block range"
+                value={`${cycle.start_date} -> ${cycle.end_date}`}
+              />
             )}
             <StatRow label="Published by" value={getOne(event.profiles)?.full_name ?? 'Manager'} />
             <StatRow label="Channel" value={event.channel} />

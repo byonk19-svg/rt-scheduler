@@ -322,22 +322,22 @@ export default async function ManagerDashboardPage() {
       ? 'Published'
       : activeCycleHasNoShifts
         ? 'Draft not started'
-        : 'Draft cycle'
-    : 'No active cycle'
+        : 'Draft Schedule Block'
+    : 'No active Schedule Block'
 
   const currentCycleDetail = activeCycle
     ? activeCycleHasNoShifts
       ? 'No staffing drafted yet. Auto-draft or add the first shifts.'
       : `Publish by ${formatCycleDate(activeCycle.end_date)}`
-    : 'No current cycle is scheduled.'
+    : 'No current Schedule Block is active.'
 
   const nextCycleLabel = nextCyclePlanning.collectAvailabilityOn
     ? `Collect availability ${formatCycleDate(nextCyclePlanning.collectAvailabilityOn)}`
-    : 'No next cycle'
+    : 'No next Schedule Block'
 
   const nextCycleDetail = nextCyclePlanning.publishBy
     ? `Publish by ${formatCycleDate(nextCyclePlanning.publishBy)}`
-    : 'Create the next 6-week cycle to plan ahead.'
+    : 'Create the next Schedule Block to plan ahead.'
 
   const needsReviewCount = unreadReviewCountResult.count ?? 0
   const needsReviewDetail =

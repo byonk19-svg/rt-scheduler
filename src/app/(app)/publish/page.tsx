@@ -258,7 +258,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             color: 'var(--success-text)',
           }}
         >
-          Cycle archived. It will no longer appear in Schedule or availability views.
+          Schedule Block archived. It will no longer appear in Schedule or availability views.
         </div>
       )}
 
@@ -313,7 +313,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                   : resolvedSearchParams.error === 'take_offline_state_changed'
                     ? 'That Schedule Block changed before it could be taken offline. Refresh and try again.'
                     : resolvedSearchParams.error === 'cycle_restart_failed'
-                      ? 'Could not restart that published cycle. Please try again.'
+                      ? 'Could not restart that published Schedule Block. Please try again.'
                       : resolvedSearchParams.error === 'unpublish_keep_shifts_failed'
                         ? 'Could not unpublish that block while keeping shifts. Please try again.'
                         : resolvedSearchParams.error === 'unpublish_not_live'
@@ -327,7 +327,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 : resolvedSearchParams.error === 'archive_live_cycle'
                                   ? 'Live blocks must be taken offline before they can be archived.'
                                   : resolvedSearchParams.error === 'cycle_archive_failed'
-                                    ? 'Could not archive that cycle. Please try again.'
+                                    ? 'Could not archive that Schedule Block. Please try again.'
                                     : resolvedSearchParams.error === 'delete_cycle_unauthorized'
                                       ? 'You do not have permission to delete that schedule block.'
                                       : resolvedSearchParams.error === 'delete_cycle_not_found'
@@ -349,8 +349,9 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         <div className="rounded-[10px] border border-[var(--info-border)] bg-[var(--info-subtle)] px-4 py-3 text-sm text-[var(--info-text)]">
           <p className="font-semibold">Ready to publish a draft?</p>
           <p className="mt-0.5">
-            Open the cycle in Schedule using the link below, then click <strong>Publish</strong> in
-            the action bar. This page only shows delivery history after publishing.
+            Open the Schedule Block in Schedule using the link below, then click{' '}
+            <strong>Publish</strong> in the action bar. This page only shows delivery history after
+            publishing.
           </p>
         </div>
       )}
@@ -510,7 +511,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                 <thead>
                   <tr className="border-b border-border bg-muted text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                     <th className="px-4 py-3">Published at</th>
-                    <th className="px-4 py-3">Cycle</th>
+                    <th className="px-4 py-3">Schedule Block</th>
                     <th className="px-4 py-3">Published by</th>
                     <th className="px-4 py-3 text-right">Recipients</th>
                     <th className="px-4 py-3 text-right">Queued</th>
@@ -591,7 +592,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                   className="inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
                                 >
                                   <Archive className="h-3.5 w-3.5" />
-                                  Archive cycle
+                                  Archive block
                                 </button>
                               </form>
                               <form action={deletePublishEventAction}>
@@ -610,7 +611,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                             href={`/schedule?cycle=${event.cycle_id}`}
                             className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                           >
-                            Open cycle
+                            Open block
                           </Link>
                           <Link
                             href={`/publish/${event.id}`}

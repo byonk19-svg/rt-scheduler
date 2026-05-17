@@ -337,7 +337,7 @@ function renderItemCard(params: {
           /
         </span>
         <span>
-          Cycle:{' '}
+          Schedule Block:{' '}
           <span className="font-medium text-foreground">
             {item.matchedCycleLabel ?? 'Needs review'}
           </span>

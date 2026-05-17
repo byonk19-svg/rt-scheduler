@@ -62,13 +62,13 @@ export function AvailabilityCalendarPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-            Six-week cycle
+            Schedule Block
           </p>
           <h3 className="mt-1 text-base font-semibold text-foreground">
             {formatHumanCycleRange(cycleStart, cycleEnd)}
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sunday-start cycle view with saved planner dates, therapist requests, and draft
+            Sunday-start Schedule Block view with saved planner dates, therapist requests, and draft
             selections in one grid.
           </p>
         </div>

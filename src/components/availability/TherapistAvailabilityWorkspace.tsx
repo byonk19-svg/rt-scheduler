@@ -285,7 +285,7 @@ export function TherapistAvailabilityWorkspace({
     if (nextCycleId === selectedCycleId) return
     if (
       hasUnsavedChanges &&
-      !window.confirm('You have unsaved changes. Switch cycles and lose them?')
+      !window.confirm('You have unsaved changes. Switch Schedule Blocks and lose them?')
     ) {
       return
     }
@@ -440,8 +440,8 @@ export function TherapistAvailabilityWorkspace({
   }
 
   const cyclePageSubtitle = useMemo(() => {
-    if (!selectedCycle) return 'Select a cycle to enter availability.'
-    const range = `Cycle: ${formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}`
+    if (!selectedCycle) return 'Select a Schedule Block to enter availability.'
+    const range = `Schedule Block: ${formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}`
     if (selectedCycle.published) {
       return `${range} · Published ${formatDateLabel(selectedCycle.start_date)}`
     }
@@ -471,10 +471,10 @@ export function TherapistAvailabilityWorkspace({
     : (deadlinePresentation?.deadlineHeadline ?? 'Availability open')
   const submissionStatusDetail = submissionUi.isSubmitted
     ? hasCycleSpecificChanges
-      ? 'Submitted with cycle-specific changes.'
+      ? 'Submitted with Schedule Block changes.'
       : hasSavedRecurringPattern
-        ? 'Submitted with no cycle-only changes. Your normal schedule is your current response.'
-        : 'Submitted with no day-level changes. This cycle is currently blank unless you add dates.'
+        ? 'Submitted with no Schedule Block-only changes. Your normal schedule is your current response.'
+        : 'Submitted with no day-level changes. This Schedule Block is currently blank unless you add dates.'
     : dueDateLabel
       ? `Due ${dueDateLabel}`
       : (deadlinePresentation?.deadlineHeadline ?? 'Save progress until you are ready to submit.')
@@ -482,9 +482,9 @@ export function TherapistAvailabilityWorkspace({
     availabilityLockedReason === 'schedule_building_started'
       ? 'Schedule building has started. Ask a manager to reopen availability if you need to make a late change.'
       : availabilityLockedReason === 'manager_closed'
-        ? 'Availability is locked for this cycle. Ask a manager to reopen it if you need to make a late change.'
+        ? 'Availability is locked for this Schedule Block. Ask a manager to reopen it if you need to make a late change.'
         : availabilityLocked
-          ? 'Availability changes are locked for this cycle.'
+          ? 'Availability changes are locked for this Schedule Block.'
           : null
   const selectedDayOptionClass = (active: boolean, tone: 'can' | 'cant' | 'neutral') =>
     cn(
@@ -502,7 +502,7 @@ export function TherapistAvailabilityWorkspace({
           <h1 className="app-page-title">Future Availability</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             No upcoming Schedule Block is open for availability yet. Check back after your manager
-            opens the next block.
+            opens the next Schedule Block.
           </p>
         </header>
       </section>
@@ -565,19 +565,19 @@ export function TherapistAvailabilityWorkspace({
               </div>
               <div className="space-y-1">
                 <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  Starting point for this cycle
+                  Starting point for this Schedule Block
                 </p>
                 <p className="text-lg font-semibold text-foreground">{recurringPatternSummary}</p>
                 <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
                   {hasSavedRecurringPattern
-                    ? 'We used your normal schedule to fill this cycle. Changes here stay in this cycle only.'
-                    : 'This cycle starts blank. Add days you need to work or need off. Changes here stay in this cycle only.'}
+                    ? 'We used your normal schedule to fill this Schedule Block. Changes here stay in this Schedule Block only.'
+                    : 'This Schedule Block starts blank. Add days you Need to Work or Need Off. Changes here stay in this Schedule Block only.'}
                 </p>
                 {submissionUi.isSubmitted && !hasCycleSpecificChanges ? (
                   <p className="text-sm font-medium text-foreground">
                     {hasSavedRecurringPattern
-                      ? 'You already submitted this cycle without adding overrides.'
-                      : 'You already submitted this cycle with a blank response.'}
+                      ? 'You already submitted this Schedule Block without adding exceptions.'
+                      : 'You already submitted this Schedule Block with a blank response.'}
                   </p>
                 ) : null}
               </div>
@@ -623,7 +623,7 @@ export function TherapistAvailabilityWorkspace({
                 htmlFor="therapist_cycle_id"
                 className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
               >
-                Cycle
+                Schedule Block
               </Label>
               <select
                 id="therapist_cycle_id"
@@ -732,7 +732,7 @@ export function TherapistAvailabilityWorkspace({
                   onClick={copyPreviousCycleOverrides}
                   className="min-h-9 rounded-xl px-3"
                 >
-                  Use last cycle
+                  Use last block
                 </Button>
                 <Button
                   type="button"
@@ -741,7 +741,7 @@ export function TherapistAvailabilityWorkspace({
                   onClick={clearOverrides}
                   className="min-h-9 rounded-xl px-3"
                 >
-                  Clear cycle changes
+                  Clear block changes
                 </Button>
               </div>
             </div>
@@ -862,7 +862,7 @@ export function TherapistAvailabilityWorkspace({
                   Save progress keeps this as a draft.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Submit availability sends this cycle to managers.
+                  Submit availability sends this Schedule Block to managers.
                 </p>
               </div>
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
@@ -961,8 +961,8 @@ export function TherapistAvailabilityWorkspace({
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 {hasSavedRecurringPattern
-                  ? 'These counts come from your normal schedule before cycle-only changes.'
-                  : 'These counts show how many days still start blank before you add cycle-only changes.'}
+                  ? 'These counts come from your normal schedule before Schedule Block-only changes.'
+                  : 'These counts show how many days still start blank before you add Schedule Block-only changes.'}
               </p>
               <div className="mt-3 space-y-2">
                 <div className="flex items-center justify-between text-sm">
@@ -996,7 +996,9 @@ export function TherapistAvailabilityWorkspace({
 
               <div className="my-3 h-px bg-border/70" />
 
-              <h3 className="text-[0.95rem] font-semibold text-foreground">This cycle changes</h3>
+              <h3 className="text-[0.95rem] font-semibold text-foreground">
+                This Schedule Block changes
+              </h3>
               <div className="mt-3 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="inline-flex items-center gap-3 text-muted-foreground">
@@ -1113,7 +1115,7 @@ export function TherapistAvailabilityWorkspace({
                         {selectedNote.length} / 200
                       </span>
                     </div>
-                    {/* Persisted notes only exist for days you change for this cycle. */}
+                    {/* Persisted notes only exist for days you change for this Schedule Block. */}
                     <textarea
                       id={`therapist-day-note-${selectedDate}`}
                       ref={noteTextareaRef}
@@ -1126,7 +1128,7 @@ export function TherapistAvailabilityWorkspace({
                     />
                     {!selectedOverride ? (
                       <p className="text-xs text-muted-foreground">
-                        Notes are only saved for days you change for this cycle.
+                        Notes are only saved for days you change for this Schedule Block.
                       </p>
                     ) : null}
                   </div>

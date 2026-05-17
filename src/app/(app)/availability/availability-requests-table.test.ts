@@ -73,6 +73,8 @@ describe('AvailabilityEntriesTable', () => {
     expect(html).toContain('Request inbox')
     expect(html).toContain('Selected therapist')
     expect(html).toContain('All staff')
+    expect(html).toContain('current Schedule Block')
+    expect(html).not.toContain('current planning cycle')
   })
 
   it('uses a compact empty state instead of a full table shell when no rows match', () => {
@@ -108,6 +110,7 @@ describe('AvailabilityEntriesTable', () => {
     expect(html).not.toContain('Details</span>')
     expect(html).toMatch(/>2<\/span>\s*entries/)
     expect(html).toContain('>Action</th>')
+    expect(html).toContain('Your saved requests for upcoming Schedule Blocks.')
     expect(html).toContain('1 Need Off')
     expect(html).toContain('1 Need to Work')
     expect(html).not.toContain('Request to Work')
@@ -151,6 +154,10 @@ describe('AvailabilityEntriesTable', () => {
       'utf8'
     )
     expect(src).toContain('Entry saved')
+    expect(src).toContain('Schedule Block')
+    expect(src).not.toContain('No day-level entries yet for this cycle.')
+    expect(src).not.toContain('Search by note, cycle, or request type')
+    expect(src).not.toContain('upcoming cycles')
     expect(src).toContain('formatDateTime(row.updatedAt ?? row.createdAt)')
     expect(src).not.toMatch(
       />[\s\n]*Submitted[\s\n]*<\/p>[\s\n]*<p className="text-sm text-foreground">[\s\n]*\{formatDateTime\(row\.createdAt\)\}/

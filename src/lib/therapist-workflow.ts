@@ -177,11 +177,11 @@ export function resolveTherapistWorkflow(params: {
         stateLabel: 'Review preliminary schedule',
         primaryTitle: 'Review preliminary schedule',
         primaryDescription:
-          'The manager has posted a preliminary schedule for this cycle. Review your assignments there now.',
+          'The manager has posted a preliminary schedule for this Schedule Block. Review your assignments there now.',
         actionCycle,
         cycleLabel: actionCycle.label,
         cycleRangeLabel,
-        cycleReason: 'This is the current cycle with a live preliminary schedule.',
+        cycleReason: 'This is the current Schedule Block with a live preliminary schedule.',
         primaryAction: {
           href: '/preliminary',
           label: 'Review preliminary schedule',
@@ -209,14 +209,14 @@ export function resolveTherapistWorkflow(params: {
     if (!writePermission.allowed && !submission && writePermission.reason === 'cycle_ended') {
       return {
         state: 'cycle_closed',
-        stateLabel: 'Cycle closed',
+        stateLabel: 'Schedule Block closed',
         primaryTitle: 'Schedule closed',
         primaryDescription:
-          'Availability entry is closed for the active cycle. Review history or wait for the next published schedule.',
+          'Availability entry is closed for the active Schedule Block. Review history or wait for the next published schedule.',
         actionCycle,
         cycleLabel: actionCycle.label,
         cycleRangeLabel,
-        cycleReason: 'This cycle no longer accepts therapist availability changes.',
+        cycleReason: 'This Schedule Block no longer accepts therapist availability changes.',
         primaryAction: {
           href: '/staff/history',
           label: 'View history',
@@ -241,7 +241,7 @@ export function resolveTherapistWorkflow(params: {
         actionCycle,
         cycleLabel: actionCycle.label,
         cycleRangeLabel,
-        cycleReason: 'This is the next 6-week cycle waiting on manager scheduling work.',
+        cycleReason: 'This is the next Schedule Block waiting on manager scheduling work.',
         primaryAction: {
           href: cycleLink,
           label: 'Review submitted availability',
@@ -269,7 +269,7 @@ export function resolveTherapistWorkflow(params: {
         actionCycle,
         cycleLabel: actionCycle.label,
         cycleRangeLabel,
-        cycleReason: 'This is the next 6-week cycle still waiting on your response.',
+        cycleReason: 'This is the next Schedule Block still waiting on your response.',
         primaryAction: {
           href: cycleLink,
           label: availabilityPastDue ? 'Review draft availability' : 'Finish and send availability',
@@ -289,12 +289,12 @@ export function resolveTherapistWorkflow(params: {
       stateLabel: 'Not started',
       primaryTitle: availabilityPastDue ? 'Availability is past due' : 'Tell us when you can work',
       primaryDescription: availabilityPastDue
-        ? 'The due date passed before you sent this availability. Review the cycle and contact your manager if you still need changes.'
+        ? 'The due date passed before you sent this availability. Review the Schedule Block and contact your manager if you still need changes.'
         : 'The next schedule is open. Add your availability so the manager can build it.',
       actionCycle,
       cycleLabel: actionCycle.label,
       cycleRangeLabel,
-      cycleReason: 'This is the next 6-week cycle that still needs your response.',
+      cycleReason: 'This is the next Schedule Block that still needs your response.',
       primaryAction: {
         href: cycleLink,
         label: availabilityPastDue ? 'Review availability' : 'Start availability',
@@ -348,18 +348,18 @@ export function resolveTherapistWorkflow(params: {
 
   return {
     state: 'cycle_closed',
-    stateLabel: 'Cycle closed',
+    stateLabel: 'Schedule Block closed',
     primaryTitle: 'Schedule closed',
     primaryDescription:
-      'There is no open therapist workflow right now. Use history for past activity and wait for the next cycle to open.',
+      'There is no open therapist workflow right now. Use history for past activity and wait for the next Schedule Block to open.',
     actionCycle: latestClosedCycle ?? null,
     cycleLabel: latestClosedCycle?.label ?? null,
     cycleRangeLabel: latestClosedCycle
       ? formatHumanCycleRange(latestClosedCycle.start_date, latestClosedCycle.end_date)
       : null,
     cycleReason: latestClosedCycle
-      ? 'The latest therapist cycle has ended.'
-      : 'There is no active therapist cycle yet.',
+      ? 'The latest therapist Schedule Block has ended.'
+      : 'There is no active therapist Schedule Block yet.',
     primaryAction: {
       href: '/staff/history',
       label: 'View history',
