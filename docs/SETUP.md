@@ -171,7 +171,7 @@ For a richer browser/UAT dataset, run:
 npm run seed:functional
 ```
 
-`seed:functional` recreates the Teamwise UAT cycles plus demo accounts and seeded swap-request scenarios, so `/requests/new` and `/shift-board` have realistic swap states immediately after login.
+`seed:functional` recreates the Teamwise UAT real-roster demo accounts, one populated published Schedule Block, one empty draft Schedule Block for Auto-draft testing, and seeded swap/pickup-request scenarios. Selected login accounts use `Teamwise123!`, including `julie.d@teamwise.test` for manager checks and `layne@teamwise.test` for staff request-workflow checks.
 
 ## Seed Fake Employees
 

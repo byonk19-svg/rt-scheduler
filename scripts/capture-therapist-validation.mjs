@@ -23,7 +23,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 const baseURL = (process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '')
-const therapistEmail = process.env.SHOT_STAFF_EMAIL ?? 'demo-therapist01@teamwise.test'
+const therapistEmail = process.env.SHOT_STAFF_EMAIL ?? 'layne@teamwise.test'
 const therapistPassword = process.env.SHOT_PASSWORD ?? 'Teamwise123!'
 
 const ROUTES = [

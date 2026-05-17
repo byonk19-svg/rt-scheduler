@@ -167,6 +167,12 @@ _Avoid_: removing inactive therapists from old schedules or history
 _Avoid_: showing inactive therapists in new assignment pickers by default
 _Avoid_: including inactive therapists in auto-draft candidates
 
+**FMLA Therapist**:
+An active therapist profile temporarily excluded from new scheduling because they are on FMLA. The therapist remains visible in the team directory and may keep login access, but Auto-draft and new assignment pickers must not include them as assignment candidates while FMLA is active.
+_Avoid_: marking FMLA therapists inactive just to keep them out of Auto-draft
+_Avoid_: letting manager-entered availability or Need to Work override the FMLA exclusion
+_Avoid_: hiding FMLA therapists from the roster when managers still need employee context
+
 **Designated Lead**:
 The one assigned lead-capable therapist responsible as lead for a specific Schedule Block date and shift, even when multiple lead-capable therapists are scheduled in that same slot. The Designated Lead must be one of the therapists assigned to that same date/shift. It is represented by the scheduled assignment row, such as `role = 'lead'`, not by a separate `lead_user_id` pointer.
 Designated Lead uniqueness is per Schedule Block, date, and shift. Each date/shift can have at most one Designated Lead in every lifecycle state. Final Publish requires exactly one Designated Lead for every date and shift; Draft and Preliminary schedules may have zero while managers build or review the schedule.
@@ -631,6 +637,7 @@ _Avoid_: embedded form, generic request page, mini composer
 - A date/shift may have many therapist assignment rows for team staffing, while **Daily Assignment Uniqueness** prevents the same therapist from appearing twice that day
 - **Inactive Therapist** profiles remain visible in historical schedules and history, but are excluded from new/future assignment pickers by default
 - Auto-draft must exclude **Inactive Therapist** profiles from new/future assignment candidates
+- **FMLA Therapist** profiles remain active and visible in the team directory, but Auto-draft and new assignment pickers exclude them while FMLA is active
 - Therapist availability entry should show the regular shift once at the top; manager availability views should show shift on each therapist row or card because managers scan mixed staff
 - **PTO Reason** may explain a **Need Off** exception, but PTO does not create a separate scheduling state
 - **Need Off** and **Need to Work** both override the **Availability Baseline** for the selected Schedule Block

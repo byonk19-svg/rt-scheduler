@@ -12,21 +12,24 @@
  * Env (optional):
  *   SEED_DOMAIN=teamwise.test
  *   SEED_PASSWORD=Teamwise123!
- *   SEED_THERAPIST_COUNT=12   (extra therapists beyond 2 fixed leads; default 12)
  */
+import { randomBytes } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 
+import {
+  FUNCTIONAL_DEMO_ACCOUNTS,
+  FUNCTIONAL_DEMO_DOMAIN,
+  FUNCTIONAL_DEMO_PASSWORD,
+  FUNCTIONAL_DEMO_ROSTER,
+  getFunctionalDemoLoginExamples,
+  getFunctionalDemoRequestAnchor,
+  toSeedEmail,
+} from './fixtures/functional-demo-roster.mjs'
+
 const DEMO_LABEL_PREFIX = 'Teamwise UAT'
 const DEMO_SITE_ID = 'teamwise-uat'
-export const FUNCTIONAL_DEMO_DOMAIN = 'teamwise.test'
-export const FUNCTIONAL_DEMO_PASSWORD = 'Teamwise123!'
-export const FUNCTIONAL_DEMO_ACCOUNTS = [
-  `demo-manager@${FUNCTIONAL_DEMO_DOMAIN}`,
-  `demo-lead-day@${FUNCTIONAL_DEMO_DOMAIN}`,
-  `demo-lead-night@${FUNCTIONAL_DEMO_DOMAIN}`,
-  `demo-therapist01@${FUNCTIONAL_DEMO_DOMAIN}`,
-]
+export { FUNCTIONAL_DEMO_ACCOUNTS, FUNCTIONAL_DEMO_DOMAIN, FUNCTIONAL_DEMO_PASSWORD }
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -66,36 +69,6 @@ const defaultDomain = String(process.env.SEED_DOMAIN ?? FUNCTIONAL_DEMO_DOMAIN)
   .trim()
   .toLowerCase()
 const defaultPassword = String(process.env.SEED_PASSWORD ?? FUNCTIONAL_DEMO_PASSWORD).trim()
-const extraTherapistCount = Math.max(
-  4,
-  Math.min(24, Number.parseInt(String(process.env.SEED_THERAPIST_COUNT ?? '12'), 10) || 12)
-)
-
-const ROSTER = [
-  'Aleyce L.',
-  'Irene Y.',
-  'Julie D.',
-  'Jannie B.',
-  'Barbara C.',
-  'Nicole G.',
-  'Ruth G.',
-  'Roy H.',
-  'Denise H.',
-  'Mark J.',
-  'Gayle K.',
-  'Kristine M.',
-  'Lisa M.',
-  'Keturah S.',
-  'Lynn S.',
-  'Adrienne S.',
-  'Kim S.',
-  'Rosa V.',
-  'Audbriana W.',
-  'Matthew W.',
-  'Sarah W.',
-  'Layne W.',
-  'Brianna Y.',
-]
 
 function formatDate(date) {
   const y = date.getFullYear()
@@ -132,6 +105,14 @@ function normalizeRosterName(name) {
     .trim()
     .replace(/\s+/g, ' ')
     .toLowerCase()
+}
+
+function generateUndisclosedPassword() {
+  return `SeedNoLogin!${randomBytes(12).toString('base64url')}`
+}
+
+function maxWorkDaysFor(member) {
+  return member.employmentType === 'prn' ? 1 : 3
 }
 
 async function listAllAuthUsers() {
@@ -252,7 +233,13 @@ async function insertShiftsBatched(rows) {
 }
 
 async function seedShiftsForCycle(cycleId, cycleStartIso, cycleEndIso, rosterRows) {
-  const therapistsAndLeads = rosterRows.filter((p) => p.role === 'therapist' || p.role === 'lead')
+  const therapistsAndLeads = rosterRows.filter(
+    (p) =>
+      (p.role === 'therapist' || p.role === 'lead') &&
+      p.is_active !== false &&
+      p.on_fmla !== true &&
+      p.employment_type !== 'prn'
+  )
   const dayPool = therapistsAndLeads.filter((p) => p.shift_type === 'day')
   const nightPool = therapistsAndLeads.filter((p) => p.shift_type === 'night')
 
@@ -301,8 +288,8 @@ async function seedShiftsForCycle(cycleId, cycleStartIso, cycleEndIso, rosterRow
   return rows.length
 }
 
-async function seedSwapRequestScenarios({ publishedCycleId, domain }) {
-  const demoStaffEmail = `demo-therapist01@${domain}`
+async function seedSwapRequestScenarios({ publishedCycleId, requestAnchorEmail }) {
+  const demoStaffEmail = requestAnchorEmail
   const { data: demoStaff, error: demoStaffError } = await supabase
     .from('profiles')
     .select('id')
@@ -486,10 +473,10 @@ async function seedEmployeeRoster(managerId, rosterRows) {
       normalized_full_name: normalizeRosterName(row.full_name),
       role: row.role,
       shift_type: row.shift_type,
-      employment_type: 'full_time',
-      max_work_days_per_week: 5,
+      employment_type: row.employment_type,
+      max_work_days_per_week: row.max_work_days_per_week,
       is_lead_eligible: row.is_lead_eligible,
-      is_active: true,
+      is_active: row.is_active,
       matched_profile_id: row.id,
       matched_email: row.email,
       matched_at: new Date().toISOString(),
@@ -592,88 +579,6 @@ async function seedPickupInterestScenarios({ publishedCycleId }) {
   return { postId: post.id, interestCount: claimantRows.length }
 }
 
-async function seedPreliminarySnapshot({ draftCycleId, managerId }) {
-  const { data: existingSnapshots, error: existingError } = await supabase
-    .from('preliminary_snapshots')
-    .select('id')
-    .eq('cycle_id', draftCycleId)
-  if (existingError) throw existingError
-
-  if ((existingSnapshots ?? []).length > 0) {
-    const { error: deleteError } = await supabase
-      .from('preliminary_snapshots')
-      .delete()
-      .eq('cycle_id', draftCycleId)
-    if (deleteError) throw deleteError
-  }
-
-  const { data: snapshot, error: snapshotError } = await supabase
-    .from('preliminary_snapshots')
-    .insert({
-      cycle_id: draftCycleId,
-      created_by: managerId,
-      status: 'active',
-    })
-    .select('id')
-    .single()
-  if (snapshotError) throw snapshotError
-
-  const { data: shifts, error: shiftsError } = await supabase
-    .from('shifts')
-    .select('id, user_id')
-    .eq('cycle_id', draftCycleId)
-    .order('date', { ascending: true })
-    .order('shift_type', { ascending: true })
-    .limit(6)
-  if (shiftsError) throw shiftsError
-
-  const rows = (shifts ?? []).map((shift, index) => ({
-    snapshot_id: snapshot.id,
-    shift_id: shift.id,
-    state: index === 0 ? 'open' : 'tentative_assignment',
-    reserved_by: null,
-    active_request_id: null,
-  }))
-
-  if (rows.length > 0) {
-    const { error: stateError } = await supabase.from('preliminary_shift_states').insert(rows)
-    if (stateError) throw stateError
-  }
-
-  const openShift = (shifts ?? [])[0]
-  const requester = (shifts ?? []).find(
-    (shift) => shift.user_id && shift.user_id !== openShift?.user_id
-  )
-  if (openShift?.id && requester?.user_id) {
-    const { data: request, error: requestError } = await supabase
-      .from('preliminary_requests')
-      .insert({
-        snapshot_id: snapshot.id,
-        shift_id: openShift.id,
-        requester_id: requester.user_id,
-        type: 'claim_open_shift',
-        status: 'pending',
-        note: 'Seeded preliminary open-slot claim',
-      })
-      .select('id')
-      .single()
-    if (requestError) throw requestError
-
-    const { error: updateError } = await supabase
-      .from('preliminary_shift_states')
-      .update({
-        state: 'pending_claim',
-        reserved_by: requester.user_id,
-        active_request_id: request.id,
-      })
-      .eq('snapshot_id', snapshot.id)
-      .eq('shift_id', openShift.id)
-    if (updateError) throw updateError
-  }
-
-  return { snapshotId: snapshot.id, stateCount: rows.length }
-}
-
 export async function seedFunctionalDemo(options = {}) {
   const domain = String(options.domain ?? defaultDomain)
     .trim()
@@ -687,103 +592,67 @@ export async function seedFunctionalDemo(options = {}) {
   const authUsers = await listAllAuthUsers()
   const userByEmail = new Map(authUsers.map((u) => [String(u.email ?? '').toLowerCase(), u]))
 
-  const managerEmail = `demo-manager@${domain}`
-  const managerId = await ensureAuthUser(userByEmail, managerEmail, password, {
-    full_name: 'Demo Manager',
-    role: 'manager',
-    shift_type: 'day',
-  })
-  await upsertProfile({
-    id: managerId,
-    full_name: 'Demo Manager',
-    email: managerEmail,
-    role: 'manager',
-    shift_type: 'day',
-    site_id: DEMO_SITE_ID,
-    employment_type: 'full_time',
-    max_work_days_per_week: 5,
-    is_active: true,
-    is_lead_eligible: false,
-    on_fmla: false,
-  })
+  const seededRoster = []
+  const undisclosedPassword = generateUndisclosedPassword()
 
-  const leadSpecs = [
-    { email: `demo-lead-day@${domain}`, name: 'Demo Lead (Day)', shift: 'day' },
-    { email: `demo-lead-night@${domain}`, name: 'Demo Lead (Night)', shift: 'night' },
-  ]
-
-  const leadIds = []
-  for (const spec of leadSpecs) {
-    const id = await ensureAuthUser(userByEmail, spec.email, password, {
-      full_name: spec.name,
-      role: 'lead',
-      shift_type: spec.shift,
+  for (const member of FUNCTIONAL_DEMO_ROSTER) {
+    const email = toSeedEmail(member, domain)
+    const accountPassword = member.login ? password : undisclosedPassword
+    const isLeadEligible = member.role === 'lead'
+    const id = await ensureAuthUser(userByEmail, email, accountPassword, {
+      full_name: member.fullName,
+      role: member.role,
+      shift_type: member.shiftType,
     })
-    leadIds.push(id)
-    await upsertProfile({
+
+    const profileRow = {
       id,
-      full_name: spec.name,
-      email: spec.email,
-      role: 'lead',
-      shift_type: spec.shift,
+      full_name: member.fullName,
+      email,
+      role: member.role,
+      shift_type: member.shiftType,
       site_id: DEMO_SITE_ID,
-      employment_type: 'full_time',
-      max_work_days_per_week: 5,
+      employment_type: member.employmentType,
+      max_work_days_per_week: maxWorkDaysFor(member),
       is_active: true,
-      is_lead_eligible: true,
-      on_fmla: false,
-    })
-    await ensureWorkPattern(id, [1, 2, 3, 4, 5])
-    spec.id = id
+      is_lead_eligible: isLeadEligible,
+      on_fmla: member.onFmla === true,
+      fmla_return_date: null,
+      access_status: 'approved',
+      staff_onboarding_required: false,
+      staff_onboarding_completed_at: null,
+    }
+    await upsertProfile(profileRow)
+
+    if (member.role === 'therapist' || member.role === 'lead') {
+      if (member.employmentType === 'prn') {
+        await ensureWorkPattern(id, [])
+      } else {
+        await ensureWorkPattern(id, [1, 2, 3, 4, 5])
+      }
+      seededRoster.push({
+        ...profileRow,
+        requestWorkflowAnchor: member.requestWorkflowAnchor === true,
+      })
+    }
   }
 
-  const therapistRows = []
-  for (let i = 0; i < extraTherapistCount; i += 1) {
-    const n = i + 1
-    const email = `demo-therapist${String(n).padStart(2, '0')}@${domain}`
-    const fullName = ROSTER[i] ?? `Demo Therapist ${n}`
-    const shiftType = n % 2 === 0 ? 'night' : 'day'
-    const id = await ensureAuthUser(userByEmail, email, password, {
-      full_name: fullName,
-      role: 'therapist',
-      shift_type: shiftType,
-    })
-    const alsoLeadEligible = n <= 2
-    await upsertProfile({
-      id,
-      full_name: fullName,
-      email,
-      role: 'therapist',
-      shift_type: shiftType,
-      site_id: DEMO_SITE_ID,
-      employment_type: 'full_time',
-      max_work_days_per_week: 5,
-      is_active: true,
-      is_lead_eligible: alsoLeadEligible,
-      on_fmla: false,
-    })
-    await ensureWorkPattern(id, [1, 2, 3, 4, 5])
-    therapistRows.push({
-      id,
-      full_name: fullName,
-      email,
-      role: 'therapist',
-      shift_type: shiftType,
-      is_lead_eligible: alsoLeadEligible,
-    })
+  const managerEmail = toSeedEmail(
+    FUNCTIONAL_DEMO_ROSTER.find((row) => row.role === 'manager'),
+    domain
+  )
+  const managerId = userByEmail.get(managerEmail)?.id
+  const requestAnchor = getFunctionalDemoRequestAnchor(domain)
+  const requestAnchorEmail = requestAnchor?.email
+
+  if (!managerId) {
+    throw new Error('Functional demo manager was not seeded.')
+  }
+  if (!requestAnchorEmail) {
+    throw new Error('Functional demo request workflow anchor was not configured.')
   }
 
-  const rosterForShifts = [
-    ...leadSpecs.map((s) => ({
-      id: s.id,
-      full_name: s.name,
-      email: s.email,
-      role: 'lead',
-      shift_type: s.shift,
-      is_lead_eligible: true,
-    })),
-    ...therapistRows,
-  ]
+  const rosterForShifts = seededRoster
 
   const today = new Date()
   const publishedStart = sundayOfWeekContaining(addDays(today, -3))
@@ -833,22 +702,19 @@ export async function seedFunctionalDemo(options = {}) {
     publishedEndIso,
     rosterForShifts
   )
-  const draftCount = await seedShiftsForCycle(
-    draftCycleId,
-    draftStartIso,
-    draftEndIso,
-    rosterForShifts
-  )
-  const seededSwapScenarios = await seedSwapRequestScenarios({ publishedCycleId, domain })
+  const draftCount = 0
+  const seededSwapScenarios = await seedSwapRequestScenarios({
+    publishedCycleId,
+    requestAnchorEmail,
+  })
   const rosterCount = await seedEmployeeRoster(managerId, rosterForShifts)
   const templateName = await seedCycleTemplates(managerId)
   const seededPickupScenario = await seedPickupInterestScenarios({ publishedCycleId })
-  const seededPreliminarySnapshot = await seedPreliminarySnapshot({ draftCycleId, managerId })
 
   console.log('')
   console.log('Functional demo seed complete.')
   console.log(`  Published cycle: ${publishedLabel} (${publishedCycleId}) — ${pubCount} shift rows`)
-  console.log(`  Draft cycle:     ${draftLabel} (${draftCycleId}) — ${draftCount} shift rows`)
+  console.log(`  Draft cycle:     ${draftLabel} (${draftCycleId}) - empty for Auto-draft testing`)
   console.log('')
   if (seededSwapScenarios.length > 0) {
     console.log('Seeded swap requests:')
@@ -864,19 +730,18 @@ export async function seedFunctionalDemo(options = {}) {
       `Seeded pickup interest queue: ${seededPickupScenario.postId} (${seededPickupScenario.interestCount} claimant rows)`
     )
   }
-  console.log(
-    `Seeded preliminary snapshot: ${seededPreliminarySnapshot.snapshotId} (${seededPreliminarySnapshot.stateCount} shift states)`
-  )
   console.log('')
-  console.log('Sign in (examples):')
-  console.log(`  Manager:  ${managerEmail} / ${password}`)
-  console.log(`  Lead:     ${leadSpecs[0].email} / ${password}`)
-  console.log(`  Staff:    demo-therapist01@${domain} / ${password}`)
+  console.log('Sign in (selected demo accounts):')
+  for (const example of getFunctionalDemoLoginExamples(domain)) {
+    console.log(`  ${example.label}: ${example.email} / ${password} (${example.name})`)
+  }
 
   return {
     managerEmail,
-    leadEmails: leadSpecs.map((spec) => spec.email),
-    staffEmail: `demo-therapist01@${domain}`,
+    loginEmails: FUNCTIONAL_DEMO_ROSTER.filter((member) => member.login).map((member) =>
+      toSeedEmail(member, domain)
+    ),
+    staffEmail: requestAnchorEmail,
     password,
     publishedLabel,
     draftLabel,
