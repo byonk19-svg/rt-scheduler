@@ -501,7 +501,8 @@ export function TherapistAvailabilityWorkspace({
         <header className="border-b border-border/70 pb-4">
           <h1 className="app-page-title">Future Availability</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            No upcoming Schedule Block is open for availability yet.
+            No upcoming Schedule Block is open for availability yet. Check back after your manager
+            opens the next Schedule Block.
           </p>
         </header>
       </section>

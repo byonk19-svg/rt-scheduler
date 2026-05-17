@@ -32,6 +32,20 @@ describe('shift-board route source contract', () => {
     expect(clientSource.match(/Published schedule changes only/g)?.length ?? 0).toBe(1)
   })
 
+  it('keeps unknown request errors user-safe instead of showing raw backend text', () => {
+    const clientSource = readFileSync(
+      resolve(process.cwd(), 'src/components/shift-board/ShiftBoardClientPage.tsx'),
+      'utf8'
+    )
+
+    expect(clientSource).toContain('Could not save this request. Refresh the board and try again.')
+    expect(clientSource).toContain(
+      'Could not update that claimant. Refresh the board and try again.'
+    )
+    expect(clientSource).not.toContain('Could not save: ${message}')
+    expect(clientSource).not.toContain('[requestId]: message')
+  })
+
   it('keeps request cards ahead of the metric-card summary', () => {
     const clientSource = readFileSync(
       resolve(process.cwd(), 'src/components/shift-board/ShiftBoardClientPage.tsx'),

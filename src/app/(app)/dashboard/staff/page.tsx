@@ -424,7 +424,11 @@ export default async function StaffDashboardPage({
             </div>
           ) : (
             <div className="mt-3 rounded-lg border border-border bg-muted p-4 text-center text-sm text-muted-foreground">
-              No published shifts
+              <p className="font-medium text-foreground">No published shifts yet.</p>
+              <p className="mt-1">
+                Your manager has not published upcoming shifts for you. Check Schedule after the
+                next Schedule Block is published.
+              </p>
             </div>
           )}
           <div className="mt-4">

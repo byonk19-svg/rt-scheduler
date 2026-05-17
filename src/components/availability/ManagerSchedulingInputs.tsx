@@ -408,7 +408,8 @@ export function ManagerSchedulingInputs({
       <section className="rounded-[1.5rem] border border-border/70 bg-card px-6 py-5">
         <h2 className="text-lg font-semibold text-foreground">Availability Manager</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Create a Schedule Block before managing therapist availability.
+          No Schedule Block is ready for availability. Create a Schedule Block from Schedule before
+          requesting or reviewing therapist availability.
         </p>
       </section>
     )
@@ -419,7 +420,8 @@ export function ManagerSchedulingInputs({
       <section className="rounded-[1.5rem] border border-border/70 bg-card px-6 py-5">
         <h2 className="text-lg font-semibold text-foreground">Availability Manager</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          No active therapists are available to review right now.
+          No active therapists are available to review right now. Check Team roster settings before
+          sending reminders or editing availability.
         </p>
       </section>
     )

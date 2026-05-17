@@ -78,6 +78,13 @@ function getRecommendationStateCopy(
   return 'This is a preview. Nothing changes in the live Schedule until the result is applied.'
 }
 
+function lotteryLoadErrorMessage(action: 'load' | 'refresh' | 'save' | 'history'): string {
+  if (action === 'load') return 'Could not load Lottery data. Refresh and try again.'
+  if (action === 'refresh') return 'Could not refresh Lottery data. Refresh and try again.'
+  if (action === 'history') return 'Could not load Lottery history. Try again.'
+  return 'Could not save that Lottery change. Review the selected shift and try again.'
+}
+
 function sameActions(
   left: LotteryRecommendationActionView[],
   right: Array<{ therapistId: string; status: 'cancelled' | 'on_call' }>
@@ -149,7 +156,8 @@ export default function LotteryClientPage({
       } | null
       if (cancelled) return
       if (!response.ok || !payload?.snapshot) {
-        setError(payload?.error ?? 'Could not load the Lottery workspace.')
+        if (payload?.error) console.error('Lottery snapshot load failed:', payload.error)
+        setError(lotteryLoadErrorMessage('load'))
         setLoading(false)
         return
       }
@@ -195,7 +203,8 @@ export default function LotteryClientPage({
       error?: string
     } | null
     if (!response.ok || !payload?.snapshot) {
-      setError(payload?.error ?? 'Could not refresh the Lottery workspace.')
+      if (payload?.error) console.error('Lottery snapshot refresh failed:', payload.error)
+      setError(lotteryLoadErrorMessage('refresh'))
       return false
     }
     setSnapshot(payload.snapshot)
@@ -211,7 +220,8 @@ export default function LotteryClientPage({
     })
     const payload = (await response.json().catch(() => null)) as { error?: string } | null
     if (!response.ok) {
-      setError(payload?.error ?? 'That Lottery action could not be saved.')
+      if (payload?.error) console.error('Lottery action failed:', payload.error)
+      setError(lotteryLoadErrorMessage('save'))
       return false
     }
     await reloadSnapshot()
@@ -233,7 +243,8 @@ export default function LotteryClientPage({
       error?: string
     } | null
     if (!response.ok || !payload?.history) {
-      setError(payload?.error ?? 'Could not load Lottery history.')
+      if (payload?.error) console.error('Lottery history load failed:', payload.error)
+      setError(lotteryLoadErrorMessage('history'))
       setHistoryLoading(false)
       return
     }
@@ -645,6 +656,41 @@ export default function LotteryClientPage({
             ))}
           </div>
         )}
+      </div>
+    )
+  }
+
+  if (snapshot.availableDates.length === 0) {
+    return (
+      <div className="max-w-6xl space-y-5">
+        <PageIntro
+          title="Lottery Decision Center"
+          subtitle="Review the live Schedule shift, volunteers, and recommendation before applying a staff reduction."
+          summary={
+            <>
+              <Badge variant="outline">
+                <CalendarDays className="h-3 w-3" />
+                No date selected
+              </Badge>
+              <Badge variant="outline">
+                <Users className="h-3 w-3" />
+                {formatShiftLabel(selectedShift)}
+              </Badge>
+              <Badge variant="outline">
+                <ClipboardList className="h-3 w-3" />0 working
+              </Badge>
+            </>
+          }
+        />
+        <Card>
+          <CardHeader>
+            <CardTitle>No published shifts are ready for Lottery.</CardTitle>
+            <CardDescription>
+              Lottery needs a published Schedule shift before requests or recommendations can be
+              reviewed. A manager needs to publish a Schedule Block before Lottery can be used.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     )
   }
