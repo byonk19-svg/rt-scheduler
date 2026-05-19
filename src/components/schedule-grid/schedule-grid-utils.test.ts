@@ -4,7 +4,7 @@ import { buildDailyTotals, getCellDisplay, isWorkingScheduledGridCell } from './
 import type { GridCell, TherapistGridRow } from './schedule-grid-types'
 
 describe('getCellDisplay', () => {
-  it('returns yellow chip data for a lead cell', () => {
+  it('returns polished yellow chip data for a lead cell', () => {
     const cell: GridCell = {
       shiftId: 's1',
       status: 'lead',
@@ -16,10 +16,11 @@ describe('getCellDisplay', () => {
 
     expect(display.code).toBe('1')
     expect(display.colorClass).toContain('bg-yellow')
+    expect(display.colorClass).toContain('border-yellow')
     expect(display.asterisk).toBe(false)
   })
 
-  it('returns plain text data for a staff cell', () => {
+  it('returns plain printed-cell data for a staff cell', () => {
     const cell: GridCell = {
       shiftId: 's2',
       status: 'staff',
@@ -27,7 +28,7 @@ describe('getCellDisplay', () => {
       isIneligible: false,
     }
 
-    expect(getCellDisplay(cell).colorClass).toBe('text-foreground')
+    expect(getCellDisplay(cell).colorClass).toBe('text-[var(--print-ink)]')
   })
 
   it('marks needs-off cells with an asterisk flag without blocking display', () => {
@@ -41,7 +42,7 @@ describe('getCellDisplay', () => {
     const display = getCellDisplay(cell)
 
     expect(display.asterisk).toBe(true)
-    expect(display.code).toBe('·')
+    expect(display.code).toBe('.')
   })
 
   it('returns the expected code for each operational status', () => {
@@ -50,7 +51,7 @@ describe('getCellDisplay', () => {
       ['cancelled', 'CX'],
       ['call_in', 'CI'],
       ['left_early', 'LE'],
-      ['off', '·'],
+      ['off', '.'],
     ]
 
     for (const [status, expectedCode] of cases) {

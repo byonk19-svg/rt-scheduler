@@ -10,7 +10,9 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
   - `id` references `auth.users.id`.
 - `schedule_cycles`
   - Scheduling windows (`label`, `start_date`, `end_date`, `published`, `archived_at`).
-  - Optional `availability_due_at` (timestamptz): explicit therapist availability deadline; UI falls back to the **calendar day before** `start_date` when null. Therapist-facing deadline copy treats **past** as after this timestamp when set, or after **end of that local calendar day** for the inferred fallback (`src/lib/therapist-availability-submission.ts`).
+  - Optional `availability_due_at` (timestamptz): explicit therapist availability deadline. For future Schedule Blocks, therapist-facing availability visibility is derived from this field being present; manager UI collects only a calendar day and normalizes it internally.
+  - Optional `preliminary_target_date` (date): manager planning target for sending the Preliminary Schedule. Actual preliminary send state remains in `preliminary_snapshots` and audit logs.
+  - Optional `final_publish_target_date` (date): manager planning target for Final Publish. Actual publish history remains in `publish_events`.
   - `archived_at` hides non-live historical cycles from active scheduling surfaces without deleting related records.
 - `shifts`
   - Assignment rows by cycle/date/shift/user.

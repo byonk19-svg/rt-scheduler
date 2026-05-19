@@ -47,19 +47,21 @@ describe('buildTeamwiseTestAuthDeletionPlan', () => {
     const plan = buildTeamwiseTestAuthDeletionPlan([
       { id: '1', email: 'demo-manager@teamwise.test' },
       { id: '2', email: 'demo-therapist01@TEAMWISE.TEST' },
-      { id: '3', email: 'manager@hospital.org' },
-      { id: '4', email: 'demo-support@teamwise.dev' },
-      { id: '5', email: null },
+      { id: '3', email: 'layne@teamwise.test' },
+      { id: '4', email: 'manager@hospital.org' },
+      { id: '5', email: 'demo-support@teamwise.dev' },
+      { id: '6', email: null },
     ])
 
     expect(plan.summary).toEqual({
-      total: 5,
-      matched: 2,
+      total: 6,
+      matched: 3,
       skipped: 3,
     })
     expect(plan.matches.map((entry) => entry.email)).toEqual([
       'demo-manager@teamwise.test',
       'demo-therapist01@teamwise.test',
+      'layne@teamwise.test',
     ])
   })
 })

@@ -15,11 +15,16 @@ describe('buildCleanupPlan', () => {
     const plan = buildCleanupPlan([
       makeUser({ id: 'demo-1', email: 'demo-manager@teamwise.test' }),
       makeUser({ id: 'demo-2', email: 'employee04@teamwise.test' }),
+      makeUser({ id: 'real-roster-demo-1', email: 'layne@teamwise.test' }),
       makeUser({ id: 'real-1', email: 'manager@clinic.org' }),
     ])
 
-    expect(plan.summary.matched).toBe(2)
-    expect(plan.matches.map((entry) => entry.user.id)).toEqual(['demo-1', 'demo-2'])
+    expect(plan.summary.matched).toBe(3)
+    expect(plan.matches.map((entry) => entry.user.id)).toEqual([
+      'demo-1',
+      'demo-2',
+      'real-roster-demo-1',
+    ])
     expect(plan.matches[0]?.reasons).toContain('matches seeded test domain')
   })
 

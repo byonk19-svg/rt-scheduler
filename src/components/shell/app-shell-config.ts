@@ -65,6 +65,7 @@ function isManagerScheduleRoute(pathname: string): boolean {
   return (
     pathname === '/schedule' ||
     pathname === '/coverage' ||
+    pathname === '/schedule/planning' ||
     pathname === '/analytics' ||
     pathname === '/publish' ||
     pathname.startsWith('/publish/') ||
@@ -225,7 +226,8 @@ export function getMobilePrimaryItems(args: {
       {
         href: '/schedule',
         label: 'Schedule',
-        active: (pathname) => pathname === '/schedule' || pathname === '/coverage',
+        active: (pathname) =>
+          pathname === '/schedule' || pathname === '/schedule/planning' || pathname === '/coverage',
       },
       {
         href: '/availability',
@@ -327,6 +329,15 @@ export function getWorkflowContext(args: {
         workflow: 'Team Schedule',
         context: 'Schedule grid and coverage review',
         state: 'Draft, review, publish',
+        permission: 'Manager editable',
+      }
+    }
+
+    if (pathname === '/schedule/planning') {
+      return {
+        workflow: 'Schedule Block Planning',
+        context: 'Future Schedule Blocks and target dates',
+        state: 'Draft planning',
         permission: 'Manager editable',
       }
     }

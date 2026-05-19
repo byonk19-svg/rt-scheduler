@@ -54,6 +54,6 @@ describe('ScheduleGrid source invariants', () => {
 
     expect(code).toContain('Respiratory Therapy')
     expect(code).toContain('cycleDateRangeLabel')
-    expect(code).toContain('{gridTitle}')
+    expect(code).toContain('{sheetTitle}')
   })
 })

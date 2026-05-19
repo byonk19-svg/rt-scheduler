@@ -126,7 +126,7 @@ For a fuller UAT dataset, run:
 npm run seed:functional
 ```
 
-That seed creates Teamwise demo accounts, published/draft cycles, and seeded swap-request scenarios for `/requests/new` and `/shift-board`.
+That seed creates Teamwise real-roster demo accounts, a populated published cycle, an empty draft cycle for Auto-draft testing, and seeded swap-request scenarios for `/requests/new` and `/shift-board`.
 
 Required env vars:
 

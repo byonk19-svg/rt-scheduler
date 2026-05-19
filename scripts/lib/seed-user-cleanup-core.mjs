@@ -16,7 +16,30 @@
 
 const DEFAULT_ALLOWED_DOMAINS = ['teamwise.test']
 const DEFAULT_EMAIL_PREFIXES = ['demo-manager', 'demo-lead-', 'demo-therapist', 'employee']
-const DEFAULT_EXACT_EMAILS = ['manager@teamwise.test']
+const DEFAULT_EXACT_EMAILS = [
+  'manager@teamwise.test',
+  'julie.d@teamwise.test',
+  'adrienne@teamwise.test',
+  'kim@teamwise.test',
+  'brianna@teamwise.test',
+  'barbara@teamwise.test',
+  'layne@teamwise.test',
+  'tannie@teamwise.test',
+  'aleyce@teamwise.test',
+  'lynn@teamwise.test',
+  'lisa@teamwise.test',
+  'irene@teamwise.test',
+  'kristine@teamwise.test',
+  'matthew@teamwise.test',
+  'rosa@teamwise.test',
+  'sarah@teamwise.test',
+  'audbriana@teamwise.test',
+  'gayle@teamwise.test',
+  'julie.c@teamwise.test',
+  'ruth@teamwise.test',
+  'nicole@teamwise.test',
+  'mark@teamwise.test',
+]
 
 function normalizeEmail(value) {
   return String(value ?? '')

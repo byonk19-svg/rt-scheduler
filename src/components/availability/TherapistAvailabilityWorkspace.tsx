@@ -471,9 +471,9 @@ export function TherapistAvailabilityWorkspace({
     : (deadlinePresentation?.deadlineHeadline ?? 'Availability open')
   const submissionStatusDetail = submissionUi.isSubmitted
     ? hasCycleSpecificChanges
-      ? 'Submitted with Schedule Block changes.'
+      ? 'Submitted with changes for this Schedule Block.'
       : hasSavedRecurringPattern
-        ? 'Submitted with no Schedule Block-only changes. Your normal schedule is your current response.'
+        ? 'Submitted with no Schedule Block changes. Your normal schedule is your current response.'
         : 'Submitted with no day-level changes. This Schedule Block is currently blank unless you add dates.'
     : dueDateLabel
       ? `Due ${dueDateLabel}`
@@ -576,7 +576,7 @@ export function TherapistAvailabilityWorkspace({
                 {submissionUi.isSubmitted && !hasCycleSpecificChanges ? (
                   <p className="text-sm font-medium text-foreground">
                     {hasSavedRecurringPattern
-                      ? 'You already submitted this Schedule Block without adding exceptions.'
+                      ? 'You already submitted this Schedule Block without adding changes for this Schedule Block.'
                       : 'You already submitted this Schedule Block with a blank response.'}
                   </p>
                 ) : null}
@@ -732,7 +732,7 @@ export function TherapistAvailabilityWorkspace({
                   onClick={copyPreviousCycleOverrides}
                   className="min-h-9 rounded-xl px-3"
                 >
-                  Use last block
+                  Use previous Schedule Block
                 </Button>
                 <Button
                   type="button"
@@ -961,8 +961,8 @@ export function TherapistAvailabilityWorkspace({
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 {hasSavedRecurringPattern
-                  ? 'These counts come from your normal schedule before Schedule Block-only changes.'
-                  : 'These counts show how many days still start blank before you add Schedule Block-only changes.'}
+                  ? 'These counts come from your normal schedule before changes for this Schedule Block.'
+                  : 'These counts show how many days still start blank before you add changes for this Schedule Block.'}
               </p>
               <div className="mt-3 space-y-2">
                 <div className="flex items-center justify-between text-sm">

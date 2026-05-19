@@ -64,6 +64,13 @@ describe('app-shell-config', () => {
 
     expect(context.primaryKey).toBe('team-schedule')
     expect(context.localNav).toBeNull()
+
+    const planningContext = getShellContext({
+      pathname: '/schedule/planning',
+      canAccessManagerUi: true,
+      pendingCount: 0,
+    })
+    expect(planningContext.primaryKey).toBe('team-schedule')
   })
 
   it('routes Team Schedule to the unified schedule grid', () => {
@@ -142,6 +149,14 @@ describe('app-shell-config', () => {
       workflow: 'Team Schedule',
       context: 'Schedule grid and coverage review',
       state: 'Draft, review, publish',
+      permission: 'Manager editable',
+    })
+    expect(
+      getWorkflowContext({ pathname: '/schedule/planning', canAccessManagerUi: true })
+    ).toEqual({
+      workflow: 'Schedule Block Planning',
+      context: 'Future Schedule Blocks and target dates',
+      state: 'Draft planning',
       permission: 'Manager editable',
     })
     expect(getWorkflowContext({ pathname: '/settings', canAccessManagerUi: true })).toBeNull()

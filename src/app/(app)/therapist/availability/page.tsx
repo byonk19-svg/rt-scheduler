@@ -24,6 +24,10 @@ import {
 } from '@/lib/coverage/work-patterns'
 import { toIsoDate } from '@/lib/calendar-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  isTherapistVisibleForAvailability,
+  sortVisibleAvailabilityCycles,
+} from '@/lib/schedule-block-planning'
 import { resolveTherapistAvailabilityCycleId } from '@/lib/therapist-workflow'
 import { createClient } from '@/lib/supabase/server'
 
@@ -238,7 +242,11 @@ export default async function TherapistAvailabilityPage({
     .gte('end_date', todayKey)
     .order('start_date', { ascending: true })
 
-  const cycles = (cyclesData ?? []) as Cycle[]
+  const cycles = sortVisibleAvailabilityCycles(
+    ((cyclesData ?? []) as Cycle[]).filter((cycle) =>
+      isTherapistVisibleForAvailability(cycle, todayKey)
+    )
+  )
   const selectedCycleIdFromParams = getSearchParam(params?.cycle)
   const { data: preliminarySnapshotsData } =
     cycles.length > 0

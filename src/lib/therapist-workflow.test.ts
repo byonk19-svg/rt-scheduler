@@ -59,6 +59,66 @@ describe('therapist-workflow', () => {
     expect(workflow.primaryAction.label).toBe('Start availability')
   })
 
+  it('does not show a future Schedule Block before the manager sets an availability due date', () => {
+    const workflow = resolveTherapistWorkflow({
+      todayKey,
+      now: new Date('2026-04-24T12:00:00.000Z'),
+      cycles: [
+        {
+          id: 'cycle-hidden',
+          label: 'Hidden future block',
+          start_date: '2026-05-10',
+          end_date: '2026-06-20',
+          published: false,
+          availability_due_at: null,
+        },
+      ],
+      availabilityEntryCountsByCycleId: {},
+      submissionsByCycleId: {},
+      preliminarySnapshots: [],
+      publishedShifts: [],
+      relevantShiftPostSummary: { pendingCount: 0, totalCount: 0 },
+    })
+
+    expect(workflow.state).toBe('cycle_closed')
+    expect(workflow.primaryAction.href).toBe('/staff/history')
+  })
+
+  it('chooses the visible future Schedule Block with the earliest due date first', () => {
+    const workflow = resolveTherapistWorkflow({
+      todayKey,
+      now: new Date('2026-04-24T12:00:00.000Z'),
+      cycles: [
+        {
+          id: 'cycle-later-start-earlier-due',
+          label: 'Later start',
+          start_date: '2026-06-21',
+          end_date: '2026-08-01',
+          published: false,
+          availability_due_at: '2026-05-01T23:59:59.000Z',
+        },
+        {
+          id: 'cycle-earlier-start-later-due',
+          label: 'Earlier start',
+          start_date: '2026-05-10',
+          end_date: '2026-06-20',
+          published: false,
+          availability_due_at: '2026-05-05T23:59:59.000Z',
+        },
+      ],
+      availabilityEntryCountsByCycleId: {},
+      submissionsByCycleId: {},
+      preliminarySnapshots: [],
+      publishedShifts: [],
+      relevantShiftPostSummary: { pendingCount: 0, totalCount: 0 },
+    })
+
+    expect(workflow.actionCycle?.id).toBe('cycle-later-start-earlier-due')
+    expect(workflow.primaryAction.href).toBe(
+      '/therapist/availability?cycle=cycle-later-start-earlier-due'
+    )
+  })
+
   it('keeps an overdue not-started cycle in the therapist workflow instead of collapsing it to closed', () => {
     const workflow = resolveTherapistWorkflow({
       todayKey,
@@ -251,6 +311,7 @@ describe('resolveTherapistActionCycleId', () => {
       start_date: '2026-05-13',
       end_date: '2026-06-23',
       published: false,
+      availability_due_at: '2026-05-01T23:59:59.000Z',
     },
   ]
 
@@ -262,6 +323,33 @@ describe('resolveTherapistActionCycleId', () => {
         preliminarySnapshots: [],
       })
     ).toBe('next-cycle')
+  })
+
+  it('skips unpublished cycles that are not visible for availability yet', () => {
+    expect(
+      resolveTherapistActionCycleId({
+        todayKey: '2026-04-24',
+        cycles: [
+          {
+            id: 'hidden-cycle',
+            label: 'Hidden',
+            start_date: '2026-05-13',
+            end_date: '2026-06-23',
+            published: false,
+            availability_due_at: null,
+          },
+          {
+            id: 'visible-cycle',
+            label: 'Visible',
+            start_date: '2026-06-24',
+            end_date: '2026-08-04',
+            published: false,
+            availability_due_at: '2026-05-15T23:59:59.000Z',
+          },
+        ],
+        preliminarySnapshots: [],
+      })
+    ).toBe('visible-cycle')
   })
 
   it('uses the preliminary cycle when a live preliminary snapshot exists', () => {

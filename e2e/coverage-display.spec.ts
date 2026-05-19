@@ -273,7 +273,7 @@ test.describe.serial('coverage display regressions', () => {
 
     await expect(page).toHaveURL(/\/schedule/)
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
-    await expect(page.locator('p').filter({ hasText: 'Read-only for staff' })).toBeVisible()
+    await expect(page.getByText('Access Read-only')).toBeVisible()
     await expect(page.getByRole('combobox', { name: 'Schedule Block' })).toHaveValue(
       ctx!.publishedCycle.id
     )

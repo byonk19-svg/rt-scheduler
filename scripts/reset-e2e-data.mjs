@@ -138,10 +138,9 @@ function printAuthResetPlan(authPlan) {
 function printCompletionHelp() {
   console.log('')
   console.log('Ready for local testing:')
-  console.log(`- ${FUNCTIONAL_DEMO_ACCOUNTS[0]} / ${FUNCTIONAL_DEMO_PASSWORD}`)
-  console.log(`- ${FUNCTIONAL_DEMO_ACCOUNTS[1]} / ${FUNCTIONAL_DEMO_PASSWORD}`)
-  console.log(`- ${FUNCTIONAL_DEMO_ACCOUNTS[2]} / ${FUNCTIONAL_DEMO_PASSWORD}`)
-  console.log(`- ${FUNCTIONAL_DEMO_ACCOUNTS[3]} / ${FUNCTIONAL_DEMO_PASSWORD}`)
+  for (const email of FUNCTIONAL_DEMO_ACCOUNTS) {
+    console.log(`- ${email} / ${FUNCTIONAL_DEMO_PASSWORD}`)
+  }
   console.log('- npm run dev')
   console.log('- npm run test:e2e')
 }

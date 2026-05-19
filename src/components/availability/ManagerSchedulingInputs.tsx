@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import type { ReactNode } from 'react'
@@ -13,8 +14,9 @@ import type {
 import type { PlannerMode, PlannerOverrideRow } from '@/lib/availability-planner'
 import { splitPlannerDatesByMode } from '@/lib/availability-planner'
 import { sendAvailabilityRemindersAction } from '@/app/(app)/availability/manager-planner-actions'
-import { formatHumanCycleRange } from '@/lib/calendar-utils'
+import { formatDateLabel, formatHumanCycleRange } from '@/lib/calendar-utils'
 import { isDateWithinCycle } from '@/lib/employee-directory'
+import { availabilityDueDateKey } from '@/lib/schedule-block-planning'
 import { cn } from '@/lib/utils'
 
 const AvailabilityStatusSummary = dynamic(() =>
@@ -34,6 +36,8 @@ type Cycle = {
   start_date: string
   end_date: string
   published: boolean
+  availability_due_at?: string | null
+  status?: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
 }
 
 type TherapistOption = {
@@ -130,6 +134,36 @@ function uniqueSortedDates(dates: string[]) {
   return [...new Set(dates)].sort((a, b) => a.localeCompare(b))
 }
 
+function availabilityVisibilitySummary(cycle: Cycle | null): {
+  label: string
+  detail: string
+  tone: 'visible' | 'draft' | 'locked'
+} | null {
+  if (!cycle) return null
+  if (cycle.published || cycle.status === 'final' || cycle.status === 'offline') {
+    return {
+      label: 'Schedule posted',
+      detail: 'Availability is no longer the active therapist step.',
+      tone: 'locked',
+    }
+  }
+
+  const dueDate = availabilityDueDateKey(cycle.availability_due_at)
+  if (!dueDate) {
+    return {
+      label: 'Manager draft',
+      detail: 'Not visible to therapists until a due date is set.',
+      tone: 'draft',
+    }
+  }
+
+  return {
+    label: 'Visible to therapists',
+    detail: `Due ${formatDateLabel(dueDate)}`,
+    tone: 'visible',
+  }
+}
+
 export function ManagerSchedulingInputs({
   cycles,
   therapists,
@@ -180,6 +214,7 @@ export function ManagerSchedulingInputs({
     () => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null,
     [cycles, selectedCycleId]
   )
+  const selectedCycleVisibility = availabilityVisibilitySummary(selectedCycle)
   const selectedTherapist = useMemo(
     () => therapists.find((therapist) => therapist.id === selectedTherapistId) ?? null,
     [selectedTherapistId, therapists]
@@ -408,7 +443,7 @@ export function ManagerSchedulingInputs({
       <section className="rounded-[1.5rem] border border-border/70 bg-card px-6 py-5">
         <h2 className="text-lg font-semibold text-foreground">Availability Manager</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          No Schedule Block is ready for availability. Create a Schedule Block from Schedule before
+          No Schedule Block is ready for availability. Create or plan a Schedule Block before
           requesting or reviewing therapist availability.
         </p>
       </section>
@@ -430,9 +465,38 @@ export function ManagerSchedulingInputs({
   return (
     <section id="staff-scheduling-inputs" className="space-y-4">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-        <h1 className="whitespace-nowrap text-[2rem] font-semibold tracking-[-0.03em] text-foreground">
-          Availability Manager
-        </h1>
+        <div className="flex flex-col gap-2">
+          <h1 className="whitespace-nowrap text-[2rem] font-semibold tracking-[-0.03em] text-foreground">
+            Availability Manager
+          </h1>
+          {selectedCycleVisibility ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span
+                className={cn(
+                  'rounded-full border px-2.5 py-1 font-semibold',
+                  selectedCycleVisibility.tone === 'visible'
+                    ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                    : selectedCycleVisibility.tone === 'draft'
+                      ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+                      : 'border-border bg-muted text-muted-foreground'
+                )}
+              >
+                {selectedCycleVisibility.label}
+              </span>
+              <span className="font-medium text-muted-foreground">
+                {selectedCycleVisibility.detail}
+              </span>
+              {selectedCycleVisibility.tone === 'draft' && selectedCycle ? (
+                <Link
+                  href={`/schedule/planning?cycle=${selectedCycle.id}`}
+                  className="font-semibold text-primary hover:underline"
+                >
+                  Plan dates
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
         <div className="flex flex-wrap items-center justify-end gap-3 xl:flex-nowrap">
           <label className="space-y-1.5">

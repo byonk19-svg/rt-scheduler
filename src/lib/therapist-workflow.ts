@@ -1,4 +1,8 @@
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
+import {
+  isTherapistVisibleForAvailability,
+  sortVisibleAvailabilityCycles,
+} from '@/lib/schedule-block-planning'
 import { resolveTherapistAvailabilityWritePermission } from '@/lib/therapist-availability-submission'
 
 export type TherapistWorkflowState =
@@ -66,6 +70,15 @@ function sortCyclesByStartDate(cycles: TherapistWorkflowCycle[]): TherapistWorkf
   return [...cycles].sort((left, right) => left.start_date.localeCompare(right.start_date))
 }
 
+function visibleAvailabilityCycles(
+  cycles: TherapistWorkflowCycle[],
+  todayKey: string
+): TherapistWorkflowCycle[] {
+  return sortVisibleAvailabilityCycles(
+    cycles.filter((cycle) => isTherapistVisibleForAvailability(cycle, todayKey))
+  )
+}
+
 function getActivePreliminaryCycleId(
   preliminarySnapshots: TherapistWorkflowPreliminarySnapshot[]
 ): string | null {
@@ -116,11 +129,8 @@ export function resolveTherapistAvailabilityCycleId(params: {
   const activePreliminaryCycleId = getActivePreliminaryCycleId(params.preliminarySnapshots)
 
   return (
-    sortCyclesByStartDate(params.cycles).find(
-      (cycle) =>
-        !cycle.published &&
-        cycle.end_date >= params.todayKey &&
-        cycle.id !== activePreliminaryCycleId
+    visibleAvailabilityCycles(params.cycles, params.todayKey).find(
+      (cycle) => cycle.id !== activePreliminaryCycleId
     )?.id ?? null
   )
 }
@@ -324,7 +334,7 @@ export function resolveTherapistWorkflow(params: {
         publishedSchedule.cycle.start_date,
         publishedSchedule.cycle.end_date
       ),
-      cycleReason: 'This is the current published schedule available to therapists.',
+      cycleReason: 'This is the current published Schedule Block available to therapists.',
       primaryAction: {
         href: `/schedule?cycle=${publishedSchedule.cycle.id}`,
         label: 'View schedule',

@@ -109,9 +109,9 @@ describe('schedule route', () => {
 
     const html = renderToStaticMarkup(await SchedulePage({ searchParams: Promise.resolve({}) }))
 
-    expect(html).toContain('No Schedule Block is available yet.')
-    expect(html).toContain('Managers need to create or publish a Schedule Block')
-    expect(html).toContain('Staff will see their Team Schedule here after a block is published.')
+    expect(html).toContain('No active Schedule Block is available yet.')
+    expect(html).toContain('Managers can create or publish a Schedule Block')
+    expect(html).toContain('Staff will see their Team Schedule here after a block is available.')
   })
 
   it('sets unified schedule metadata', () => {
