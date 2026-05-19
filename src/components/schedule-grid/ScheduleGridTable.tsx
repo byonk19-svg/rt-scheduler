@@ -33,11 +33,19 @@ function isWeekend(date: string) {
   return day === 0 || day === 6
 }
 
-function totalColorClass(date: string, count: number): string {
-  if (isWeekend(date)) return 'text-muted-foreground font-semibold'
-  if (count < 3) return 'text-red-600 font-bold'
-  if (count <= 5) return 'text-teal-700 font-bold'
-  return 'text-amber-600 font-bold'
+function isWeekStart(date: string) {
+  const parsed = new Date(`${date}T12:00:00`)
+  return parsed.getDay() === 0
+}
+
+function weekBoundaryClass(date: string): string {
+  return isWeekStart(date) ? 'border-l-2 border-l-foreground/35' : 'border-l border-border/55'
+}
+
+function totalToneClass(date: string): string {
+  return isWeekend(date)
+    ? 'border-border/70 bg-muted/80 text-[var(--print-ink-muted)]'
+    : 'border-border/70 bg-[var(--print-paper)] text-[var(--print-ink)]'
 }
 
 function rowScheduledTotal(row: TherapistGridRow, cycleDates: readonly string[]) {
@@ -77,12 +85,12 @@ export function ScheduleGridTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-max border-collapse text-xs">
+    <div className="max-h-[min(72vh,46rem)] overflow-auto bg-[var(--print-paper)]">
+      <table className="w-full min-w-max border-collapse text-[8px]">
         <thead>
-          <tr className="border-b border-border bg-card">
-            <th className="sticky left-0 z-20 min-w-[180px] bg-card px-3 py-2 text-left font-semibold text-muted-foreground">
-              Therapist
+          <tr className="border-b border-border/70 bg-[var(--print-paper)]">
+            <th className="sticky left-0 top-0 z-40 min-w-[118px] bg-[var(--print-paper)] px-2 py-1.5 text-left font-black uppercase tracking-[0.04em] text-[var(--print-ink)] shadow-[1px_0_0_var(--border)]">
+              Date
             </th>
             {cycleDates.map((date) => {
               const label = formatHeaderDate(date)
@@ -90,16 +98,21 @@ export function ScheduleGridTable({
                 <th
                   key={date}
                   className={cn(
-                    'min-w-8 border-l border-border/70 px-1 py-2 text-center font-medium text-muted-foreground',
-                    isWeekend(date) && 'bg-muted/45'
+                    'sticky top-0 z-30 min-w-5 px-0.5 py-1 text-center font-black text-[var(--print-ink-muted)] shadow-[0_1px_0_var(--border)]',
+                    weekBoundaryClass(date),
+                    isWeekend(date)
+                      ? 'bg-[color-mix(in_srgb,var(--print-paper)_84%,var(--muted))]'
+                      : 'bg-[var(--print-paper)]'
                   )}
                 >
-                  <span className="block text-[10px] uppercase">{label.day}</span>
-                  <span className="block text-[11px] text-foreground">{label.number}</span>
+                  <span className="block text-[7px] uppercase leading-tight">{label.day}</span>
+                  <span className="block text-[8px] leading-tight text-[var(--print-ink)]">
+                    {label.number}
+                  </span>
                 </th>
               )
             })}
-            <th className="sticky right-0 z-20 min-w-12 border-l border-border bg-card px-2 py-2 text-center font-semibold text-muted-foreground">
+            <th className="sticky right-0 top-0 z-40 min-w-8 border-l border-border bg-[var(--print-paper)] px-1 py-1.5 text-center font-black uppercase tracking-[0.04em] text-[var(--print-ink)] shadow-[-1px_0_0_var(--border)]">
               Total
             </th>
           </tr>
@@ -118,21 +131,30 @@ export function ScheduleGridTable({
               onCellClick={onCellClick}
             />
           ))}
-          <tr className="border-t-2 border-border bg-muted/45">
-            <th className="sticky left-0 z-20 bg-muted px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+          <tr className="border-t-2 border-foreground/20 bg-[color-mix(in_srgb,var(--print-paper)_82%,var(--muted))]">
+            <th className="sticky bottom-0 left-0 z-30 bg-[color-mix(in_srgb,var(--print-paper)_78%,var(--muted))] px-2 py-1.5 text-left text-[8px] font-black uppercase tracking-[0.08em] text-[var(--print-ink)] shadow-[1px_0_0_var(--border)]">
               Daily total
             </th>
             {cycleDates.map((date) => (
-              <td key={date} className="border-l border-border/70 px-1 py-2 text-center">
+              <td
+                key={date}
+                className={cn(
+                  weekBoundaryClass(date),
+                  'sticky bottom-0 z-20 bg-[color-mix(in_srgb,var(--print-paper)_78%,var(--muted))] px-0 py-1 text-center shadow-[0_-1px_0_var(--border)]'
+                )}
+              >
                 <span
                   data-testid={`total-${date}`}
-                  className={totalColorClass(date, dailyTotals[date] ?? 0)}
+                  className={cn(
+                    'inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] border px-0 text-[8px] font-black tabular-nums',
+                    totalToneClass(date)
+                  )}
                 >
                   {dailyTotals[date] ?? 0}
                 </span>
               </td>
             ))}
-            <td className="sticky right-0 z-20 border-l border-border bg-muted" />
+            <td className="sticky bottom-0 right-0 z-30 border-l border-border bg-[color-mix(in_srgb,var(--print-paper)_78%,var(--muted))] shadow-[-1px_0_0_var(--border)]" />
           </tr>
         </tbody>
       </table>
@@ -164,20 +186,20 @@ function TherapistRow({
   return (
     <tr
       className={cn(
-        'border-b border-border/70',
+        'border-b border-border/45',
         isViewer && 'border-b-2 border-teal-600 bg-teal-50/55'
       )}
     >
       <th
         scope="row"
         className={cn(
-          'sticky left-0 z-10 bg-card px-3 py-2 text-left font-semibold text-foreground',
+          'sticky left-0 z-10 bg-[var(--print-paper)] px-2 py-1 text-left text-[9px] font-black text-[var(--print-ink)] shadow-[1px_0_0_var(--border)]',
           isViewer && 'bg-teal-50'
         )}
       >
         <span className="block truncate">{isViewer ? `You (${row.name})` : row.name}</span>
         {row.isOnFmla ? (
-          <span className="text-[10px] font-medium uppercase text-muted-foreground">FMLA</span>
+          <span className="text-[7px] font-black uppercase text-muted-foreground">FMLA</span>
         ) : null}
       </th>
       {cycleDates.map((date) => {
@@ -202,16 +224,19 @@ function TherapistRow({
           <td
             key={date}
             className={cn(
-              'border-l border-border/70 px-1 py-1.5 text-center',
-              isWeekend(date) && 'bg-muted/25'
+              'px-0 py-0.5 text-center',
+              weekBoundaryClass(date),
+              isWeekend(date) && 'bg-[color-mix(in_srgb,var(--print-paper)_90%,var(--muted))]'
             )}
           >
             <button
               type="button"
               data-testid={`cell-${row.userId}-${date}`}
               className={cn(
-                'inline-flex min-h-6 min-w-6 items-center justify-center rounded px-1 text-[11px] font-bold leading-none',
-                display.isEmpty ? 'text-muted-foreground' : display.colorClass,
+                'inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] px-0 text-[8px] font-black leading-none tabular-nums',
+                display.isEmpty
+                  ? 'text-[var(--print-ink-muted)] hover:bg-muted/35'
+                  : display.colorClass,
                 clickable
                   ? 'cursor-pointer ring-offset-background transition hover:ring-2 hover:ring-ring/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                   : 'cursor-default',
@@ -224,7 +249,7 @@ function TherapistRow({
               {display.asterisk ? (
                 <sup
                   data-testid={`asterisk-${row.userId}-${date}`}
-                  className="ml-px text-[9px] font-black text-foreground"
+                  className="ml-px text-[6px] font-black text-[var(--print-ink)]"
                 >
                   *
                 </sup>
@@ -233,8 +258,10 @@ function TherapistRow({
           </td>
         )
       })}
-      <td className="sticky right-0 z-10 border-l border-border bg-card px-2 py-1.5 text-center font-bold text-foreground">
-        {total}
+      <td className="sticky right-0 z-10 border-l border-border bg-[var(--print-paper)] px-1 py-0.5 text-center shadow-[-1px_0_0_var(--border)]">
+        <span className="inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] bg-muted/65 px-0 text-[8px] font-black tabular-nums text-[var(--print-ink)]">
+          {total}
+        </span>
       </td>
     </tr>
   )

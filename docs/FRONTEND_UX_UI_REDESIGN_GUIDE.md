@@ -1412,8 +1412,8 @@ Screenshots were captured during a live audit session (2026-05-04) using the Chr
 
 **Auth credentials used:**
 
-- Manager: `demo-manager@teamwise.test` / `Teamwise123!`
-- Therapist: `demo-therapist01@teamwise.test` / `Teamwise123!`
+- Manager: `julie.d@teamwise.test` / `Teamwise123!`
+- Therapist: `layne@teamwise.test` / `Teamwise123!`
 
 ---
 

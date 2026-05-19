@@ -57,7 +57,7 @@ async function loadSeededTeamwiseDirectSwap(
   const { data: recipient, error: recipientError } = await supabase
     .from('profiles')
     .select('id, full_name')
-    .eq('email', 'demo-therapist01@teamwise.test')
+    .eq('email', 'layne@teamwise.test')
     .maybeSingle()
 
   if (recipientError || !recipient) {
@@ -479,7 +479,7 @@ test.describe.serial('requests workflow', () => {
     reseedFunctionalDemo()
     const seededSwap = await loadSeededTeamwiseDirectSwap(ctx!.supabase)
 
-    await loginAs(page, 'demo-therapist01@teamwise.test', 'Teamwise123!')
+    await loginAs(page, 'layne@teamwise.test', 'Teamwise123!')
     await gotoWithRetry(page, '/therapist/swaps')
     await expect(page.getByRole('heading', { name: 'Shift Swaps & Pickups' })).toBeVisible()
 
@@ -525,7 +525,7 @@ test.describe.serial('requests workflow', () => {
     const managerContext = await browser.newContext()
     const managerPage = await managerContext.newPage()
     try {
-      await loginAs(managerPage, 'demo-manager@teamwise.test', 'Teamwise123!')
+      await loginAs(managerPage, 'julie.d@teamwise.test', 'Teamwise123!')
       await openShiftBoard(managerPage)
       const managerCard = managerPage
         .locator('div.rounded-xl')

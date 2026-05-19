@@ -10,6 +10,7 @@ type ManagerWorkspaceHeaderProps = {
   className?: string
   /** Override default h1 styling (e.g. `app-page-title` on availability). */
   titleClassName?: string
+  compact?: boolean
 }
 
 export function ManagerWorkspaceHeader({
@@ -19,6 +20,7 @@ export function ManagerWorkspaceHeader({
   actions,
   className,
   titleClassName,
+  compact,
 }: ManagerWorkspaceHeaderProps) {
   return (
     <PageIntro
@@ -28,6 +30,7 @@ export function ManagerWorkspaceHeader({
       actions={actions}
       className={className}
       titleClassName={titleClassName}
+      compact={compact}
     />
   )
 }

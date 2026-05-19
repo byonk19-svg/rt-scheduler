@@ -28,7 +28,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
   title: 'Publish History',
-  description: 'Manage schedule blocks and review publish email delivery history.',
+  description: 'Manage Schedule Blocks and review publish email delivery history.',
 }
 
 type PublishEventRow = {
@@ -193,8 +193,8 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
               Publish History
             </h1>
             <p className="mt-0.5 max-w-xl text-xs text-muted-foreground">
-              Manage 6-week schedule blocks (the same list as on Schedule) and review email delivery
-              when you publish.
+              Manage Schedule Blocks (the same list as on Schedule) and review email delivery when
+              you publish.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -231,7 +231,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             color: 'var(--success-text)',
           }}
         >
-          Schedule block taken offline. Assignments were preserved, staff live views are hidden, and
+          Schedule Block taken offline. Assignments were preserved, staff live views are hidden, and
           new swaps or pickups stay paused until you republish.
         </div>
       )}
@@ -271,7 +271,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             color: 'var(--success-text)',
           }}
         >
-          Draft schedule block deleted.
+          Draft Schedule Block deleted.
         </div>
       )}
 
@@ -303,9 +303,9 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
           }}
         >
           {resolvedSearchParams.error === 'missing_cycle'
-            ? 'Could not change that Schedule Block because no block was selected.'
+            ? 'Could not change that Schedule Block because no Schedule Block was selected.'
             : resolvedSearchParams.error === 'start_over_after_final_blocked'
-              ? 'Published Schedule Blocks cannot be started over. Take the block offline or make post-publish edits instead.'
+              ? 'Published Schedule Blocks cannot be started over. Take the Schedule Block offline or make post-publish edits instead.'
               : resolvedSearchParams.error === 'take_offline_failed'
                 ? 'Could not take that Schedule Block offline. Please try again.'
                 : resolvedSearchParams.error === 'take_offline_not_live'
@@ -315,9 +315,9 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                     : resolvedSearchParams.error === 'cycle_restart_failed'
                       ? 'Could not restart that published Schedule Block. Please try again.'
                       : resolvedSearchParams.error === 'unpublish_keep_shifts_failed'
-                        ? 'Could not unpublish that block while keeping shifts. Please try again.'
+                        ? 'Could not unpublish that Schedule Block while keeping shifts. Please try again.'
                         : resolvedSearchParams.error === 'unpublish_not_live'
-                          ? 'That block is already a draft.'
+                          ? 'That Schedule Block is already a draft.'
                           : resolvedSearchParams.error === 'delete_live_publish_event'
                             ? 'Live publish entries must be restarted from Schedule before they can be removed from history.'
                             : resolvedSearchParams.error === 'missing_publish_event'
@@ -325,22 +325,22 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                               : resolvedSearchParams.error === 'delete_publish_event_failed'
                                 ? 'Could not delete that publish history entry. Please try again.'
                                 : resolvedSearchParams.error === 'archive_live_cycle'
-                                  ? 'Live blocks must be taken offline before they can be archived.'
+                                  ? 'Live Schedule Blocks must be taken offline before they can be archived.'
                                   : resolvedSearchParams.error === 'cycle_archive_failed'
                                     ? 'Could not archive that Schedule Block. Please try again.'
                                     : resolvedSearchParams.error === 'delete_cycle_unauthorized'
-                                      ? 'You do not have permission to delete that schedule block.'
+                                      ? 'You do not have permission to delete that Schedule Block.'
                                       : resolvedSearchParams.error === 'delete_cycle_not_found'
-                                        ? 'That schedule block was not found.'
+                                        ? 'That Schedule Block was not found.'
                                         : resolvedSearchParams.error === 'delete_cycle_published'
-                                          ? 'Published blocks cannot be deleted. Take the block offline or use post-publish edits instead.'
+                                          ? 'Published Schedule Blocks cannot be deleted. Take the Schedule Block offline or use post-publish edits instead.'
                                           : resolvedSearchParams.error === 'delete_cycle_not_draft'
                                             ? 'Only empty unpublished Draft Schedule Blocks can be deleted.'
                                             : resolvedSearchParams.error ===
                                                 'delete_cycle_not_empty'
                                               ? 'This Schedule Block already has schedule, availability, preliminary, or publish history. Archive it instead of deleting it.'
                                               : resolvedSearchParams.error === 'delete_cycle_failed'
-                                                ? 'Could not delete that draft block. Please try again.'
+                                                ? 'Could not delete that draft Schedule Block. Please try again.'
                                                 : 'Something went wrong.'}
         </div>
       )}
@@ -358,23 +358,24 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
 
       <div className="space-y-2">
         <div className="px-0.5">
-          <h2 className="text-sm font-bold tracking-tight text-foreground">Schedule blocks</h2>
+          <h2 className="text-sm font-bold tracking-tight text-foreground">Schedule Blocks</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Live blocks can be taken offline without deleting assignments. Offline blocks can be
-            republished after validation. Drafts can be archived or safely deleted when empty. Email
-            log is below.
+            Live Schedule Blocks can be taken offline without deleting assignments. Offline Schedule
+            Blocks can be republished after validation. Drafts can be archived or safely deleted
+            when empty. Email log is below.
           </p>
         </div>
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-tw-sm">
           {cyclesLoadError ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              Could not load schedule blocks. Refresh, or run database migrations.
+              Could not load Schedule Blocks. Refresh, or contact an admin if this continues.
             </div>
           ) : activeCycles.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
-              <p className="text-sm font-medium text-foreground">No active schedule blocks</p>
+              <p className="text-sm font-medium text-foreground">No active Schedule Blocks</p>
               <p className="max-w-sm text-xs text-muted-foreground">
-                Create a block from the Schedule page, or archived blocks are hidden here.
+                Create a Schedule Block from the Schedule page. Archived Schedule Blocks stay hidden
+                here.
               </p>
               <Button asChild size="sm" variant="outline">
                 <Link href="/schedule">Go to schedule</Link>
@@ -492,7 +493,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
           <h2 className="text-sm font-bold tracking-tight text-foreground">Publish email log</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             One row per time a schedule was published and emails were queued. Deleting a row here
-            only removes the log entry, not the schedule block. Use Schedule blocks above to
+            only removes the log entry, not the Schedule Block. Use Schedule Blocks above to
             archive.
           </p>
         </div>
@@ -592,7 +593,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                   className="inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
                                 >
                                   <Archive className="h-3.5 w-3.5" />
-                                  Archive block
+                                  Archive Schedule Block
                                 </button>
                               </form>
                               <form action={deletePublishEventAction}>
@@ -611,7 +612,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                             href={`/schedule?cycle=${event.cycle_id}`}
                             className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                           >
-                            Open block
+                            Open Schedule Block
                           </Link>
                           <Link
                             href={`/publish/${event.id}`}

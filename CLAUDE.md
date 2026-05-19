@@ -179,7 +179,7 @@ Broader historical baseline:
 
 - `npm run test:e2e` pass when Supabase service env is available; there are 26 Playwright spec files as of 2026-05-05 and default workers are set to `2`
 - Full `npx vitest run` is green without real Supabase admin env: **`assignment-status`** route tests mock **`@/lib/supabase/admin`** (`createAdminClient`).
-- Local auth E2E defaults to the `reset:e2e` / `seed:functional` demo manager (`demo-manager@teamwise.test` / `Teamwise123!`) when `CI` is not set; CI should still provide explicit credentials.
+- Local auth E2E defaults to the `reset:e2e` / `seed:functional` real-roster demo manager (`julie.d@teamwise.test` / `Teamwise123!`) when `CI` is not set; CI should still provide explicit credentials.
 
 CI gates: format check → lint → tsc → build → Playwright E2E
 

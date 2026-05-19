@@ -188,6 +188,7 @@ export function ManagerTriageDashboard({
   reviewHref,
   activeCycleDateRange,
   currentCycleCtaHref,
+  nextCycleCtaHref,
 }: ManagerTriageDashboardProps) {
   const isLoading =
     isLoadingValue(todayCoverageCovered) ||
@@ -423,6 +424,14 @@ export function ManagerTriageDashboard({
               <Button variant="outline" size="sm" className="min-h-10 w-full" asChild>
                 <Link href={currentCycleCtaHref ?? scheduleHref}>
                   Continue Schedule Block
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
+              </Button>
+            ) : null}
+            {nextCycleCtaHref ? (
+              <Button variant="outline" size="sm" className="min-h-10 w-full" asChild>
+                <Link href={nextCycleCtaHref}>
+                  Plan next Schedule Block
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               </Button>

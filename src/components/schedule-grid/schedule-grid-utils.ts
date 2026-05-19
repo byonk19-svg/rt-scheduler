@@ -18,12 +18,12 @@ const STATUS_CODE: Record<GridCellStatus, string> = {
 }
 
 const STATUS_COLOR: Record<GridCellStatus, string> = {
-  lead: 'bg-yellow-200 text-yellow-900',
-  staff: 'bg-blue-100 text-blue-700',
-  on_call: 'bg-yellow-50 text-yellow-700',
-  cancelled: 'bg-red-100 text-red-800',
-  call_in: 'bg-green-100 text-green-800',
-  left_early: 'bg-orange-100 text-orange-800',
+  lead: 'border border-yellow-300 bg-yellow-200 text-yellow-950',
+  staff: 'text-[var(--print-ink)]',
+  on_call: 'font-black text-[var(--warning-text)]',
+  cancelled: 'font-black text-[var(--error-text)]',
+  call_in: 'font-black text-[var(--success-text)]',
+  left_early: 'font-black text-orange-700',
   off: '',
 }
 

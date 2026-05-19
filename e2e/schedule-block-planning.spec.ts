@@ -1,0 +1,149 @@
+import { expect, test } from '@playwright/test'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+import { loginAs } from './helpers/auth'
+import { randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
+import { createScheduleCycle } from './helpers/schedule-cycles'
+import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
+
+type TestContext = {
+  supabase: SupabaseClient
+  siteId: string
+  manager: { id: string; email: string; password: string }
+  therapist: { id: string; email: string; password: string }
+  hiddenCycle: { id: string; label: string; startDate: string; endDate: string }
+}
+
+test.describe.serial('/schedule/planning Schedule Block Planning', () => {
+  test.setTimeout(90_000)
+
+  let ctx: TestContext | null = null
+  const createdUserIds: string[] = []
+  const createdCycleIds: string[] = []
+
+  test.beforeAll(async () => {
+    const supabase = createServiceRoleClientOrNull()
+    if (!supabase) return
+
+    const siteId = randomString('planning-site')
+    const siteInsert = await supabase
+      .from('sites')
+      .insert({ id: siteId, name: 'Planning E2E Site' })
+    if (siteInsert.error) throw new Error(siteInsert.error.message)
+
+    const managerEmail = `${randomString('planning-manager')}@example.com`
+    const managerPassword = `Mngr!${Math.random().toString(16).slice(2, 8)}`
+    const manager = await createE2EUser(supabase, {
+      email: managerEmail,
+      password: managerPassword,
+      fullName: 'E2E Planning Manager',
+      role: 'manager',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      siteId,
+      isLeadEligible: true,
+    })
+
+    const therapistEmail = `${randomString('planning-therapist')}@example.com`
+    const therapistPassword = `Ther!${Math.random().toString(16).slice(2, 8)}`
+    const therapist = await createE2EUser(supabase, {
+      email: therapistEmail,
+      password: therapistPassword,
+      fullName: 'E2E Planning Therapist',
+      role: 'therapist',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      siteId,
+      isLeadEligible: false,
+    })
+
+    const hiddenLabel = `Hidden Planning ${randomString('cycle')}`
+    const hiddenCycle = await createScheduleCycle(supabase, {
+      label: hiddenLabel,
+      siteId,
+      startDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 180),
+    })
+
+    createdUserIds.push(manager.id, therapist.id)
+    createdCycleIds.push(hiddenCycle.id)
+    ctx = {
+      supabase,
+      siteId,
+      manager: { id: manager.id, email: managerEmail, password: managerPassword },
+      therapist: { id: therapist.id, email: therapistEmail, password: therapistPassword },
+      hiddenCycle: {
+        id: hiddenCycle.id,
+        label: hiddenLabel,
+        startDate: hiddenCycle.start_date,
+        endDate: hiddenCycle.end_date,
+      },
+    }
+  })
+
+  test.afterAll(async () => {
+    if (!ctx) return
+    await ctx.supabase.from('notifications').delete().in('target_id', createdCycleIds)
+    await ctx.supabase.from('availability_overrides').delete().in('cycle_id', createdCycleIds)
+    await ctx.supabase
+      .from('therapist_availability_submissions')
+      .delete()
+      .in('schedule_cycle_id', createdCycleIds)
+    await ctx.supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
+    await ctx.supabase.from('schedule_cycles').delete().in('id', createdCycleIds)
+    await ctx.supabase.from('profiles').delete().in('id', createdUserIds)
+    for (const userId of createdUserIds) {
+      await ctx.supabase.auth.admin.deleteUser(userId)
+    }
+    await ctx.supabase.from('sites').delete().eq('id', ctx.siteId)
+  })
+
+  test('manager plans the next block and therapists only see blocks with a due date', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await gotoWithRetry(page, '/schedule/planning')
+
+    await expect(page.getByRole('heading', { name: 'Schedule Block Planning' })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByRole('link', { name: 'Planning' })).toBeVisible()
+    await expect(page.getByText('Manager draft').first()).toBeVisible()
+
+    await page.getByRole('button', { name: 'Save Schedule Block' }).click()
+    await expect(page.getByText('Schedule Block Planning saved.')).toBeVisible({
+      timeout: 20_000,
+    })
+
+    const createdResult = await ctx!.supabase
+      .from('schedule_cycles')
+      .select(
+        'id, label, start_date, end_date, availability_due_at, preliminary_target_date, final_publish_target_date'
+      )
+      .eq('site_id', ctx!.siteId)
+      .gt('start_date', ctx!.hiddenCycle.endDate)
+      .order('start_date', { ascending: true })
+      .limit(1)
+      .single()
+
+    if (createdResult.error || !createdResult.data) {
+      throw new Error(`Could not read planned Schedule Block: ${createdResult.error?.message}`)
+    }
+
+    createdCycleIds.push(createdResult.data.id)
+    expect(createdResult.data.availability_due_at).toBeTruthy()
+    expect(createdResult.data.preliminary_target_date).toBeTruthy()
+    expect(createdResult.data.final_publish_target_date).toBeTruthy()
+
+    await page.context().clearCookies()
+    await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
+    await gotoWithRetry(page, '/therapist/availability')
+
+    await expect(page.getByText(createdResult.data.label).first()).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByText(ctx!.hiddenCycle.label)).toHaveCount(0)
+  })
+})

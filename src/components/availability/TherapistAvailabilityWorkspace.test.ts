@@ -278,6 +278,7 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Add days you Need to Work or Need Off.')
     expect(html).toContain('Set recurring pattern')
     expect(html).not.toContain('Edit recurring pattern')
+    expect(html).not.toContain('We used your normal schedule to fill this cycle.')
     expect(html).not.toContain('We used your normal schedule to fill this Schedule Block.')
   })
 
@@ -297,7 +298,10 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(src).toContain('Need to Work')
     expect(src).toContain('Need Off')
     expect(src).toContain(
-      'Submitted with no Schedule Block-only changes. Your normal schedule is your current response.'
+      'Submitted with no Schedule Block changes. Your normal schedule is your current response.'
+    )
+    expect(src).toContain(
+      'You already submitted this Schedule Block without adding changes for this Schedule Block.'
     )
     expect(src).toContain(
       'Submitted with no day-level changes. This Schedule Block is currently blank unless you add dates.'

@@ -358,6 +358,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const isTherapistSchedulePage =
     pathname === '/therapist/schedule' || pathname === '/staff/my-schedule'
   const hideLocalSectionNav = pathname.startsWith('/availability')
+  const showWorkflowContextStrip = Boolean(workflowContext) && !isSchedulePage
 
   return (
     <ThemeProvider>
@@ -437,12 +438,14 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
         />
 
         <div className="min-h-screen pb-20 pt-11 md:pb-0">
-          {workflowContext ? <WorkflowContextStrip context={workflowContext} /> : null}
+          {showWorkflowContextStrip && workflowContext ? (
+            <WorkflowContextStrip context={workflowContext} />
+          ) : null}
           <main
             id="main-content"
             tabIndex={-1}
             className={cn(
-              'w-full print:max-w-none',
+              'scroll-mt-16 w-full print:max-w-none',
               isCoveragePage || isSchedulePage || isAvailabilityPage || isTherapistSchedulePage
                 ? 'py-4 md:py-5'
                 : cn(APP_PAGE_MAX_WIDTH_CLASS, 'py-5 md:py-7 print:mx-0 print:px-4 print:py-4')

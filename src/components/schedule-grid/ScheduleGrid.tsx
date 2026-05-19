@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createCoverageShiftMutator } from '@/lib/coverage/mutations'
 import { shiftTabToQueryValue } from '@/lib/coverage/coverage-shift-tab'
 import type { AssignmentStatus, ShiftStatus } from '@/lib/shift-types'
+import { cn } from '@/lib/utils'
 
 import { AssignCellPopover } from './AssignCellPopover'
 import { ScheduleGridTable } from './ScheduleGridTable'
@@ -30,6 +31,39 @@ type ScheduleGridProps = {
   publishAction?: (formData: FormData) => void | Promise<void>
   preFlightSummary?: ScheduleGridPreFlightSummary | null
 }
+
+const SCHEDULE_LEGEND_ITEMS = [
+  {
+    label: 'Staff',
+    code: '1',
+    className: 'text-[var(--print-ink)]',
+  },
+  { label: 'Lead', code: '1', className: 'border border-yellow-300 bg-yellow-200 text-yellow-900' },
+  {
+    label: 'On call',
+    code: 'OC',
+    className:
+      'border border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+  },
+  {
+    label: 'Cancelled',
+    code: 'CX',
+    className:
+      'border border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]',
+  },
+  {
+    label: 'Call in',
+    code: 'CI',
+    className:
+      'border border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]',
+  },
+  {
+    label: 'Left early',
+    code: 'LE',
+    className: 'border border-orange-200 bg-orange-100 text-orange-800',
+  },
+  { label: 'Requested off', code: '*', className: 'text-foreground' },
+] as const
 
 function toCoveragePayload(status: AssignmentStatusValue): {
   assignment_status: AssignmentStatus
@@ -184,9 +218,11 @@ export function ScheduleGrid({
 
   const isAssignTarget = activeCellTarget?.cell.status === 'off'
   const isStatusTarget = Boolean(activeCellTarget && activeCellTarget.cell.status !== 'off')
+  const sheetTitle = loadedShiftTab === 'Night' ? 'RT NIGHT SHIFT LOG' : 'RT DAY SHIFT LOG'
+  const sheetDayCount = `${initialDataset.cycleDates.length} days`
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+    <div className="rounded-xl border border-border/60 bg-[color-mix(in_srgb,var(--muted)_68%,var(--background))] p-3 shadow-inner sm:p-4 lg:p-5">
       {autoDraftAction ? (
         <form ref={autoDraftFormRef} action={autoDraftAction} className="hidden">
           <input type="hidden" name="cycle_id" value={initialDataset.cycleId} />
@@ -206,36 +242,71 @@ export function ScheduleGrid({
           <input type="hidden" name="view" value="grid" />
         </form>
       ) : null}
-      <ScheduleGridToolbar
-        cycleId={initialDataset.cycleId}
-        cycleDateRangeLabel={initialDataset.cycleDateRangeLabel}
-        availableCycles={initialDataset.availableCycles}
-        isPublished={initialDataset.isPublished}
-        shiftTab={shiftTab}
-        isPending={isPending}
-        canManageCoverage={initialDataset.canManageCoverage}
-        onCycleChange={handleCycleChange}
-        onShiftTabChange={handleShiftTabChange}
-        onAutoDraft={autoDraftAction ? () => autoDraftFormRef.current?.requestSubmit() : undefined}
-        onPreFlight={preFlightSummary ? () => setShowPreFlight((value) => !value) : undefined}
-        onPrint={() => window.print()}
-        onPublish={publishAction ? () => publishFormRef.current?.requestSubmit() : undefined}
-      />
-      {showPreFlight && preFlightSummary ? (
-        <div className="border-b border-border bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <p className="font-semibold">Pre-flight summary</p>
-          <p className="mt-1">
-            {preFlightSummary.unfilledSlots} unfilled assignments,{' '}
-            {preFlightSummary.missingLeadSlots} missing lead slots,{' '}
-            {preFlightSummary.forcedMustWorkMisses} need-to-work misses.
-          </p>
-        </div>
-      ) : null}
-      <ScheduleGridTable
-        dataset={initialDataset}
-        onCellClick={handleCellClick}
-        interactionsDisabled={cellsLocked}
-      />
+      <div className="space-y-3">
+        <ScheduleGridToolbar
+          cycleId={initialDataset.cycleId}
+          cycleDateRangeLabel={initialDataset.cycleDateRangeLabel}
+          availableCycles={initialDataset.availableCycles}
+          isPublished={initialDataset.isPublished}
+          shiftTab={shiftTab}
+          isPending={isPending}
+          canManageCoverage={initialDataset.canManageCoverage}
+          onCycleChange={handleCycleChange}
+          onShiftTabChange={handleShiftTabChange}
+          onAutoDraft={
+            autoDraftAction ? () => autoDraftFormRef.current?.requestSubmit() : undefined
+          }
+          onPreFlight={preFlightSummary ? () => setShowPreFlight((value) => !value) : undefined}
+          onPrint={() => window.print()}
+          onPublish={publishAction ? () => publishFormRef.current?.requestSubmit() : undefined}
+        />
+        {showPreFlight && preFlightSummary ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-tw-2xs">
+            <p className="font-semibold">Pre-flight summary</p>
+            <p className="mt-1">
+              {preFlightSummary.unfilledSlots} unfilled assignments,{' '}
+              {preFlightSummary.missingLeadSlots} missing lead slots,{' '}
+              {preFlightSummary.forcedMustWorkMisses} need-to-work misses.
+            </p>
+          </div>
+        ) : null}
+        <article className="mx-auto max-w-[96rem] overflow-hidden rounded-[6px] border border-border/80 bg-[var(--print-paper)] text-[var(--print-ink)] shadow-[0_22px_54px_-38px_rgba(15,23,42,0.58)]">
+          <div className="border-b border-border/60 bg-[var(--print-paper)] px-5 py-4">
+            <div>
+              <p className="text-[13px] font-black uppercase tracking-[0.12em] text-[var(--print-ink)]">
+                {sheetTitle}
+              </p>
+              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.04em] text-[var(--print-ink-muted)]">
+                {initialDataset.cycleDateRangeLabel} | {sheetDayCount}
+              </p>
+            </div>
+          </div>
+          <div
+            aria-label="Schedule legend"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/55 bg-[color-mix(in_srgb,var(--print-paper)_94%,var(--muted))] px-5 py-1.5 text-[9px] text-[var(--print-ink-muted)]"
+          >
+            <span className="font-black uppercase tracking-[0.1em]">Legend</span>
+            {SCHEDULE_LEGEND_ITEMS.map((item) => (
+              <span key={item.label} className="inline-flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    'inline-flex min-h-3.5 min-w-3.5 items-center justify-center rounded-[2px] px-0.5 text-[8px] font-black leading-none',
+                    item.className
+                  )}
+                >
+                  {item.code}
+                </span>
+                <span>{item.label}</span>
+              </span>
+            ))}
+          </div>
+          <ScheduleGridTable
+            dataset={initialDataset}
+            onCellClick={handleCellClick}
+            interactionsDisabled={cellsLocked}
+          />
+        </article>
+      </div>
       {isAssignTarget && activeCellTarget ? (
         <AssignCellPopover
           open

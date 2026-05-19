@@ -9,8 +9,8 @@
  * Env:
  *   NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY (required for authenticated shots)
  *   PLAYWRIGHT_BASE_URL   (default http://127.0.0.1:3000 — if this points at production, shots won’t match local edits)
- *   SHOT_MANAGER_EMAIL    (default demo-manager@teamwise.test)
- *   SHOT_STAFF_EMAIL      (default demo-therapist01@teamwise.test)
+ *   SHOT_MANAGER_EMAIL    (default julie.d@teamwise.test)
+ *   SHOT_STAFF_EMAIL      (default layne@teamwise.test)
  *   SHOT_PASSWORD         (default Teamwise123!)
  *   E2E_USER_EMAIL / E2E_USER_PASSWORD — fallback if SHOT_* not set for manager
  */
@@ -113,8 +113,8 @@ function assertLikelyLocalDev() {
 }
 
 const managerEmail =
-  process.env.SHOT_MANAGER_EMAIL ?? process.env.E2E_USER_EMAIL ?? 'demo-manager@teamwise.test'
-const staffEmail = process.env.SHOT_STAFF_EMAIL ?? 'demo-therapist01@teamwise.test'
+  process.env.SHOT_MANAGER_EMAIL ?? process.env.E2E_USER_EMAIL ?? 'julie.d@teamwise.test'
+const staffEmail = process.env.SHOT_STAFF_EMAIL ?? 'layne@teamwise.test'
 const password = process.env.SHOT_PASSWORD ?? process.env.E2E_USER_PASSWORD ?? 'Teamwise123!'
 
 const PUBLIC_SHOTS = [

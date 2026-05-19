@@ -64,6 +64,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 function isManagerScheduleRoute(pathname: string): boolean {
   return (
     pathname === '/schedule' ||
+    pathname === '/schedule/planning' ||
     pathname === '/analytics' ||
     pathname === '/availability' ||
     pathname === '/lottery' ||
@@ -114,6 +115,11 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           href: '/schedule',
           label: 'Schedule',
           active: (pathname) => pathname === '/schedule',
+        },
+        {
+          href: '/schedule/planning',
+          label: 'Planning',
+          active: (pathname) => pathname === '/schedule/planning',
         },
         {
           href: '/analytics',
@@ -269,7 +275,8 @@ export function getMobilePrimaryItems(args: {
       {
         href: '/schedule',
         label: 'Schedule',
-        active: (pathname) => pathname === '/schedule' || pathname === '/coverage',
+        active: (pathname) =>
+          pathname === '/schedule' || pathname === '/schedule/planning' || pathname === '/coverage',
       },
       {
         href: '/availability',
@@ -369,10 +376,19 @@ export function getWorkflowContext(args: {
       }
     }
 
+    if (pathname === '/schedule/planning') {
+      return {
+        workflow: 'Schedule Block Planning',
+        context: 'Future Schedule Blocks and target dates',
+        state: 'Draft planning',
+        permission: 'Manager editable',
+      }
+    }
+
     if (pathname === '/availability') {
       return {
         workflow: 'Availability',
-        context: 'Team exceptions for the block',
+        context: 'Team exceptions for the Schedule Block',
         state: 'Missing, submitted, manager edited',
         permission: 'Manager managed after lock',
       }
@@ -408,7 +424,7 @@ export function getWorkflowContext(args: {
     if (pathname === '/publish' || pathname.startsWith('/publish/')) {
       return {
         workflow: 'Publish',
-        context: 'Schedule Block history',
+        context: 'Schedule Block - history',
         state: 'Queued, published, offline',
         permission: 'Manager controlled',
       }
@@ -463,7 +479,7 @@ export function getWorkflowContext(args: {
   if (pathname === '/therapist/availability' || pathname === '/availability') {
     return {
       workflow: 'Availability',
-      context: 'Need Off and Need to Work',
+      context: 'Need Off / Need to Work',
       state: 'Editable while the window is open',
       permission: 'Your exceptions',
     }

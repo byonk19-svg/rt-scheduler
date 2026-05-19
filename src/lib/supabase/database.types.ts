@@ -1624,6 +1624,8 @@ export type Database = {
           label: string
           offline_at: string | null
           offline_by: string | null
+          final_publish_target_date: string | null
+          preliminary_target_date: string | null
           published: boolean
           site_id: string
           start_date: string
@@ -1642,6 +1644,8 @@ export type Database = {
           label: string
           offline_at?: string | null
           offline_by?: string | null
+          final_publish_target_date?: string | null
+          preliminary_target_date?: string | null
           published?: boolean
           site_id?: string
           start_date: string
@@ -1660,6 +1664,8 @@ export type Database = {
           label?: string
           offline_at?: string | null
           offline_by?: string | null
+          final_publish_target_date?: string | null
+          preliminary_target_date?: string | null
           published?: boolean
           site_id?: string
           start_date?: string

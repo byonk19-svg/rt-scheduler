@@ -6,8 +6,8 @@ import { ManagerTriageDashboard } from '@/components/manager/ManagerTriageDashbo
 import { can } from '@/lib/auth/can'
 import { resolveUserRole } from '@/lib/auth/role-source'
 import { buildCycleRoute } from '@/lib/cycle-route'
-import { getNextCyclePlanningWindow } from '@/lib/manager-inbox'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { availabilityDueDateKey } from '@/lib/schedule-block-planning'
 import { createClient } from '@/lib/supabase/server'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
@@ -52,6 +52,14 @@ type ShiftCountRow = {
   user_id: string | null
 }
 
+type DashboardCycle = Cycle & {
+  archived_at?: string | null
+  availability_due_at?: string | null
+  preliminary_target_date?: string | null
+  final_publish_target_date?: string | null
+  status?: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+}
+
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
@@ -71,6 +79,53 @@ function formatCycleDate(value: string): string {
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function getNextPlanningSummary(cycle: DashboardCycle | null): {
+  label: string
+  detail: string
+  ctaHref: string
+} {
+  if (!cycle) {
+    return {
+      label: 'Plan the next Schedule Block',
+      detail: 'Create the next six-week Schedule Block and set its planning dates.',
+      ctaHref: '/schedule/planning',
+    }
+  }
+
+  const availabilityDueDate = availabilityDueDateKey(cycle.availability_due_at)
+  if (!availabilityDueDate) {
+    return {
+      label: 'Set availability due date',
+      detail: `${cycle.label} is not visible to therapists yet.`,
+      ctaHref: `/schedule/planning?cycle=${cycle.id}`,
+    }
+  }
+
+  if (!cycle.preliminary_target_date) {
+    return {
+      label: `Availability due ${formatCycleDate(availabilityDueDate)}`,
+      detail: 'Add the Preliminary target date for this Schedule Block.',
+      ctaHref: `/schedule/planning?cycle=${cycle.id}`,
+    }
+  }
+
+  if (!cycle.final_publish_target_date) {
+    return {
+      label: `Preliminary target ${formatCycleDate(cycle.preliminary_target_date)}`,
+      detail: 'Add the Final Publish target date for this Schedule Block.',
+      ctaHref: `/schedule/planning?cycle=${cycle.id}`,
+    }
+  }
+
+  return {
+    label: `Availability due ${formatCycleDate(availabilityDueDate)}`,
+    detail: `Preliminary target ${formatCycleDate(
+      cycle.preliminary_target_date
+    )}. Final Publish target ${formatCycleDate(cycle.final_publish_target_date)}.`,
+    ctaHref: `/schedule/planning?cycle=${cycle.id}`,
+  }
 }
 
 function formatDayLabel(value: string): string {
@@ -151,7 +206,9 @@ export default async function ManagerDashboardPage() {
       .maybeSingle(),
     supabase
       .from('schedule_cycles')
-      .select('id, label, start_date, end_date, published, archived_at')
+      .select(
+        'id, label, start_date, end_date, published, status, archived_at, availability_due_at, preliminary_target_date, final_publish_target_date'
+      )
       .is('archived_at', null)
       .gte('end_date', todayKey)
       .order('start_date', { ascending: true }),
@@ -209,7 +266,7 @@ export default async function ManagerDashboardPage() {
     redirect('/dashboard/staff')
   }
 
-  const cycles = (cyclesResult.data ?? []) as Cycle[]
+  const cycles = (cyclesResult.data ?? []) as DashboardCycle[]
   const activeCycle =
     cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ?? null
   const nextCycle = activeCycle
@@ -313,7 +370,7 @@ export default async function ManagerDashboardPage() {
   }))
 
   const scheduleHref = buildCycleRoute('/schedule', activeCycle?.id ?? null)
-  const nextCyclePlanning = getNextCyclePlanningWindow(nextCycle?.start_date ?? null)
+  const nextCyclePlanning = getNextPlanningSummary(nextCycle)
   const activeCycleHasNoShifts =
     Boolean(activeCycle) && dayRows.length === 0 && nightRows.length === 0
 
@@ -331,13 +388,8 @@ export default async function ManagerDashboardPage() {
       : `Publish by ${formatCycleDate(activeCycle.end_date)}`
     : 'No current Schedule Block is active.'
 
-  const nextCycleLabel = nextCyclePlanning.collectAvailabilityOn
-    ? `Collect availability ${formatCycleDate(nextCyclePlanning.collectAvailabilityOn)}`
-    : 'No next Schedule Block'
-
-  const nextCycleDetail = nextCyclePlanning.publishBy
-    ? `Publish by ${formatCycleDate(nextCyclePlanning.publishBy)}`
-    : 'Create the next Schedule Block to plan ahead.'
+  const nextCycleLabel = nextCyclePlanning.label
+  const nextCycleDetail = nextCyclePlanning.detail
 
   const needsReviewCount = unreadReviewCountResult.count ?? 0
   const needsReviewDetail =
@@ -374,7 +426,7 @@ export default async function ManagerDashboardPage() {
       reviewHref={latestUnread ? getNotificationHref(latestUnread) : '/schedule'}
       activeCycleDateRange={activeCycleDateRange ?? undefined}
       currentCycleCtaHref={!activeCycle ? '/schedule' : undefined}
-      nextCycleCtaHref={!nextCycle ? '/schedule' : undefined}
+      nextCycleCtaHref={nextCyclePlanning.ctaHref}
     />
   )
 }

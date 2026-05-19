@@ -33,6 +33,7 @@ Default match rules are intentionally narrow:
 
 - domain: `teamwise.test`
 - prefixes: `demo-manager`, `demo-lead-`, `demo-therapist`, `employee`
+- exact real-roster demo emails such as `julie.d@teamwise.test`, `layne@teamwise.test`, and `mark@teamwise.test`
 - exact email: `manager@teamwise.test`
 
 Optional overrides:
