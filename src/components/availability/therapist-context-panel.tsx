@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 
-import { CalendarDays, ChevronDown, Info, MoreHorizontal } from 'lucide-react'
+import { CalendarDays, ChevronDown } from 'lucide-react'
 
 import { ManagerAvailabilityEditorPanel } from '@/components/availability/manager-availability-editor-panel'
 import { Badge } from '@/components/ui/badge'
@@ -96,6 +96,11 @@ function initialsForName(name: string): string {
     .join('')
 }
 
+function submissionLabel(status: SubmissionStatus | null) {
+  if (!status?.submitted) return 'Not submitted'
+  return status.overridesCount > 0 ? 'Submitted with requests' : 'Submitted no requests'
+}
+
 export function TherapistContextPanel({
   therapist,
   cycleLabel,
@@ -155,14 +160,14 @@ export function TherapistContextPanel({
   }
 
   return (
-    <section className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted/45 text-[1.35rem] font-semibold tracking-[-0.03em] text-foreground">
+    <section className="space-y-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/45 text-base font-semibold text-foreground">
             {initialsForName(therapist.full_name)}
           </div>
-          <div className="min-w-0 space-y-2">
-            <h2 className="text-[1.65rem] font-semibold tracking-[-0.03em] text-foreground">
+          <div className="min-w-0 space-y-1">
+            <h2 className="text-[1.25rem] font-semibold tracking-[-0.02em] text-foreground">
               {therapist.full_name}
             </h2>
             <div className="flex flex-wrap items-center gap-2">
@@ -174,7 +179,7 @@ export function TherapistContextPanel({
                     : 'border-[var(--warning-border)] text-[var(--warning-text)]'
                 )}
               >
-                {submissionStatus?.submitted ? 'Submitted' : 'Not submitted'}
+                {submissionLabel(submissionStatus)}
               </Badge>
               <Badge variant="outline">{shiftLabel(therapist.shift_type)}</Badge>
               <Badge variant="outline" className="text-muted-foreground">
@@ -182,19 +187,14 @@ export function TherapistContextPanel({
               </Badge>
             </div>
             <p className="text-[0.88rem] text-muted-foreground">{cycleLabel}</p>
-            {!submissionStatus?.submitted ? (
-              <p className="text-sm text-muted-foreground">
-                No official submission yet. Review requests here or enter dates on their behalf.
-              </p>
-            ) : null}
           </div>
         </div>
 
-        <div className="flex min-w-[10.5rem] flex-col gap-3">
+        <div className="flex min-w-[7rem] flex-col gap-2">
           <Button
             type="button"
             variant="outline"
-            className="min-h-11 rounded-xl text-[0.95rem]"
+            className="min-h-9 rounded-md text-sm"
             onClick={onClose}
           >
             Close
@@ -202,50 +202,41 @@ export function TherapistContextPanel({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[1rem] border border-border/60 bg-background/80 px-4 py-4">
-          <p className="text-[13px] font-medium text-muted-foreground">Need Off</p>
-          <p className="mt-3 text-[1.35rem] font-semibold tracking-[-0.02em] text-[var(--warning-text)]">
-            {needOffCount}
-          </p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-[0.8rem] border border-border/60 bg-background/80 px-3 py-2 text-sm">
+        <div>
+          <span className="text-xs font-medium text-muted-foreground">Need Off</span>
+          <span className="ml-2 font-semibold text-[var(--warning-text)]">{needOffCount}</span>
         </div>
-
-        <div className="rounded-[1rem] border border-border/60 bg-background/80 px-4 py-4">
-          <p className="text-[13px] font-medium text-muted-foreground">Need to Work</p>
-          <p className="mt-3 text-[1.35rem] font-semibold tracking-[-0.02em] text-[color:#7c3aed]">
-            {requestToWorkCount}
-          </p>
+        <div>
+          <span className="text-xs font-medium text-muted-foreground">Need to Work</span>
+          <span className="ml-2 font-semibold text-[var(--info-text)]">{requestToWorkCount}</span>
         </div>
-
-        <div className="rounded-[1rem] border border-border/60 bg-background/80 px-4 py-4">
-          <p className="text-[13px] font-medium text-muted-foreground">Manager plan dates</p>
-          <p className="mt-3 text-[1.35rem] font-semibold tracking-[-0.02em] text-[var(--success-text)]">
-            {savedPlannerCount}
-          </p>
+        <div>
+          <span className="text-xs font-medium text-muted-foreground">Planning assumptions</span>
+          <span className="ml-2 font-semibold text-[var(--success-text)]">{savedPlannerCount}</span>
         </div>
-
-        <div className="rounded-[1rem] border border-border/60 bg-background/80 px-4 py-4">
-          <p className="text-[13px] font-medium text-muted-foreground">Latest activity</p>
-          <p className="mt-3 text-[1rem] font-semibold tracking-[-0.02em] text-foreground">
+        <div>
+          <span className="text-xs font-medium text-muted-foreground">Last activity</span>
+          <span className="ml-2 font-semibold text-foreground">
             {formatDateTime(latestActivity)}
-          </p>
+          </span>
         </div>
       </div>
 
-      <section className="rounded-[1.1rem] border border-border/60 bg-background/85 px-5 py-4">
-        <h3 className="text-[0.95rem] font-semibold tracking-[-0.02em] text-foreground">
-          Requests on file
-        </h3>
-        {visibleRequests.length > 0 ? (
-          <div className="mt-4 space-y-2">
+      {visibleRequests.length > 0 ? (
+        <section className="rounded-[0.8rem] border border-border/60 bg-background/85 px-3 py-2.5">
+          <h3 className="text-[0.95rem] font-semibold tracking-[-0.02em] text-foreground">
+            Requests on file
+          </h3>
+          <div className="mt-3 space-y-1.5">
             {visibleRequests.map((row) => {
               const isManagerEdited = row.createdById && row.createdById !== therapist.id
               return (
                 <div
                   key={row.id}
-                  className="rounded-[0.95rem] border border-border/60 bg-muted/10 px-4 py-3"
+                  className="rounded-md border border-border/60 bg-muted/10 px-3 py-2"
                 >
-                  <div className="grid gap-3 md:grid-cols-[11rem_minmax(0,1fr)_7rem_1.5rem] md:items-center">
+                  <div className="grid gap-2 md:grid-cols-[10rem_minmax(0,1fr)_12rem] md:items-center">
                     <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       <CalendarDays className="h-4 w-4 text-muted-foreground" />
                       <span>{formatEmployeeDate(row.date)}</span>
@@ -274,57 +265,36 @@ export function TherapistContextPanel({
                         </Badge>
                       ) : null}
                     </div>
-                    <button
-                      type="button"
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      aria-label="Request actions"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
                   </div>
-                  <p className="mt-2 text-[10px] text-muted-foreground md:text-right">
+                  <p className="mt-1 text-[10px] text-muted-foreground md:text-right">
                     {formatDateTime(row.updatedAt ?? row.createdAt)}
                   </p>
                 </div>
               )
             })}
           </div>
-        ) : (
-          <p className="mt-3 text-sm text-muted-foreground">
-            No therapist requests are on file for this Schedule Block.
-          </p>
-        )}
-
-        {requestRows.length > 3 ? (
-          <div className="mt-4 flex justify-center">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80"
-              onClick={() => setExpandedRequests((value) => !value)}
-            >
-              {expandedRequests ? 'Show fewer requests' : `View all ${requestRows.length} requests`}
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${expandedRequests ? 'rotate-180' : ''}`}
-              />
-            </button>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="rounded-[1.1rem] border border-[color:rgba(59,130,246,0.18)] bg-[color:rgba(239,246,255,0.7)] px-5 py-4">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[color:rgba(59,130,246,0.3)] bg-white text-[color:#2563eb]">
-            <Info className="h-4 w-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Manager note</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              The grid below keeps therapist requests, saved manager plan dates, and your draft
-              changes visible in one place.
-            </p>
-          </div>
+        </section>
+      ) : (
+        <div className="rounded-[0.75rem] border border-dashed border-border/60 bg-muted/[0.04] px-3 py-2 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">Requests on file:</span>{' '}
+          <span>None for this Schedule Block.</span>
         </div>
-      </section>
+      )}
+
+      {visibleRequests.length > 0 && requestRows.length > 3 ? (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+            onClick={() => setExpandedRequests((value) => !value)}
+          >
+            {expandedRequests ? 'Show fewer requests' : `View all ${requestRows.length} requests`}
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${expandedRequests ? 'rotate-180' : ''}`}
+            />
+          </button>
+        </div>
+      ) : null}
 
       <ManagerAvailabilityEditorPanel
         therapist={therapist}

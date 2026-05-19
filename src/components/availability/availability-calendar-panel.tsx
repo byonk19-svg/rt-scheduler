@@ -35,10 +35,11 @@ const CHIP_STYLES = {
     'border-[var(--info-border)]/80 bg-[var(--info-subtle)]/65 text-[var(--info-text)]',
 } as const
 
-function renderStateChip(type: keyof typeof CHIP_STYLES, label: string) {
+function renderStateChip(type: keyof typeof CHIP_STYLES, label: string, title?: string) {
   return (
     <span
       key={`${type}-${label}`}
+      title={title ?? label}
       className={cn(
         'inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none',
         CHIP_STYLES[type]
@@ -58,27 +59,24 @@ export function AvailabilityCalendarPanel({
   const calendarWeeks = buildCalendarWeeks(cycleStart, cycleEnd)
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section className="space-y-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-            Schedule Block
-          </p>
-          <h3 className="mt-1 text-base font-semibold text-foreground">
+          <h3 className="text-sm font-semibold text-foreground">
             {formatHumanCycleRange(cycleStart, cycleEnd)}
           </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sunday-start Schedule Block view with saved planner dates, therapist requests, and draft
-            selections in one grid.
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Unmarked days are baseline. Colored markers show therapist requests, manager plan dates,
+            and unsaved draft changes.
           </p>
         </div>
 
-        <div className="flex flex-wrap justify-end gap-1.5 text-xs text-muted-foreground">
-          {renderStateChip('saved', 'Plan')}
-          {renderStateChip('will_work', 'Work')}
-          {renderStateChip('cannot_work', 'Block')}
-          {renderStateChip('need_off', 'Off')}
-          {renderStateChip('request_to_work', 'Req')}
+        <div className="flex flex-wrap justify-end gap-1 text-xs text-muted-foreground">
+          {renderStateChip('saved', 'Planning assumption')}
+          {renderStateChip('will_work', 'Need to work')}
+          {renderStateChip('need_off', 'Need off')}
+          {renderStateChip('cannot_work', 'Blocked')}
+          {renderStateChip('request_to_work', 'Therapist request')}
         </div>
       </div>
 
@@ -104,21 +102,28 @@ export function AvailabilityCalendarPanel({
                 const state = dayStates[dayKey] ?? {}
                 const chips = []
 
-                if (state.savedPlanner) chips.push(renderStateChip('saved', 'Plan'))
+                if (state.savedPlanner)
+                  chips.push(renderStateChip('saved', 'Plan', 'Planning assumption'))
                 if (state.requestTypes?.includes('need_off'))
-                  chips.push(renderStateChip('need_off', 'Off'))
+                  chips.push(renderStateChip('need_off', 'Off', 'Therapist Need Off request'))
                 if (state.requestTypes?.includes('request_to_work')) {
-                  chips.push(renderStateChip('request_to_work', 'Req'))
+                  chips.push(
+                    renderStateChip('request_to_work', 'Req', 'Therapist Need to Work request')
+                  )
                 }
                 if (state.draftSelection === 'will_work')
-                  chips.push(renderStateChip('will_work', 'Work'))
+                  chips.push(renderStateChip('will_work', 'Work', 'Draft Need to Work'))
                 if (state.draftSelection === 'cannot_work') {
-                  chips.push(renderStateChip('cannot_work', 'Block'))
+                  chips.push(
+                    renderStateChip('cannot_work', 'Block', 'Draft blocked or unavailable')
+                  )
                 }
                 if (state.draftSelection === 'need_off')
-                  chips.push(renderStateChip('need_off', 'Off'))
+                  chips.push(renderStateChip('need_off', 'Off', 'Draft Need Off'))
                 if (state.draftSelection === 'request_to_work') {
-                  chips.push(renderStateChip('request_to_work', 'Req'))
+                  chips.push(
+                    renderStateChip('request_to_work', 'Req', 'Draft Need to Work request')
+                  )
                 }
 
                 return (

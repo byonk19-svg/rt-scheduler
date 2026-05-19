@@ -152,7 +152,7 @@ function availabilityVisibilitySummary(cycle: Cycle | null): {
   if (!dueDate) {
     return {
       label: 'Manager draft',
-      detail: 'Not visible to therapists until a due date is set.',
+      detail: 'Hidden from therapists until planning dates are set.',
       tone: 'draft',
     }
   }
@@ -200,14 +200,19 @@ export function ManagerSchedulingInputs({
     initialTherapist?.shift_type ?? 'day'
   )
   const [therapistSearch, setTherapistSearch] = useState('')
-  const [mode, setMode] = useState<AvailabilityEditorMode>('will_work')
+  const [mode, setMode] = useState<AvailabilityEditorMode>('need_off')
   const [selectedDates, setSelectedDates] = useState<string[]>(() => {
-    const initialBuckets = getSavedBucketsForSelection(
-      overrides,
-      initialSelectedCycleId,
-      initialSelectedTherapistId
+    return uniqueSortedDates(
+      availabilityEntries
+        .filter(
+          (row) =>
+            row.cycleId === initialSelectedCycleId &&
+            row.therapistId === initialSelectedTherapistId &&
+            isTherapistAvailabilityIntent(row) &&
+            row.entryType === 'force_off'
+        )
+        .map((row) => row.date)
     )
-    return initialBuckets.willWork
   })
 
   const selectedCycle = useMemo(
@@ -553,7 +558,7 @@ export function ManagerSchedulingInputs({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(39rem,1fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(28rem,0.8fr)_minmax(48rem,1.4fr)]">
         <div id="availability-work-queue" className="min-h-0">
           <AvailabilityStatusSummary
             submittedRows={filteredQueueRows.filter((row) => row.submitted)}
@@ -573,7 +578,7 @@ export function ManagerSchedulingInputs({
             }
           />
         </div>
-        <div className="min-h-0 rounded-[1.5rem] border border-border/70 bg-card px-5 py-5 shadow-tw-sm">
+        <div className="min-h-0 rounded-[1.25rem] border border-border/70 bg-card px-4 py-4 shadow-tw-sm">
           <TherapistContextPanel
             therapist={selectedTherapist}
             cycleLabel={

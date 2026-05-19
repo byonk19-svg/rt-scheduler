@@ -1154,7 +1154,6 @@ test.describe.serial('role journeys', () => {
   })
 
   test('manager can force approve a lead-gap pickup with an override reason', async ({
-    page,
     browser,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run role journeys.')
@@ -1507,8 +1506,8 @@ test.describe.serial('role journeys', () => {
 
     await page.goto(`/availability?cycle=${ctx!.draftCycle.id}&therapist=${ctx!.therapist.id}`)
     await expect(page.getByRole('heading', { name: 'Availability Manager' }).first()).toBeVisible()
-    await expect(page.getByRole('button', { name: /Missing submissions/ })).toBeVisible()
-    await expect(page.getByRole('heading', { name: /Edit availability/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Needs submission/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Availability editor/ })).toBeVisible()
 
     await page.goto('/team')
     await expect(page.getByRole('heading', { name: 'Team', level: 1 })).toBeVisible()

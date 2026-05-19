@@ -92,6 +92,18 @@ function statusBadgeClass(submitted: boolean) {
     : 'border-[var(--warning-border)] text-[var(--warning-text)]'
 }
 
+function queueStatusLabel(row: CombinedRosterRow) {
+  if (!row.submitted) return 'Needs submission'
+  return row.overridesCount > 0 ? 'Submitted with requests' : 'Submitted no requests'
+}
+
+function reminderButtonLabel(activeFilter: AvailabilityRosterFilter, missingCount: number) {
+  const count = `(${missingCount})`
+  return activeFilter === 'missing'
+    ? `Remind missing submissions ${count}`
+    : `Send reminders ${count}`
+}
+
 export function AvailabilityStatusSummary({
   submittedRows,
   missingRows,
@@ -215,24 +227,28 @@ export function AvailabilityStatusSummary({
   return (
     <section
       aria-labelledby="availability-work-queue-heading"
-      className="flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-border/70 bg-card shadow-tw-sm"
+      className="flex min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-border/70 bg-card shadow-tw-sm"
     >
       <div
         className={cn(
-          'flex flex-wrap gap-6 border-b border-border/60 px-4 py-5',
+          'flex flex-wrap items-center gap-2 border-b border-border/60 px-4 py-4',
           embedded ? 'bg-muted/[0.04]' : undefined
         )}
       >
+        <div className="mr-auto min-w-[13rem]">
+          <h2 id="availability-work-queue-heading" className="text-base font-bold text-foreground">
+            Availability queue
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Follow up on missing submissions and review therapist requests.
+          </p>
+        </div>
         {(
           [
-            ['missing', 'Missing submissions', missingCount],
-            [
-              'submitted_with_exceptions',
-              'Submitted with exceptions',
-              submittedWithExceptionsCount,
-            ],
-            ['submitted_no_exceptions', 'Submitted no exceptions', submittedNoExceptionsCount],
-            ['all', 'All', visibleRows.length],
+            ['missing', 'Needs submission', missingCount],
+            ['submitted_with_exceptions', 'Submitted with requests', submittedWithExceptionsCount],
+            ['submitted_no_exceptions', 'Submitted no requests', submittedNoExceptionsCount],
+            ['all', 'All therapists', visibleRows.length],
           ] as const
         ).map(([value, label, count]) => (
           <button
@@ -240,10 +256,10 @@ export function AvailabilityStatusSummary({
             type="button"
             data-roster-filter={value}
             className={cn(
-              'inline-flex min-h-11 items-center gap-2 border-b-2 border-transparent px-1 py-2 text-[1.05rem] font-medium tracking-[-0.02em] transition-colors',
+              'inline-flex min-h-9 items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm font-semibold transition-colors',
               resolvedActiveFilter === value
-                ? 'border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-background text-muted-foreground hover:text-foreground'
             )}
             onClick={() => handleFilterChange(value)}
           >
@@ -252,7 +268,7 @@ export function AvailabilityStatusSummary({
               className={cn(
                 'rounded-full px-2 py-0.5 text-[11px]',
                 resolvedActiveFilter === value
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-primary-foreground/20 text-primary-foreground'
                   : 'bg-muted text-muted-foreground'
               )}
             >
@@ -267,13 +283,13 @@ export function AvailabilityStatusSummary({
               <button
                 type="button"
                 disabled={isSending}
-                className="ml-auto inline-flex min-h-9 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                className="inline-flex min-h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 data-testid="send-reminders-trigger"
               >
                 {isSending ? (
                   <span aria-live="polite">Sending…</span>
                 ) : (
-                  <>Send reminders ({missingRows.length})</>
+                  <>{reminderButtonLabel(resolvedActiveFilter, missingRows.length)}</>
                 )}
               </button>
             </AlertDialogTrigger>
@@ -298,12 +314,9 @@ export function AvailabilityStatusSummary({
       <div className="px-3 py-3">
         {displayedRows.length > 0 ? (
           <div className="space-y-2">
-            <div className="hidden grid-cols-[minmax(0,2.9fr)_6rem_3.25rem_5.75rem_5.75rem] gap-4 px-2 pb-2 text-[13px] font-medium text-muted-foreground md:grid">
+            <div className="hidden items-center justify-between gap-3 px-2 pb-2 text-[12px] font-medium text-muted-foreground md:flex">
               <span>Therapist</span>
-              <span>Status</span>
-              <span>Exceptions</span>
-              <span>Last activity</span>
-              <span>Actions</span>
+              <span>Status / requests / activity</span>
             </div>
             {displayedRows.map((row) => {
               const isSelected = row.therapistId === selectedTherapistId
@@ -315,7 +328,7 @@ export function AvailabilityStatusSummary({
                   role="button"
                   tabIndex={0}
                   className={cn(
-                    'rounded-[1.1rem] border px-4 py-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+                    'rounded-[0.9rem] border px-3 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
                     isSelected
                       ? 'border-primary/35 bg-[color:rgba(15,118,110,0.045)] shadow-tw-inset-highlight-soft'
                       : 'border-border/60 bg-background/85 hover:border-border'
@@ -328,46 +341,47 @@ export function AvailabilityStatusSummary({
                     }
                   }}
                 >
-                  <div className="grid gap-4 md:grid-cols-[minmax(0,2.9fr)_6rem_3.25rem_5.75rem_5.75rem] md:items-center">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted/55 text-base font-semibold text-foreground">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <div className="flex min-w-0 flex-1 basis-full items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/55 text-sm font-semibold text-foreground">
                         {initialsForName(row.therapistName)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[1.02rem] font-semibold tracking-[-0.02em] text-foreground">
+                        <p className="truncate text-base font-semibold leading-5 text-foreground">
                           {row.therapistName}
                         </p>
 
-                        <p className="mt-1 text-[12px] text-muted-foreground">
-                          {shiftLabel(row.shiftType)} · {employmentLabel(row.employmentType)}
+                        <p className="mt-1 truncate text-[12px] text-muted-foreground">
+                          {shiftLabel(row.shiftType)} {'\u00b7'}{' '}
+                          {employmentLabel(row.employmentType)}
                         </p>
                       </div>
                     </div>
 
-                    <div className="md:text-center">
+                    <div>
                       <span
                         className={cn(
                           'inline-flex items-center justify-center rounded-md border bg-secondary px-2 py-0.5 text-xs font-medium whitespace-nowrap',
                           statusBadgeClass(row.submitted)
                         )}
                       >
-                        {row.submitted ? 'Submitted' : 'Not submitted'}
+                        {queueStatusLabel(row)}
                       </span>
                     </div>
 
-                    <div className="text-base font-semibold text-foreground md:text-center">
-                      {row.overridesCount}
+                    <div className="text-[12px] font-medium text-muted-foreground">
+                      Requests: {row.overridesCount}
                     </div>
 
-                    <div className="whitespace-nowrap text-[12px] text-muted-foreground md:text-center">
+                    <div className="whitespace-nowrap text-[12px] text-muted-foreground">
                       {formatLastActivity(row.lastUpdatedAt)}
                     </div>
 
-                    <div className="flex md:justify-end">
+                    <div className="ml-auto flex">
                       <button
                         type="button"
                         data-review-action={row.therapistId}
-                        className="inline-flex min-h-9 w-[96px] items-center justify-center rounded-full border border-border bg-card px-3 text-[11px] font-medium text-foreground transition-all duration-150 hover:bg-secondary/70 hover:text-foreground"
+                        className="inline-flex min-h-8 items-center justify-center rounded-md border border-border bg-card px-3 text-[11px] font-medium text-foreground transition-all duration-150 hover:bg-secondary/70 hover:text-foreground"
                         onClick={(event) => {
                           event.stopPropagation()
                           onReviewTherapist?.(row.therapistId)

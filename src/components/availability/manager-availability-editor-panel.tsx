@@ -44,26 +44,31 @@ type ManagerAvailabilityEditorPanelProps = {
 const MODE_OPTIONS: Array<{
   value: AvailabilityEditorMode
   label: string
+  group: 'Availability' | 'Planning assumptions'
   tone: string
 }> = [
   {
     value: 'will_work',
-    label: 'Will work',
+    label: 'Available',
+    group: 'Planning assumptions',
     tone: 'data-[active=true]:bg-[var(--success-subtle)] data-[active=true]:text-[var(--success-text)]',
   },
   {
     value: 'cannot_work',
-    label: 'Cannot work',
+    label: 'Unavailable',
+    group: 'Planning assumptions',
     tone: 'data-[active=true]:bg-[var(--error-subtle)] data-[active=true]:text-[var(--error-text)]',
   },
   {
     value: 'need_off',
     label: 'Need Off',
+    group: 'Availability',
     tone: 'data-[active=true]:bg-[var(--warning-subtle)] data-[active=true]:text-[var(--warning-text)]',
   },
   {
     value: 'request_to_work',
     label: 'Need to Work',
+    group: 'Availability',
     tone: 'data-[active=true]:bg-[var(--info-subtle)] data-[active=true]:text-[var(--info-text)]',
   },
 ]
@@ -76,9 +81,12 @@ function saveLabel(therapistName: string) {
   return `Save for ${firstName(therapistName)}`
 }
 
+function modeLabel(mode: AvailabilityEditorMode) {
+  return MODE_OPTIONS.find((option) => option.value === mode)?.label ?? 'selected state'
+}
+
 export function ManagerAvailabilityEditorPanel({
   therapist,
-  cycleLabel,
   cycleStart,
   cycleEnd,
   mode,
@@ -103,9 +111,9 @@ export function ManagerAvailabilityEditorPanel({
   return (
     <section
       data-availability-editor
-      className="rounded-[1.2rem] border border-border/70 bg-card px-4 py-4 shadow-tw-sm sm:px-5"
+      className="rounded-[1rem] border border-border/70 bg-card px-3 py-3 shadow-tw-sm sm:px-4"
     >
-      <form action={saveAction} className="space-y-4">
+      <form action={saveAction} className="space-y-2.5">
         <input type="hidden" name="cycle_id" value={selectedCycleId} />
         <input type="hidden" name="therapist_id" value={selectedTherapistId} />
         <input
@@ -119,14 +127,13 @@ export function ManagerAvailabilityEditorPanel({
         ))}
 
         <div className="space-y-2">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-foreground">
-                Edit availability
+                Availability editor
               </h3>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                You are entering availability on behalf of {therapist.full_name}. Select dates in
-                the Schedule Block grid, choose the state to apply, and save when ready.
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Select dates, then choose what to save for {therapist.full_name}.
               </p>
             </div>
 
@@ -135,42 +142,80 @@ export function ManagerAvailabilityEditorPanel({
               formAction={copyAvailabilityFromPreviousCycleAction}
               className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              Copy previous
+              Copy previous block
             </button>
           </div>
+          <p className="max-w-3xl text-xs text-muted-foreground">
+            Use Need Off or Need to Work for availability exceptions. Planning assumptions are
+            optional manager-only draft notes.
+          </p>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full border border-border/70 bg-muted/10 px-3 py-1">
-              {cycleLabel}
-            </span>
-            <span className="rounded-full border border-border/70 bg-muted/10 px-3 py-1">
-              {therapist.shift_type === 'night' ? 'Night shift' : 'Day shift'}
-            </span>
+        <fieldset className="rounded-[0.8rem] border border-border/60 bg-muted/[0.04] px-2.5 py-2">
+          <legend className="px-1 text-[11px] font-semibold uppercase text-muted-foreground">
+            Availability exceptions
+          </legend>
+          <div className="mt-1 grid gap-1.5 sm:grid-cols-2">
+            {MODE_OPTIONS.filter((option) => option.group === 'Availability').map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                data-active={mode === option.value && selectedDates.length > 0}
+                className={cn(
+                  'min-h-9 rounded-md border border-border/70 px-3 py-2 text-left text-sm font-semibold text-muted-foreground transition-colors hover:border-border hover:text-foreground',
+                  option.tone,
+                  mode === option.value &&
+                    selectedDates.length > 0 &&
+                    'border-transparent shadow-tw-inset-highlight-soft'
+                )}
+                onClick={() => onModeChange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
-        </div>
+        </fieldset>
 
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          {MODE_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              data-active={mode === option.value}
-              className={cn(
-                'min-h-11 rounded-xl border border-border/70 px-3 py-3 text-left text-sm font-semibold text-muted-foreground transition-colors hover:border-border hover:text-foreground',
-                option.tone,
-                mode === option.value && 'border-transparent shadow-tw-inset-highlight-soft'
-              )}
-              onClick={() => onModeChange(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <details className="rounded-[0.8rem] border border-border/60 bg-muted/[0.03] px-2.5 py-2">
+          <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">
+            Planning assumptions
+          </summary>
+          <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {MODE_OPTIONS.filter((option) => option.group === 'Planning assumptions').map(
+              (option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  data-active={mode === option.value && selectedDates.length > 0}
+                  className={cn(
+                    'min-h-9 rounded-md border border-border/70 px-3 py-2 text-left text-sm font-semibold text-muted-foreground transition-colors hover:border-border hover:text-foreground',
+                    option.tone,
+                    mode === option.value &&
+                      selectedDates.length > 0 &&
+                      'border-transparent shadow-tw-inset-highlight-soft'
+                  )}
+                  onClick={() => onModeChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              )
+            )}
+          </div>
+        </details>
 
-        <section className="rounded-[1.15rem] border border-dashed border-border/70 bg-muted/[0.08] px-3 py-3">
+        <section className="rounded-[0.9rem] border border-border/60 bg-background/80 px-2.5 py-2.5 sm:px-3">
+          <AvailabilityCalendarPanel
+            cycleStart={cycleStart}
+            cycleEnd={cycleEnd}
+            dayStates={dayStates}
+            onToggleDate={onToggleDate}
+          />
+        </section>
+
+        <section className="rounded-[0.95rem] border border-dashed border-border/70 bg-muted/[0.08] px-3 py-2.5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              <p className="text-[11px] font-bold uppercase text-muted-foreground">
                 Selected dates
               </p>
               <p className="mt-1 text-sm font-semibold text-foreground">
@@ -210,16 +255,14 @@ export function ManagerAvailabilityEditorPanel({
           )}
         </section>
 
-        <section className="rounded-[1.2rem] border border-border/60 bg-background/80 px-3 py-3 sm:px-4 sm:py-4">
-          <AvailabilityCalendarPanel
-            cycleStart={cycleStart}
-            cycleEnd={cycleEnd}
-            dayStates={dayStates}
-            onToggleDate={onToggleDate}
-          />
-        </section>
-
-        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border/70 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
+          <p className="text-xs font-medium text-muted-foreground" aria-live="polite">
+            {selectedDates.length > 0
+              ? `${selectedDates.length} selected - Apply: ${modeLabel(mode)}`
+              : hasUnsavedChanges
+                ? 'Draft changes ready to save.'
+                : 'No unsaved changes.'}
+          </p>
           <FormSubmitButton
             type="submit"
             pendingText="Saving..."
