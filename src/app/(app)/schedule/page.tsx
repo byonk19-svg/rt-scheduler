@@ -9,8 +9,8 @@ import { toggleCyclePublishedAction } from '@/app/(app)/schedule/actions/publish
 import { loadScheduleGridData } from './schedule-grid-data'
 
 export const metadata: Metadata = {
-  title: 'Schedule',
-  description: 'Review and manage the unified respiratory therapy schedule grid.',
+  title: 'Team Schedule',
+  description: 'Review staffing, coverage, and publish readiness from the unified schedule grid.',
 }
 
 export const dynamic = 'force-dynamic'
@@ -51,10 +51,10 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
+    <div className="mx-auto max-w-7xl px-4 pb-6 pt-3 md:px-6 md:pt-4">
       <ManagerWorkspaceHeader
-        title="Schedule"
-        subtitle="One grid for draft staffing, live status, and team visibility."
+        title="Team Schedule"
+        subtitle="Draft staffing, coverage review, and live schedule visibility."
       />
       <ScheduleGrid
         key={`${result.dataset.cycleId}:${result.dataset.shiftType}`}

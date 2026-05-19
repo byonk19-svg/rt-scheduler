@@ -49,6 +49,7 @@ type TherapistRow = {
   id: string
   full_name: string | null
   shift_type: 'day' | 'night' | null
+  employment_type: 'full_time' | 'part_time' | 'prn' | null
   on_fmla: boolean | null
   is_active: boolean | null
   archived_at: string | null
@@ -190,7 +191,7 @@ export async function loadScheduleGridData(
   const therapistQuery = supabase
     .from('profiles')
     .select(
-      'id, full_name, shift_type, on_fmla, is_active, archived_at, role, max_work_days_per_week'
+      'id, full_name, shift_type, employment_type, on_fmla, is_active, archived_at, role, max_work_days_per_week'
     )
     .in('role', ['therapist', 'lead'])
     .is('archived_at', null)
@@ -270,6 +271,10 @@ export async function loadScheduleGridData(
         name: therapist.full_name?.trim() || 'Unknown',
         isOnFmla: therapist.on_fmla === true,
         isActive: therapist.is_active !== false,
+        employmentType:
+          therapist.employment_type === 'part_time' || therapist.employment_type === 'prn'
+            ? therapist.employment_type
+            : 'full_time',
         shiftType: shiftType,
         cells,
       }

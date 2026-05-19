@@ -48,4 +48,12 @@ describe('ScheduleGrid source invariants', () => {
     expect(code).toContain('{tab} shift')
     expect(code).toContain('Schedule Block')
   })
+
+  it('adds a compact paper-style title inside the schedule grid', () => {
+    const code = source()
+
+    expect(code).toContain('Respiratory Therapy')
+    expect(code).toContain('cycleDateRangeLabel')
+    expect(code).toContain('{gridTitle}')
+  })
 })

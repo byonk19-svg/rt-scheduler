@@ -48,6 +48,7 @@ type Profile = {
   id: string
   role: Role
   shift_type: 'day' | 'night'
+  employment_type?: 'full_time' | 'part_time' | 'prn'
   is_active: boolean
   archived_at: string | null
   site_id: string
@@ -87,6 +88,7 @@ const therapistRows: Profile[] = [
     archived_at: null,
     site_id: 'site-a',
     full_name: 'Day Therapist',
+    employment_type: 'full_time',
     on_fmla: false,
     max_work_days_per_week: 3,
   },
@@ -264,5 +266,25 @@ describe('loadScheduleGridData visibility', () => {
     await expect(loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })).resolves.toEqual({
       status: 'no_cycle',
     })
+  })
+
+  it('includes employment type so the grid can group PRN therapists at the bottom', async () => {
+    setViewer(
+      {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      [draftCycle]
+    )
+
+    const result = await loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.dataset.therapistRows[0]?.employmentType).toBe('full_time')
   })
 })

@@ -95,6 +95,19 @@ describe('AppShell mobile menu', () => {
   it('offsets main-content anchor scrolling below the fixed header', () => {
     expect(appShellSource).toContain('scroll-mt-20')
   })
+
+  it('suppresses the workflow context strip on the unified schedule page', () => {
+    expect(appShellSource).toContain("pathname === '/schedule'")
+    expect(appShellSource).toContain('workflowContext && !hideWorkflowContext')
+  })
+
+  it('keeps optional access-request summary fetch failures out of the dev overlay', () => {
+    expect(appShellSource).toContain(
+      "fetch('/api/requests/user-access?summary=1', { cache: 'no-store' })"
+    )
+    expect(appShellSource).toContain('} catch {')
+    expect(appShellSource).toContain('setFetchedPendingCount(0)')
+  })
 })
 
 describe('AppShell navigation structure', () => {
@@ -147,16 +160,22 @@ describe('AppShell navigation structure', () => {
 
   it('groups manager workflow into direct top-level operational sections', () => {
     expect(shellConfigSource).toContain("key: 'dashboard'")
-    expect(shellConfigSource).toContain("key: 'coverage'")
     expect(shellConfigSource).toContain("key: 'team-schedule'")
     expect(shellConfigSource).toContain("key: 'availability'")
     expect(shellConfigSource).toContain("key: 'shift-board'")
     expect(shellConfigSource).toContain("key: 'lottery'")
+    expect(shellConfigSource).not.toContain("key: 'coverage'")
     expect(shellConfigSource).not.toContain("key: 'people'")
   })
 
-  it('puts Coverage, Team Schedule, Availability, Shift Board, and Lottery in manager top navigation', () => {
-    expect(shellConfigSource).toContain("label: 'Coverage'")
+  it('puts Team Schedule, Availability, Shift Board, and Lottery in manager top navigation', () => {
+    expect(buildManagerSections(0).map((section) => section.label)).toEqual([
+      'Dashboard',
+      'Team Schedule',
+      'Availability',
+      'Shift Board',
+      'Lottery',
+    ])
     expect(shellConfigSource).toContain("label: 'Team Schedule'")
     expect(shellConfigSource).not.toContain("label: 'Roster View'")
     expect(shellConfigSource).toContain("label: 'Availability'")

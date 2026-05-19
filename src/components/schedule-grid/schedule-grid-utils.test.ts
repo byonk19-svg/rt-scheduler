@@ -19,7 +19,7 @@ describe('getCellDisplay', () => {
     expect(display.asterisk).toBe(false)
   })
 
-  it('returns blue chip data for a staff cell', () => {
+  it('returns plain text data for a staff cell', () => {
     const cell: GridCell = {
       shiftId: 's2',
       status: 'staff',
@@ -27,7 +27,7 @@ describe('getCellDisplay', () => {
       isIneligible: false,
     }
 
-    expect(getCellDisplay(cell).colorClass).toContain('bg-blue')
+    expect(getCellDisplay(cell).colorClass).toBe('text-foreground')
   })
 
   it('marks needs-off cells with an asterisk flag without blocking display', () => {
@@ -68,6 +68,7 @@ describe('buildDailyTotals', () => {
         name: 'A',
         isOnFmla: false,
         isActive: true,
+        employmentType: 'full_time',
         shiftType: 'day',
         cells: {
           '2026-05-04': { shiftId: 's1', status: 'lead', hasNeedsOff: false, isIneligible: false },
@@ -79,6 +80,7 @@ describe('buildDailyTotals', () => {
         name: 'B',
         isOnFmla: false,
         isActive: true,
+        employmentType: 'full_time',
         shiftType: 'day',
         cells: {
           '2026-05-04': {
@@ -100,6 +102,7 @@ describe('buildDailyTotals', () => {
         name: 'C',
         isOnFmla: false,
         isActive: true,
+        employmentType: 'prn',
         shiftType: 'day',
         cells: {
           '2026-05-04': {

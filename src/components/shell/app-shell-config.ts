@@ -64,6 +64,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 function isManagerScheduleRoute(pathname: string): boolean {
   return (
     pathname === '/schedule' ||
+    pathname === '/coverage' ||
     pathname === '/analytics' ||
     pathname === '/publish' ||
     pathname.startsWith('/publish/') ||
@@ -102,13 +103,6 @@ export function buildManagerSections(_pendingCount: number): readonly ShellSecti
       label: 'Dashboard',
       href: MANAGER_WORKFLOW_LINKS.dashboard,
       isActive: (pathname) => pathname.startsWith('/dashboard/manager'),
-      subItems: [],
-    },
-    {
-      key: 'coverage',
-      label: 'Coverage',
-      href: '/coverage',
-      isActive: (pathname) => pathname === '/coverage',
       subItems: [],
     },
     {
@@ -320,7 +314,6 @@ export function getWorkflowContext(args: {
   if (canAccessManagerUi) {
     if (
       !isManagerScheduleRoute(pathname) &&
-      pathname !== '/coverage' &&
       pathname !== '/availability' &&
       pathname !== '/lottery' &&
       pathname !== '/shift-board' &&
@@ -329,20 +322,11 @@ export function getWorkflowContext(args: {
       return null
     }
 
-    if (pathname === '/coverage') {
+    if (pathname === '/schedule' || pathname === '/coverage') {
       return {
-        workflow: 'Coverage',
-        context: 'Manager staffing work',
-        state: 'Build, review, publish',
-        permission: 'Manager controlled',
-      }
-    }
-
-    if (pathname === '/schedule') {
-      return {
-        workflow: 'Schedule',
-        context: 'Unified grid workspace',
-        state: 'Draft or published',
+        workflow: 'Team Schedule',
+        context: 'Schedule grid and coverage review',
+        state: 'Draft, review, publish',
         permission: 'Manager editable',
       }
     }

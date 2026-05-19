@@ -41,7 +41,6 @@ describe('app-shell-config', () => {
     const sections = buildManagerSections(0)
     expect(sections.map((section) => section.key)).toEqual([
       'dashboard',
-      'coverage',
       'team-schedule',
       'availability',
       'shift-board',
@@ -49,7 +48,6 @@ describe('app-shell-config', () => {
     ])
     expect(sections.map((section) => section.label)).toEqual([
       'Dashboard',
-      'Coverage',
       'Team Schedule',
       'Availability',
       'Shift Board',
@@ -135,16 +133,16 @@ describe('app-shell-config', () => {
 
   it('returns manager workflow context for schedule routes', () => {
     expect(getWorkflowContext({ pathname: '/schedule', canAccessManagerUi: true })).toEqual({
-      workflow: 'Schedule',
-      context: 'Unified grid workspace',
-      state: 'Draft or published',
+      workflow: 'Team Schedule',
+      context: 'Schedule grid and coverage review',
+      state: 'Draft, review, publish',
       permission: 'Manager editable',
     })
     expect(getWorkflowContext({ pathname: '/coverage', canAccessManagerUi: true })).toEqual({
-      workflow: 'Coverage',
-      context: 'Manager staffing work',
-      state: 'Build, review, publish',
-      permission: 'Manager controlled',
+      workflow: 'Team Schedule',
+      context: 'Schedule grid and coverage review',
+      state: 'Draft, review, publish',
+      permission: 'Manager editable',
     })
     expect(getWorkflowContext({ pathname: '/settings', canAccessManagerUi: true })).toBeNull()
   })

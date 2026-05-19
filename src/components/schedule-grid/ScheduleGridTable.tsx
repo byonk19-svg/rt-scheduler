@@ -33,6 +33,11 @@ function isWeekend(date: string) {
   return day === 0 || day === 6
 }
 
+function isWeekStart(date: string) {
+  const parsed = new Date(`${date}T12:00:00`)
+  return parsed.getDay() === 0
+}
+
 function totalColorClass(date: string, count: number): string {
   if (isWeekend(date)) return 'text-muted-foreground font-semibold'
   if (count < 3) return 'text-red-600 font-bold'
@@ -40,10 +45,20 @@ function totalColorClass(date: string, count: number): string {
   return 'text-amber-600 font-bold'
 }
 
-function rowScheduledTotal(row: TherapistGridRow, cycleDates: readonly string[]) {
-  return cycleDates.reduce((count, date) => {
-    return isWorkingScheduledGridCell(row.cells[date]) ? count + 1 : count
-  }, 0)
+function dailyTotalsForRows(rows: readonly TherapistGridRow[], cycleDates: readonly string[]) {
+  const totals: Record<string, number> = {}
+  for (const date of cycleDates) {
+    totals[date] = rows.reduce((count, row) => {
+      return isWorkingScheduledGridCell(row.cells[date]) ? count + 1 : count
+    }, 0)
+  }
+  return totals
+}
+
+function orderManagerRows(rows: readonly TherapistGridRow[]) {
+  const regularRows = rows.filter((row) => row.employmentType !== 'prn')
+  const prnRows = rows.filter((row) => row.employmentType === 'prn')
+  return { regularRows, prnRows }
 }
 
 export function ScheduleGridTable({
@@ -59,6 +74,9 @@ export function ScheduleGridTable({
         ...therapistRows.filter((row) => row.userId !== viewerUserId),
       ]
     : therapistRows
+  const { regularRows, prnRows } = orderManagerRows(sortedRows)
+  const showPrnSection = !isStaffViewer && prnRows.length > 0
+  const regularDailyTotals = dailyTotalsForRows(regularRows, cycleDates)
   const shiftLabel = dataset.shiftType === 'night' ? 'night-shift' : 'day-shift'
 
   if (sortedRows.length === 0) {
@@ -77,11 +95,11 @@ export function ScheduleGridTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-max border-collapse text-xs">
+    <div className="overflow-x-auto bg-white">
+      <table className="w-full min-w-max border-collapse font-mono text-[11px]">
         <thead>
-          <tr className="border-b border-border bg-card">
-            <th className="sticky left-0 z-20 min-w-[180px] bg-card px-3 py-2 text-left font-semibold text-muted-foreground">
+          <tr className="border-b-2 border-border bg-card">
+            <th className="sticky left-0 z-20 min-w-[140px] bg-card px-2 py-1.5 text-left font-semibold text-muted-foreground">
               Therapist
             </th>
             {cycleDates.map((date) => {
@@ -90,7 +108,8 @@ export function ScheduleGridTable({
                 <th
                   key={date}
                   className={cn(
-                    'min-w-8 border-l border-border/70 px-1 py-2 text-center font-medium text-muted-foreground',
+                    'min-w-6 border-l border-border/80 px-0 py-1.5 text-center font-medium text-muted-foreground',
+                    isWeekStart(date) && 'border-l-2 border-l-foreground/40',
                     isWeekend(date) && 'bg-muted/45'
                   )}
                 >
@@ -99,13 +118,10 @@ export function ScheduleGridTable({
                 </th>
               )
             })}
-            <th className="sticky right-0 z-20 min-w-12 border-l border-border bg-card px-2 py-2 text-center font-semibold text-muted-foreground">
-              Total
-            </th>
           </tr>
         </thead>
         <tbody>
-          {sortedRows.map((row) => (
+          {(showPrnSection ? regularRows : sortedRows).map((row) => (
             <TherapistRow
               key={row.userId}
               row={row}
@@ -118,25 +134,88 @@ export function ScheduleGridTable({
               onCellClick={onCellClick}
             />
           ))}
-          <tr className="border-t-2 border-border bg-muted/45">
-            <th className="sticky left-0 z-20 bg-muted px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Daily total
-            </th>
-            {cycleDates.map((date) => (
-              <td key={date} className="border-l border-border/70 px-1 py-2 text-center">
-                <span
-                  data-testid={`total-${date}`}
-                  className={totalColorClass(date, dailyTotals[date] ?? 0)}
-                >
-                  {dailyTotals[date] ?? 0}
-                </span>
-              </td>
-            ))}
-            <td className="sticky right-0 z-20 border-l border-border bg-muted" />
-          </tr>
+          {showPrnSection ? (
+            <>
+              <DailyTotalRow
+                label="Daily staffing"
+                cycleDates={cycleDates}
+                totals={regularDailyTotals}
+                testIdPrefix="regular-total"
+              />
+              {prnRows.map((row) => (
+                <TherapistRow
+                  key={row.userId}
+                  row={row}
+                  cycleDates={cycleDates}
+                  isViewer={false}
+                  canManageCoverage={dataset.canManageCoverage}
+                  canUpdateAssignmentStatus={dataset.canUpdateAssignmentStatus}
+                  isPublished={dataset.isPublished}
+                  interactionsDisabled={interactionsDisabled}
+                  onCellClick={onCellClick}
+                />
+              ))}
+            </>
+          ) : null}
+          <DailyTotalRow
+            label="Daily total"
+            cycleDates={cycleDates}
+            totals={dailyTotals}
+            testIdPrefix="total"
+            emphasis="strong"
+          />
         </tbody>
       </table>
     </div>
+  )
+}
+
+function DailyTotalRow({
+  label,
+  cycleDates,
+  totals,
+  testIdPrefix,
+  emphasis = 'standard',
+}: {
+  label: string
+  cycleDates: readonly string[]
+  totals: Record<string, number>
+  testIdPrefix: string
+  emphasis?: 'standard' | 'strong'
+}) {
+  return (
+    <tr
+      className={cn(
+        'border-y-2',
+        emphasis === 'strong' ? 'border-foreground/30 bg-muted/75' : 'border-border bg-muted/55'
+      )}
+    >
+      <th
+        className={cn(
+          'sticky left-0 z-20 bg-muted px-2 py-1.5 text-left text-[11px] font-bold uppercase tracking-wide',
+          emphasis === 'strong' ? 'text-foreground' : 'text-muted-foreground'
+        )}
+      >
+        {label}
+      </th>
+      {cycleDates.map((date) => (
+        <td
+          key={date}
+          className={cn(
+            'border-l border-border/80 px-0 py-1.5 text-center',
+            isWeekStart(date) && 'border-l-2 border-l-foreground/40',
+            isWeekend(date) && 'bg-muted/45'
+          )}
+        >
+          <span
+            data-testid={`${testIdPrefix}-${date}`}
+            className={totalColorClass(date, totals[date] ?? 0)}
+          >
+            {totals[date] ?? 0}
+          </span>
+        </td>
+      ))}
+    </tr>
   )
 }
 
@@ -159,19 +238,17 @@ function TherapistRow({
   interactionsDisabled: boolean
   onCellClick?: CellClickHandler
 }) {
-  const total = rowScheduledTotal(row, cycleDates)
-
   return (
     <tr
       className={cn(
-        'border-b border-border/70',
+        'border-b border-border/80',
         isViewer && 'border-b-2 border-teal-600 bg-teal-50/55'
       )}
     >
       <th
         scope="row"
         className={cn(
-          'sticky left-0 z-10 bg-card px-3 py-2 text-left font-semibold text-foreground',
+          'sticky left-0 z-10 max-w-[140px] bg-card px-2 py-1.5 text-left font-semibold text-foreground',
           isViewer && 'bg-teal-50'
         )}
       >
@@ -202,7 +279,8 @@ function TherapistRow({
           <td
             key={date}
             className={cn(
-              'border-l border-border/70 px-1 py-1.5 text-center',
+              'border-l border-border/80 px-0 py-1 text-center',
+              isWeekStart(date) && 'border-l-2 border-l-foreground/40',
               isWeekend(date) && 'bg-muted/25'
             )}
           >
@@ -210,7 +288,7 @@ function TherapistRow({
               type="button"
               data-testid={`cell-${row.userId}-${date}`}
               className={cn(
-                'inline-flex min-h-6 min-w-6 items-center justify-center rounded px-1 text-[11px] font-bold leading-none',
+                'inline-flex min-h-5 min-w-5 items-center justify-center rounded px-0.5 text-[11px] font-bold leading-none',
                 display.isEmpty ? 'text-muted-foreground' : display.colorClass,
                 clickable
                   ? 'cursor-pointer ring-offset-background transition hover:ring-2 hover:ring-ring/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -233,9 +311,6 @@ function TherapistRow({
           </td>
         )
       })}
-      <td className="sticky right-0 z-10 border-l border-border bg-card px-2 py-1.5 text-center font-bold text-foreground">
-        {total}
-      </td>
     </tr>
   )
 }

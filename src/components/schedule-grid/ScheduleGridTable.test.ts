@@ -19,6 +19,7 @@ function makeDataset(overrides: Partial<GridDataset> = {}): GridDataset {
         name: 'Alice Johnson',
         isOnFmla: false,
         isActive: true,
+        employmentType: 'full_time',
         shiftType: 'day',
         cells: {
           '2026-05-04': {
@@ -90,6 +91,74 @@ describe('ScheduleGridTable', () => {
 
     expect(html).toContain('data-testid="total-2026-05-04"')
     expect(html).toContain('>1</span>')
+  })
+
+  it('does not render a per-therapist total column', () => {
+    const html = renderTable(makeDataset())
+
+    expect(html).not.toContain('>Total</th>')
+    expect(html).toContain('Daily total')
+  })
+
+  it('keeps PRN therapists in a bottom section below regular staff', () => {
+    const html = renderTable(
+      makeDataset({
+        therapistRows: [
+          {
+            userId: 'regular-1',
+            name: 'Regular Therapist',
+            isOnFmla: false,
+            isActive: true,
+            employmentType: 'full_time',
+            shiftType: 'day',
+            cells: {
+              '2026-05-04': {
+                shiftId: 'regular-shift',
+                status: 'staff',
+                hasNeedsOff: false,
+                isIneligible: false,
+              },
+              '2026-05-05': {
+                shiftId: null,
+                status: 'off',
+                hasNeedsOff: false,
+                isIneligible: false,
+              },
+            },
+          },
+          {
+            userId: 'prn-1',
+            name: 'PRN Therapist',
+            isOnFmla: false,
+            isActive: true,
+            employmentType: 'prn',
+            shiftType: 'day',
+            cells: {
+              '2026-05-04': {
+                shiftId: null,
+                status: 'off',
+                hasNeedsOff: false,
+                isIneligible: false,
+              },
+              '2026-05-05': {
+                shiftId: 'prn-shift',
+                status: 'staff',
+                hasNeedsOff: false,
+                isIneligible: false,
+              },
+            },
+          },
+        ],
+        dailyTotals: { '2026-05-04': 1, '2026-05-05': 1 },
+      })
+    )
+
+    expect(html).toContain('Daily staffing')
+    expect(html).not.toContain('PRN staff')
+    expect(html.indexOf('Regular Therapist')).toBeLessThan(html.indexOf('Daily staffing'))
+    expect(html.indexOf('Daily staffing')).toBeLessThan(html.indexOf('PRN Therapist'))
+    expect(html).toContain('data-testid="regular-total-2026-05-04"')
+    expect(html).toContain('data-testid="total-2026-05-05"')
   })
 
   it('explains an empty shift roster with a next step', () => {

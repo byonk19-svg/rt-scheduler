@@ -19,6 +19,7 @@ export type TherapistGridRow = {
   name: string
   isOnFmla: boolean
   isActive: boolean
+  employmentType: 'full_time' | 'part_time' | 'prn'
   shiftType: 'day' | 'night'
   cells: Record<string, GridCell>
 }

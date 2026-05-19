@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import { resolveNotificationHref } from '@/components/NotificationBell'
+
+const notificationBellSource = readFileSync(
+  resolve(process.cwd(), 'src/components/NotificationBell.tsx'),
+  'utf8'
+)
 
 describe('resolveNotificationHref', () => {
   it('routes therapist shift notifications to the unified schedule page', () => {
@@ -91,5 +98,14 @@ describe('resolveNotificationHref', () => {
         'manager'
       )
     ).toBe('/approvals')
+  })
+
+  it('catches optional notification fetch failures so dev overlays do not appear', () => {
+    expect(notificationBellSource).toContain("fetch('/api/notifications', { cache: 'no-store' })")
+    expect(notificationBellSource).toContain(
+      "fetch('/api/notifications?summary=1', { cache: 'no-store' })"
+    )
+    expect(notificationBellSource).toContain("fetch('/api/notifications/mark-read'")
+    expect(notificationBellSource.match(/} catch \{/g)?.length).toBeGreaterThanOrEqual(3)
   })
 })

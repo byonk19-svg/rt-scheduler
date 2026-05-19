@@ -334,11 +334,15 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
     let cancelled = false
 
     async function loadPendingSummary() {
-      const response = await fetch('/api/requests/user-access?summary=1', { cache: 'no-store' })
-      if (!response.ok || cancelled) return
-      const data = (await response.json()) as { pendingCount?: number }
-      if (cancelled) return
-      setFetchedPendingCount(data.pendingCount ?? 0)
+      try {
+        const response = await fetch('/api/requests/user-access?summary=1', { cache: 'no-store' })
+        if (!response.ok || cancelled) return
+        const data = (await response.json()) as { pendingCount?: number }
+        if (cancelled) return
+        setFetchedPendingCount(data.pendingCount ?? 0)
+      } catch {
+        if (!cancelled) setFetchedPendingCount(0)
+      }
     }
 
     void loadPendingSummary()
@@ -358,7 +362,11 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const isTherapistSchedulePage =
     pathname === '/therapist/schedule' || pathname === '/staff/my-schedule'
   const hideLocalSectionNav = pathname.startsWith('/availability')
-  const hideWorkflowContext = pathname === '/shift-board' || pathname === '/swaps'
+  const hideWorkflowContext =
+    pathname === '/schedule' ||
+    pathname === '/coverage' ||
+    pathname === '/shift-board' ||
+    pathname === '/swaps'
 
   return (
     <ThemeProvider>

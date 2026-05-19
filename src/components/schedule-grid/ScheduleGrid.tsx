@@ -61,6 +61,7 @@ export function ScheduleGrid({
   const publishFormRef = useRef<HTMLFormElement | null>(null)
   const mutator = useMemo(() => createCoverageShiftMutator(), [])
   const cellsLocked = isPending
+  const gridTitle = `Respiratory Therapy ${initialDataset.shiftType === 'night' ? 'Night' : 'Day'} Shift · ${initialDataset.cycleDateRangeLabel}`
 
   const handleShiftTabChange = useCallback(
     (tab: 'Day' | 'Night') => {
@@ -221,6 +222,9 @@ export function ScheduleGrid({
         onPrint={() => window.print()}
         onPublish={publishAction ? () => publishFormRef.current?.requestSubmit() : undefined}
       />
+      <div className="border-b border-border bg-card px-4 py-2 text-center">
+        <p className="font-mono text-xs font-semibold text-foreground">{gridTitle}</p>
+      </div>
       {showPreFlight && preFlightSummary ? (
         <div className="border-b border-border bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <p className="font-semibold">Pre-flight summary</p>

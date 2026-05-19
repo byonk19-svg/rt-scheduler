@@ -82,7 +82,8 @@ describe('schedule route', () => {
     )
 
     expect(loadScheduleGridDataMock).toHaveBeenCalledWith({ cycle: 'cycle-2' })
-    expect(html).toContain('Schedule')
+    expect(html).toContain('Team Schedule')
+    expect(html).toContain('Draft staffing, coverage review, and live schedule visibility.')
     expect(html).toContain('Mock Schedule Grid')
     expect(html).toContain('May 3 - Jun 13, 2026')
   })
@@ -116,8 +117,8 @@ describe('schedule route', () => {
   it('sets unified schedule metadata', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/schedule/page.tsx'), 'utf8')
 
-    expect(source).toContain("title: 'Schedule'")
-    expect(source).toContain('unified respiratory therapy schedule grid')
+    expect(source).toContain("title: 'Team Schedule'")
+    expect(source).toContain('unified schedule grid')
   })
 
   it('remounts the grid when the loaded cycle or shift changes', () => {
