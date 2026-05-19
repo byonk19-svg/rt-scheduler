@@ -24,8 +24,9 @@ describe('Schedule Block Planning page source contract', () => {
   })
 
   it('keeps actual preliminary and publish actions out of the planning route', () => {
-    expect(source).toContain('Next suggested Schedule Block')
-    expect(source).toContain('This is a preview. It is not saved until you confirm the dates.')
+    expect(source).toContain('Create next schedule block')
+    expect(source).toContain('Review or edit dates')
+    expect(source).toContain('Missing historical targets')
     expect(source).not.toContain('sendPreliminary')
     expect(source).not.toContain('publishSchedule')
   })
