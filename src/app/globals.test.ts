@@ -52,4 +52,8 @@ describe('global CSS tokens and theme overrides', () => {
     expect(cssSource).toContain('@media print')
     expect(cssSource).toContain('color-scheme: light;')
   })
+
+  it('reserves scroll offset for the fixed authenticated header', () => {
+    expect(cssSource).toContain('scroll-padding-top: 5rem;')
+  })
 })

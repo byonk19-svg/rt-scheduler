@@ -394,7 +394,7 @@ async function mapOpenRequests(params: {
         interest.status === 'selected'
           ? {
               label: 'Approved',
-              detail: 'Manager selected you as the claimant for this request.',
+              detail: 'Manager selected you as the responder for this request.',
             }
           : {
               label: 'Waiting for manager review',

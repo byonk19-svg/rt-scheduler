@@ -48,18 +48,18 @@ export function partitionPickupInterestQueue<
 }
 
 export function getPickupInterestTherapistCopy(status: PickupInterestStatus): {
-  roleLabel: 'Primary claimant' | 'Backup interest'
+  roleLabel: 'First responder' | 'Backup responder'
   helperText: string
 } {
   if (status === 'selected') {
     return {
-      roleLabel: 'Primary claimant',
+      roleLabel: 'First responder',
       helperText: 'You are currently first in line for this pickup request.',
     }
   }
 
   return {
-    roleLabel: 'Backup interest',
+    roleLabel: 'Backup responder',
     helperText: 'You are still interested and listed as a backup for this pickup request.',
   }
 }

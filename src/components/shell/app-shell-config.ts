@@ -1,7 +1,7 @@
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
-export const APP_HEADER_HEIGHT = 44
-export const APP_PAGE_MAX_WIDTH_CLASS = 'mx-auto max-w-7xl px-4 md:px-6'
+export const APP_HEADER_HEIGHT = 64
+export const APP_PAGE_MAX_WIDTH_CLASS = 'mx-auto max-w-[96rem] px-4 md:px-6'
 
 export type ShellNavItem = {
   href: string
@@ -65,8 +65,6 @@ function isManagerScheduleRoute(pathname: string): boolean {
   return (
     pathname === '/schedule' ||
     pathname === '/analytics' ||
-    pathname === '/availability' ||
-    pathname === '/lottery' ||
     pathname === '/publish' ||
     pathname.startsWith('/publish/') ||
     pathname === '/approvals'
@@ -95,87 +93,51 @@ export function usesAppShell(pathname: string): boolean {
   return SHELL_ROUTES.some((route) => isRouteActive(pathname, route))
 }
 
-export function buildManagerSections(pendingCount: number): readonly ShellSection[] {
+export function buildManagerSections(_pendingCount: number): readonly ShellSection[] {
+  void _pendingCount
+
   return [
     {
-      key: 'today',
+      key: 'dashboard',
       label: 'Dashboard',
       href: MANAGER_WORKFLOW_LINKS.dashboard,
       isActive: (pathname) => pathname.startsWith('/dashboard/manager'),
       subItems: [],
     },
     {
-      key: 'schedule',
-      label: 'Schedule',
-      href: '/schedule',
-      isActive: (pathname) => isManagerScheduleRoute(pathname),
-      subItems: [
-        {
-          href: '/schedule',
-          label: 'Schedule',
-          active: (pathname) => pathname === '/schedule',
-        },
-        {
-          href: '/analytics',
-          label: 'Analytics',
-          active: (pathname) => pathname === '/analytics',
-        },
-        {
-          href: '/availability',
-          label: 'Availability',
-          active: (pathname) => pathname === '/availability',
-        },
-        {
-          href: MANAGER_WORKFLOW_LINKS.lottery,
-          label: 'Lottery',
-          active: (pathname) => pathname === MANAGER_WORKFLOW_LINKS.lottery,
-        },
-        {
-          href: '/publish',
-          label: 'Publish',
-          active: (pathname) => pathname === '/publish' || pathname.startsWith('/publish/'),
-        },
-        {
-          href: '/approvals',
-          label: 'Approvals',
-          active: (pathname) => pathname === '/approvals',
-        },
-      ],
+      key: 'coverage',
+      label: 'Coverage',
+      href: '/coverage',
+      isActive: (pathname) => pathname === '/coverage',
+      subItems: [],
     },
     {
-      key: 'people',
-      label: 'People',
-      href: '/team',
-      isActive: (pathname) =>
-        pathname === '/team' ||
-        pathname === '/requests' ||
-        pathname.startsWith('/requests/') ||
-        pathname === '/shift-board' ||
-        pathname === '/settings' ||
-        pathname.startsWith('/settings/'),
-      subItems: [
-        {
-          href: '/team',
-          label: 'Team',
-          active: (pathname) => pathname === '/team',
-        },
-        {
-          href: '/requests/user-access',
-          label: 'Requests',
-          active: (pathname) => pathname === '/requests' || pathname.startsWith('/requests/'),
-          badgeCount: pendingCount > 0 ? pendingCount : undefined,
-        },
-        {
-          href: '/shift-board',
-          label: 'Shift Board',
-          active: (pathname) => pathname === '/shift-board',
-        },
-        {
-          href: '/settings/audit-log',
-          label: 'Audit log',
-          active: (pathname) => pathname === '/settings/audit-log',
-        },
-      ],
+      key: 'team-schedule',
+      label: 'Team Schedule',
+      href: '/schedule',
+      isActive: (pathname) => isManagerScheduleRoute(pathname),
+      subItems: [],
+    },
+    {
+      key: 'availability',
+      label: 'Availability',
+      href: '/availability',
+      isActive: (pathname) => pathname === '/availability',
+      subItems: [],
+    },
+    {
+      key: 'shift-board',
+      label: 'Shift Board',
+      href: '/shift-board',
+      isActive: (pathname) => pathname === '/shift-board' || pathname === '/swaps',
+      subItems: [],
+    },
+    {
+      key: 'lottery',
+      label: 'Lottery',
+      href: MANAGER_WORKFLOW_LINKS.lottery,
+      isActive: (pathname) => pathname === MANAGER_WORKFLOW_LINKS.lottery,
+      subItems: [],
     },
   ]
 }
@@ -356,8 +318,24 @@ export function getWorkflowContext(args: {
   const { pathname, canAccessManagerUi, canAccessLeadTools } = args
 
   if (canAccessManagerUi) {
-    if (!isManagerScheduleRoute(pathname) && pathname !== '/shift-board' && pathname !== '/swaps') {
+    if (
+      !isManagerScheduleRoute(pathname) &&
+      pathname !== '/coverage' &&
+      pathname !== '/availability' &&
+      pathname !== '/lottery' &&
+      pathname !== '/shift-board' &&
+      pathname !== '/swaps'
+    ) {
       return null
+    }
+
+    if (pathname === '/coverage') {
+      return {
+        workflow: 'Coverage',
+        context: 'Manager staffing work',
+        state: 'Build, review, publish',
+        permission: 'Manager controlled',
+      }
     }
 
     if (pathname === '/schedule') {

@@ -91,6 +91,10 @@ describe('AppShell mobile menu', () => {
   it('does not keep a second fixed shell bar under the main header', () => {
     expect(appShellSource).not.toContain('app-shell-chrome-secondary fixed top-14')
   })
+
+  it('offsets main-content anchor scrolling below the fixed header', () => {
+    expect(appShellSource).toContain('scroll-mt-20')
+  })
 })
 
 describe('AppShell navigation structure', () => {
@@ -100,20 +104,22 @@ describe('AppShell navigation structure', () => {
   })
 
   it('keeps the manager Schedule section active on the legacy /schedule route', () => {
-    const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
+    const scheduleSection = buildManagerSections(0).find(
+      (section) => section.key === 'team-schedule'
+    )
 
     expect(scheduleSection).toBeDefined()
     expect(scheduleSection?.isActive('/schedule')).toBe(true)
   })
 
   it('sends the manager Schedule entry to the unified schedule grid', () => {
-    const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
+    const scheduleSection = buildManagerSections(0).find(
+      (section) => section.key === 'team-schedule'
+    )
 
     expect(scheduleSection?.href).toBe('/schedule')
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Schedule')?.href).toBe(
-      '/schedule'
-    )
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')).toBeUndefined()
+    expect(scheduleSection?.label).toBe('Team Schedule')
+    expect(scheduleSection?.subItems).toEqual([])
     expect(scheduleSection?.subItems.find((item) => item.label === 'Roster View')).toBeUndefined()
   })
 
@@ -132,7 +138,6 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("href: '/schedule'")
     expect(shellConfigSource).toContain("label: 'Schedule'")
     expect(shellConfigSource).not.toContain("label: 'My Shifts'")
-    expect(shellConfigSource).not.toContain("label: 'Team Schedule'")
   })
 
   it('routes manager Dashboard section to the manager dashboard', () => {
@@ -140,40 +145,40 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain('MANAGER_WORKFLOW_LINKS.dashboard')
   })
 
-  it('groups manager workflow into Dashboard, Schedule, and People sections', () => {
-    expect(shellConfigSource).toContain("key: 'today'")
-    expect(shellConfigSource).toContain("key: 'schedule'")
-    expect(shellConfigSource).toContain("key: 'people'")
+  it('groups manager workflow into direct top-level operational sections', () => {
+    expect(shellConfigSource).toContain("key: 'dashboard'")
+    expect(shellConfigSource).toContain("key: 'coverage'")
+    expect(shellConfigSource).toContain("key: 'team-schedule'")
+    expect(shellConfigSource).toContain("key: 'availability'")
+    expect(shellConfigSource).toContain("key: 'shift-board'")
+    expect(shellConfigSource).toContain("key: 'lottery'")
+    expect(shellConfigSource).not.toContain("key: 'people'")
   })
 
-  it('puts Schedule, Availability, Lottery, Publish, and Approvals under the Schedule section', () => {
-    expect(shellConfigSource).toContain("label: 'Schedule'")
-    expect(shellConfigSource).not.toContain("label: 'Coverage'")
+  it('puts Coverage, Team Schedule, Availability, Shift Board, and Lottery in manager top navigation', () => {
+    expect(shellConfigSource).toContain("label: 'Coverage'")
+    expect(shellConfigSource).toContain("label: 'Team Schedule'")
     expect(shellConfigSource).not.toContain("label: 'Roster View'")
     expect(shellConfigSource).toContain("label: 'Availability'")
+    expect(shellConfigSource).toContain("label: 'Shift Board'")
     expect(shellConfigSource).toContain("label: 'Lottery'")
-    expect(shellConfigSource).toContain("label: 'Publish'")
-    expect(shellConfigSource).toContain("label: 'Approvals'")
   })
 
   it('allows the shared local section nav to scroll horizontally on narrow screens', () => {
     expect(localSectionNavSource).toContain('overflow-x-auto')
   })
 
-  it('puts Team, Requests, and Shift Board under the People section', () => {
-    expect(shellConfigSource).toContain("label: 'Team'")
-    expect(shellConfigSource).toContain("label: 'Requests'")
-    expect(shellConfigSource).toContain("label: 'Shift Board'")
-    expect(shellConfigSource).toContain("href: '/shift-board'")
-    const peopleSection = buildManagerSections(0).find((section) => section.key === 'people')
-    expect(peopleSection?.subItems.find((item) => item.label === 'Requests')?.href).toBe(
-      '/requests/user-access'
+  it('shows Shift Board as its own active manager section', () => {
+    const shiftBoardSection = buildManagerSections(0).find(
+      (section) => section.key === 'shift-board'
     )
-    // User Access Requests is no longer a separate top-level nav item
-    expect(shellConfigSource).not.toContain("label: 'User Access Requests'")
+
+    expect(shiftBoardSection?.href).toBe('/shift-board')
+    expect(shiftBoardSection?.label).toBe('Shift Board')
+    expect(shiftBoardSection?.isActive('/shift-board')).toBe(true)
   })
 
-  it('shows pending badge on Requests sub-item when there are pending access requests', () => {
-    expect(shellConfigSource).toContain('badgeCount: pendingCount > 0 ? pendingCount : undefined')
+  it('does not show People as the active manager section for Shift Board', () => {
+    expect(buildManagerSections(2).map((section) => section.label)).not.toContain('People')
   })
 })
