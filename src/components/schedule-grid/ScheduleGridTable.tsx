@@ -48,10 +48,20 @@ function totalToneClass(date: string): string {
     : 'border-border/70 bg-[var(--print-paper)] text-[var(--print-ink)]'
 }
 
-function rowScheduledTotal(row: TherapistGridRow, cycleDates: readonly string[]) {
-  return cycleDates.reduce((count, date) => {
-    return isWorkingScheduledGridCell(row.cells[date]) ? count + 1 : count
-  }, 0)
+function dailyTotalsForRows(rows: readonly TherapistGridRow[], cycleDates: readonly string[]) {
+  const totals: Record<string, number> = {}
+  for (const date of cycleDates) {
+    totals[date] = rows.reduce((count, row) => {
+      return isWorkingScheduledGridCell(row.cells[date]) ? count + 1 : count
+    }, 0)
+  }
+  return totals
+}
+
+function orderManagerRows(rows: readonly TherapistGridRow[]) {
+  const regularRows = rows.filter((row) => row.employmentType !== 'prn')
+  const prnRows = rows.filter((row) => row.employmentType === 'prn')
+  return { regularRows, prnRows }
 }
 
 export function ScheduleGridTable({
@@ -67,6 +77,9 @@ export function ScheduleGridTable({
         ...therapistRows.filter((row) => row.userId !== viewerUserId),
       ]
     : therapistRows
+  const { regularRows, prnRows } = orderManagerRows(sortedRows)
+  const showPrnSection = !isStaffViewer && prnRows.length > 0
+  const regularDailyTotals = dailyTotalsForRows(regularRows, cycleDates)
   const shiftLabel = dataset.shiftType === 'night' ? 'night-shift' : 'day-shift'
 
   if (sortedRows.length === 0) {
@@ -112,13 +125,10 @@ export function ScheduleGridTable({
                 </th>
               )
             })}
-            <th className="sticky right-0 top-0 z-40 min-w-8 border-l border-border bg-[var(--print-paper)] px-1 py-1.5 text-center font-black uppercase tracking-[0.04em] text-[var(--print-ink)] shadow-[-1px_0_0_var(--border)]">
-              Total
-            </th>
           </tr>
         </thead>
         <tbody>
-          {sortedRows.map((row) => (
+          {(showPrnSection ? regularRows : sortedRows).map((row) => (
             <TherapistRow
               key={row.userId}
               row={row}
@@ -131,34 +141,86 @@ export function ScheduleGridTable({
               onCellClick={onCellClick}
             />
           ))}
-          <tr className="border-t-2 border-foreground/20 bg-[color-mix(in_srgb,var(--print-paper)_82%,var(--muted))]">
-            <th className="sticky bottom-0 left-0 z-30 bg-[color-mix(in_srgb,var(--print-paper)_78%,var(--muted))] px-2 py-1.5 text-left text-[8px] font-black uppercase tracking-[0.08em] text-[var(--print-ink)] shadow-[1px_0_0_var(--border)]">
-              Daily total
-            </th>
-            {cycleDates.map((date) => (
-              <td
-                key={date}
-                className={cn(
-                  weekBoundaryClass(date),
-                  'sticky bottom-0 z-20 bg-[color-mix(in_srgb,var(--print-paper)_78%,var(--muted))] px-0 py-1 text-center shadow-[0_-1px_0_var(--border)]'
-                )}
-              >
-                <span
-                  data-testid={`total-${date}`}
-                  className={cn(
-                    'inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] border px-0 text-[8px] font-black tabular-nums',
-                    totalToneClass(date)
-                  )}
-                >
-                  {dailyTotals[date] ?? 0}
-                </span>
-              </td>
-            ))}
-            <td className="sticky bottom-0 right-0 z-30 border-l border-border bg-[color-mix(in_srgb,var(--print-paper)_78%,var(--muted))] shadow-[-1px_0_0_var(--border)]" />
-          </tr>
+          {showPrnSection ? (
+            <>
+              <DailyTotalRow
+                label="Daily staffing"
+                cycleDates={cycleDates}
+                totals={regularDailyTotals}
+                testIdPrefix="regular-total"
+              />
+              {prnRows.map((row) => (
+                <TherapistRow
+                  key={row.userId}
+                  row={row}
+                  cycleDates={cycleDates}
+                  isViewer={false}
+                  canManageCoverage={dataset.canManageCoverage}
+                  canUpdateAssignmentStatus={dataset.canUpdateAssignmentStatus}
+                  isPublished={dataset.isPublished}
+                  interactionsDisabled={interactionsDisabled}
+                  onCellClick={onCellClick}
+                />
+              ))}
+            </>
+          ) : null}
+          <DailyTotalRow
+            label="Daily total"
+            cycleDates={cycleDates}
+            totals={dailyTotals}
+            testIdPrefix="total"
+            sticky
+          />
         </tbody>
       </table>
     </div>
+  )
+}
+
+function DailyTotalRow({
+  label,
+  cycleDates,
+  totals,
+  testIdPrefix,
+  sticky = false,
+}: {
+  label: string
+  cycleDates: readonly string[]
+  totals: Record<string, number>
+  testIdPrefix: string
+  sticky?: boolean
+}) {
+  return (
+    <tr className="border-t-2 border-foreground/20 bg-[color-mix(in_srgb,var(--print-paper)_82%,var(--muted))]">
+      <th
+        className={cn(
+          'left-0 z-30 bg-[color-mix(in_srgb,var(--print-paper)_78%,var(--muted))] px-2 py-1.5 text-left text-[8px] font-black uppercase tracking-[0.08em] text-[var(--print-ink)] shadow-[1px_0_0_var(--border)]',
+          sticky ? 'sticky bottom-0' : 'sticky'
+        )}
+      >
+        {label}
+      </th>
+      {cycleDates.map((date) => (
+        <td
+          key={date}
+          className={cn(
+            weekBoundaryClass(date),
+            'bg-[color-mix(in_srgb,var(--print-paper)_78%,var(--muted))] px-0 py-1 text-center',
+            sticky && 'sticky bottom-0 z-20 shadow-[0_-1px_0_var(--border)]'
+          )}
+        >
+          <span
+            data-testid={`${testIdPrefix}-${date}`}
+            className={cn(
+              'inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] border px-0 text-[8px] font-black tabular-nums',
+              totalToneClass(date)
+            )}
+          >
+            {totals[date] ?? 0}
+          </span>
+        </td>
+      ))}
+    </tr>
   )
 }
 
@@ -181,8 +243,6 @@ function TherapistRow({
   interactionsDisabled: boolean
   onCellClick?: CellClickHandler
 }) {
-  const total = rowScheduledTotal(row, cycleDates)
-
   return (
     <tr
       className={cn(
@@ -258,11 +318,6 @@ function TherapistRow({
           </td>
         )
       })}
-      <td className="sticky right-0 z-10 border-l border-border bg-[var(--print-paper)] px-1 py-0.5 text-center shadow-[-1px_0_0_var(--border)]">
-        <span className="inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] bg-muted/65 px-0 text-[8px] font-black tabular-nums text-[var(--print-ink)]">
-          {total}
-        </span>
-      </td>
     </tr>
   )
 }

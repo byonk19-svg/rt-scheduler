@@ -218,7 +218,8 @@ export function ScheduleGrid({
 
   const isAssignTarget = activeCellTarget?.cell.status === 'off'
   const isStatusTarget = Boolean(activeCellTarget && activeCellTarget.cell.status !== 'off')
-  const sheetTitle = loadedShiftTab === 'Night' ? 'RT NIGHT SHIFT LOG' : 'RT DAY SHIFT LOG'
+  const sheetTitle =
+    loadedShiftTab === 'Night' ? 'Respiratory Therapy Night Shift' : 'Respiratory Therapy Day Shift'
   const sheetDayCount = `${initialDataset.cycleDates.length} days`
 
   return (

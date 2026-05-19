@@ -45,27 +45,15 @@ describe('ScheduleGrid source invariants', () => {
   it('uses explicit shift labels in the toolbar', () => {
     const code = toolbarSource()
 
-    expect(code).toContain('aria-label={`${tab} shift`}')
+    expect(code).toContain('{tab} shift')
     expect(code).toContain('Schedule Block')
   })
 
-  it('keeps schedule status help in a compact print legend inside the paper sheet', () => {
+  it('adds a compact paper-style title inside the schedule grid', () => {
     const code = source()
 
-    expect(code).toContain('SCHEDULE_LEGEND_ITEMS')
-    expect(code).toContain("label: 'Staff'")
-    expect(code).toContain("label: 'Lead'")
-    expect(code).toContain("label: 'On call'")
-    expect(code).toContain("label: 'Requested off'")
-    expect(code).toContain('aria-label="Schedule legend"')
-  })
-
-  it('renders a shift-specific paper schedule title with the 42-day count source', () => {
-    const code = source()
-
-    expect(code).toContain('RT DAY SHIFT LOG')
-    expect(code).toContain('RT NIGHT SHIFT LOG')
-    expect(code).toContain('initialDataset.cycleDates.length')
-    expect(code).toContain('sheetDayCount')
+    expect(code).toContain('Respiratory Therapy')
+    expect(code).toContain('cycleDateRangeLabel')
+    expect(code).toContain('{sheetTitle}')
   })
 })

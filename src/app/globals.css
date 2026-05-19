@@ -50,6 +50,10 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
+html {
+  scroll-padding-top: 5rem;
+}
+
 :root {
   /* --font-geist-mono: set on <html> via next/font (layout.tsx) */
   --radius: 0.625rem;

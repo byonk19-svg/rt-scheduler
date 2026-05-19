@@ -66,8 +66,8 @@ type HistoryItem = {
     | 'Received'
     | 'Claimed'
     | 'Interested'
-    | 'Primary claimant'
-    | 'Backup interest'
+    | 'First responder'
+    | 'Backup responder'
   partnerName: string | null
   status: RequestStatus
   visibilityLabel: 'Direct' | 'Team'

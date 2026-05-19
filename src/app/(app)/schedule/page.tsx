@@ -10,8 +10,8 @@ import { toggleCyclePublishedAction } from '@/app/(app)/schedule/actions/publish
 import { loadScheduleGridData } from './schedule-grid-data'
 
 export const metadata: Metadata = {
-  title: 'Schedule',
-  description: 'Review and manage the unified respiratory therapy schedule grid.',
+  title: 'Team Schedule',
+  description: 'Review staffing, coverage, and publish readiness from the unified schedule grid.',
 }
 
 export const dynamic = 'force-dynamic'
@@ -37,7 +37,7 @@ function getScheduleAccessLabel(dataset: GridDataset) {
 
 function getScheduleSubtitle(dataset: GridDataset) {
   if (dataset.canManageCoverage) {
-    return 'Draft staffing, live status, and team visibility in one 42-day grid.'
+    return 'Draft staffing, coverage review, and live schedule visibility.'
   }
   if (dataset.canUpdateAssignmentStatus) {
     return 'Review the team schedule and update published shift status in one 42-day grid.'
@@ -65,8 +65,8 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
             No active Schedule Block is available yet.
           </p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Managers can open Coverage to start the next Schedule Block. Staff will see this page
-            once a manager makes the Schedule Block available.
+            Managers can create or publish a Schedule Block before this view has shifts to show.
+            Staff will see their Team Schedule here after a block is available.
           </p>
         </section>
       </div>
@@ -74,9 +74,9 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   }
 
   return (
-    <div className="mx-auto max-w-[96rem] scroll-mt-24 px-4 pt-2 pb-6 md:px-6 md:pt-3">
+    <div className="mx-auto max-w-[96rem] scroll-mt-24 px-4 pb-6 pt-2 md:px-6 md:pt-3">
       <ManagerWorkspaceHeader
-        title="Schedule"
+        title="Team Schedule"
         subtitle={getScheduleSubtitle(result.dataset)}
         summary={
           <>

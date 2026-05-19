@@ -12,26 +12,18 @@ import {
 
 describe('app-shell-config', () => {
   it('uses a single standard authenticated header height token', () => {
-    expect(APP_HEADER_HEIGHT).toBe(44)
+    expect(APP_HEADER_HEIGHT).toBe(64)
   })
 
-  it('maps /team into the People section with Team, Requests, Shift Board, and Audit log local items', () => {
+  it('uses direct manager workflow nav without local section tabs', () => {
     const context = getShellContext({
-      pathname: '/team',
+      pathname: '/shift-board',
       canAccessManagerUi: true,
       pendingCount: 3,
     })
 
-    expect(context.primaryKey).toBe('people')
-    expect(context.localNav?.items.map((item) => item.label)).toEqual([
-      'Team',
-      'Requests',
-      'Shift Board',
-      'Audit log',
-    ])
-    const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
-    expect(requestsItem?.href).toBe('/requests/user-access')
-    expect(requestsItem?.badgeCount).toBe(3)
+    expect(context.primaryKey).toBe('shift-board')
+    expect(context.localNav).toBeNull()
   })
 
   it('does not return local nav for manager dashboard', () => {
@@ -41,103 +33,92 @@ describe('app-shell-config', () => {
       pendingCount: 0,
     })
 
-    expect(context.primaryKey).toBe('today')
+    expect(context.primaryKey).toBe('dashboard')
     expect(context.localNav).toBeNull()
   })
 
-  it('keeps the manager sections grouped into Dashboard, Schedule, and People', () => {
+  it('keeps manager top navigation aligned to primary workflows', () => {
     const sections = buildManagerSections(0)
-    expect(sections.map((section) => section.key)).toEqual(['today', 'schedule', 'people'])
-    expect(sections.map((section) => section.label)).toEqual(['Dashboard', 'Schedule', 'People'])
+    expect(sections.map((section) => section.key)).toEqual([
+      'dashboard',
+      'team-schedule',
+      'availability',
+      'shift-board',
+      'lottery',
+    ])
+    expect(sections.map((section) => section.label)).toEqual([
+      'Dashboard',
+      'Team Schedule',
+      'Availability',
+      'Shift Board',
+      'Lottery',
+    ])
   })
 
-  it('adds Analytics under Schedule and keeps /analytics schedule-active', () => {
+  it('keeps supporting schedule routes active under Team Schedule', () => {
     const context = getShellContext({
       pathname: '/analytics',
       canAccessManagerUi: true,
       pendingCount: 0,
     })
 
-    expect(context.primaryKey).toBe('schedule')
-    expect(context.localNav?.items.find((item) => item.label === 'Analytics')?.href).toBe(
-      '/analytics'
-    )
+    expect(context.primaryKey).toBe('team-schedule')
+    expect(context.localNav).toBeNull()
+
+    const planningContext = getShellContext({
+      pathname: '/schedule/planning',
+      canAccessManagerUi: true,
+      pendingCount: 0,
+    })
+    expect(planningContext.primaryKey).toBe('team-schedule')
   })
 
-  it('collapses legacy schedule labels into one manager Schedule tab', () => {
+  it('routes Team Schedule to the unified schedule grid', () => {
     const sections = buildManagerSections(0)
-    const scheduleSection = sections.find((section) => section.key === 'schedule')
+    const scheduleSection = sections.find((section) => section.key === 'team-schedule')
 
     expect(scheduleSection?.href).toBe('/schedule')
-    expect(scheduleSection?.subItems.map((item) => item.label)).toEqual([
-      'Schedule',
-      'Planning',
-      'Analytics',
-      'Availability',
-      'Lottery',
-      'Publish',
-      'Approvals',
-    ])
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Schedule')?.href).toBe(
-      '/schedule'
-    )
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Planning')?.href).toBe(
-      '/schedule/planning'
-    )
+    expect(scheduleSection?.label).toBe('Team Schedule')
+    expect(scheduleSection?.subItems).toEqual([])
   })
 
-  it('exposes /lottery as a first-class Schedule navigation item', () => {
+  it('exposes /lottery as a first-class manager navigation item', () => {
     const context = getShellContext({
       pathname: '/lottery',
       canAccessManagerUi: true,
       pendingCount: 0,
     })
 
-    expect(context.primaryKey).toBe('schedule')
+    expect(context.primaryKey).toBe('lottery')
     expect(usesAppShell('/lottery')).toBe(true)
-    expect(context.localNav?.items.map((item) => item.label)).toEqual([
-      'Schedule',
-      'Planning',
-      'Analytics',
-      'Availability',
-      'Lottery',
-      'Publish',
-      'Approvals',
-    ])
-    const lotteryItem = context.localNav?.items.find((item) => item.label === 'Lottery')
+    expect(context.localNav).toBeNull()
+    const lotteryItem = context.primaryItems.find((item) => item.label === 'Lottery')
     expect(lotteryItem?.href).toBe('/lottery')
     expect(lotteryItem?.active('/lottery')).toBe(true)
   })
 
-  it('/shift-board is active under a direct manager Shift Board sub-nav item', () => {
+  it('/shift-board is active as the manager Shift Board top navigation item', () => {
     const context = getShellContext({
       pathname: '/shift-board',
       canAccessManagerUi: true,
       pendingCount: 0,
     })
-    expect(context.primaryKey).toBe('people')
-    const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
-    expect(requestsItem?.active('/shift-board')).toBe(false)
-    expect(requestsItem?.href).toBe('/requests/user-access')
-    expect(requestsItem?.active('/requests')).toBe(true)
 
-    const shiftBoardItem = context.localNav?.items.find((item) => item.label === 'Shift Board')
+    expect(context.primaryKey).toBe('shift-board')
+    const shiftBoardItem = context.primaryItems.find((item) => item.label === 'Shift Board')
     expect(shiftBoardItem?.href).toBe('/shift-board')
     expect(shiftBoardItem?.active('/shift-board')).toBe(true)
   })
 
-  it('links manager Requests directly to user access while preserving active state and badge', () => {
+  it('does not make People active on the manager Shift Board route', () => {
     const context = getShellContext({
-      pathname: '/requests/user-access',
+      pathname: '/shift-board',
       canAccessManagerUi: true,
       pendingCount: 2,
     })
-    expect(context.primaryKey).toBe('people')
-    const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
-    expect(requestsItem?.href).toBe('/requests/user-access')
-    expect(requestsItem?.active('/requests/user-access')).toBe(true)
-    expect(requestsItem?.active('/requests')).toBe(true)
-    expect(requestsItem?.badgeCount).toBe(2)
+
+    expect(context.primaryItems.map((item) => item.label)).not.toContain('People')
+    expect(context.primaryKey).toBe('shift-board')
   })
 
   it('uses explicit manager mobile workflow destinations instead of a generic action slot', () => {
@@ -159,12 +140,25 @@ describe('app-shell-config', () => {
 
   it('returns manager workflow context for schedule routes', () => {
     expect(getWorkflowContext({ pathname: '/schedule', canAccessManagerUi: true })).toEqual({
-      workflow: 'Schedule',
-      context: 'Unified grid workspace',
-      state: 'Draft or published',
+      workflow: 'Team Schedule',
+      context: 'Schedule grid and coverage review',
+      state: 'Draft, review, publish',
       permission: 'Manager editable',
     })
-    expect(getWorkflowContext({ pathname: '/coverage', canAccessManagerUi: true })).toBeNull()
+    expect(getWorkflowContext({ pathname: '/coverage', canAccessManagerUi: true })).toEqual({
+      workflow: 'Team Schedule',
+      context: 'Schedule grid and coverage review',
+      state: 'Draft, review, publish',
+      permission: 'Manager editable',
+    })
+    expect(
+      getWorkflowContext({ pathname: '/schedule/planning', canAccessManagerUi: true })
+    ).toEqual({
+      workflow: 'Schedule Block Planning',
+      context: 'Future Schedule Blocks and target dates',
+      state: 'Draft planning',
+      permission: 'Manager editable',
+    })
     expect(getWorkflowContext({ pathname: '/settings', canAccessManagerUi: true })).toBeNull()
   })
 })

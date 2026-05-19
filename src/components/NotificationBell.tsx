@@ -79,27 +79,35 @@ export function NotificationBell({
 
   const loadNotifications = useCallback(async () => {
     setLoading(true)
-    const response = await fetch('/api/notifications', { cache: 'no-store' })
-    if (!response.ok) {
+    try {
+      const response = await fetch('/api/notifications', { cache: 'no-store' })
+      if (!response.ok) {
+        setLoading(false)
+        return
+      }
+      const data = (await response.json()) as {
+        unreadCount: number
+        notifications: NotificationItem[]
+      }
+      setUnreadCount(data.unreadCount)
+      setNotifications(data.notifications)
       setLoading(false)
-      return
+      setHasLoaded(true)
+    } catch {
+      setLoading(false)
     }
-    const data = (await response.json()) as {
-      unreadCount: number
-      notifications: NotificationItem[]
-    }
-    setUnreadCount(data.unreadCount)
-    setNotifications(data.notifications)
-    setLoading(false)
-    setHasLoaded(true)
   }, [])
 
   const loadUnreadSummary = useCallback(async () => {
-    const response = await fetch('/api/notifications?summary=1', { cache: 'no-store' })
-    if (!response.ok) return
-    const data = (await response.json()) as NotificationSummaryResponse
-    setUnreadCount(data.unreadCount)
-    setHasLoadedSummary(true)
+    try {
+      const response = await fetch('/api/notifications?summary=1', { cache: 'no-store' })
+      if (!response.ok) return
+      const data = (await response.json()) as NotificationSummaryResponse
+      setUnreadCount(data.unreadCount)
+      setHasLoadedSummary(true)
+    } catch {
+      return
+    }
   }, [])
 
   useEffect(() => {
@@ -188,13 +196,17 @@ export function NotificationBell({
 
   async function markAllAsRead() {
     if (unreadCount === 0) return
-    const response = await fetch('/api/notifications/mark-read', { method: 'POST' })
-    if (!response.ok) return
-    setUnreadCount(0)
-    const now = new Date().toISOString()
-    setNotifications((current) =>
-      current.map((item) => ({ ...item, read_at: item.read_at ?? now }))
-    )
+    try {
+      const response = await fetch('/api/notifications/mark-read', { method: 'POST' })
+      if (!response.ok) return
+      setUnreadCount(0)
+      const now = new Date().toISOString()
+      setNotifications((current) =>
+        current.map((item) => ({ ...item, read_at: item.read_at ?? now }))
+      )
+    } catch {
+      return
+    }
   }
 
   async function handleNotificationClick(item: NotificationItem) {

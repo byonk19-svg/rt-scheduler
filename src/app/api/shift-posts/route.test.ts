@@ -95,6 +95,43 @@ function makeAdminQuery(result: { data: unknown; error: unknown }) {
   return query
 }
 
+function makeReviewAdminClient(params: {
+  rpc?: ReturnType<typeof vi.fn>
+  post?: unknown
+  postError?: unknown
+  interest?: unknown
+  interestError?: unknown
+}) {
+  const rpc = params.rpc ?? vi.fn()
+  return {
+    rpc,
+    from(table: string) {
+      if (table === 'shift_posts') {
+        return makeAdminQuery({
+          data: params.post ?? {
+            id: 'post-1',
+            type: 'pickup',
+            status: 'pending',
+            visibility: 'team',
+            recipient_response: null,
+            claimed_by: null,
+          },
+          error: params.postError ?? null,
+        })
+      }
+      if (table === 'shift_post_interests') {
+        return makeAdminQuery({
+          data: Object.prototype.hasOwnProperty.call(params, 'interest')
+            ? params.interest
+            : { id: 'interest-2', status: 'pending' },
+          error: params.interestError ?? null,
+        })
+      }
+      throw new Error(`Unexpected admin table ${table}`)
+    },
+  }
+}
+
 describe('shift-post mutation API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -251,6 +288,7 @@ describe('shift-post mutation API', () => {
         action: 'review_request',
         requestId: 'post-1',
         decision: 'approve',
+        selectedInterestId: 'interest-2',
       })
     )
 
@@ -265,9 +303,7 @@ describe('shift-post mutation API', () => {
     }))
 
     createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
-    createAdminClientMock.mockReturnValue({
-      rpc: rpcMock,
-    })
+    createAdminClientMock.mockReturnValue(makeReviewAdminClient({ rpc: rpcMock }))
 
     const response = await POST(
       makeRequest({
@@ -313,9 +349,19 @@ describe('shift-post mutation API', () => {
     }))
 
     createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
-    createAdminClientMock.mockReturnValue({
-      rpc: rpcMock,
-    })
+    createAdminClientMock.mockReturnValue(
+      makeReviewAdminClient({
+        rpc: rpcMock,
+        post: {
+          id: 'post-1',
+          type: 'swap',
+          status: 'pending',
+          visibility: 'team',
+          recipient_response: null,
+          claimed_by: null,
+        },
+      })
+    )
 
     const response = await POST(
       makeRequest({
@@ -355,9 +401,39 @@ describe('shift-post mutation API', () => {
     }))
 
     createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
-    createAdminClientMock.mockReturnValue({
-      rpc: rpcMock,
-    })
+    createAdminClientMock.mockReturnValue(makeReviewAdminClient({ rpc: rpcMock }))
+
+    const response = await POST(
+      makeRequest({
+        action: 'review_request',
+        requestId: 'post-1',
+        decision: 'approve',
+        selectedInterestId: 'interest-2',
+      })
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain('Lead coverage gap')
+  })
+
+  it('blocks direct swaps waiting on teammate response before the review RPC', async () => {
+    const rpcMock = vi.fn()
+
+    createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
+    createAdminClientMock.mockReturnValue(
+      makeReviewAdminClient({
+        rpc: rpcMock,
+        post: {
+          id: 'post-1',
+          type: 'swap',
+          status: 'pending',
+          visibility: 'direct',
+          recipient_response: 'pending',
+          claimed_by: 'therapist-2',
+        },
+      })
+    )
 
     const response = await POST(
       makeRequest({
@@ -369,7 +445,86 @@ describe('shift-post mutation API', () => {
     const body = await response.json()
 
     expect(response.status).toBe(400)
-    expect(body.error).toContain('Lead coverage gap')
+    expect(body.error).toContain('accepted by the recipient')
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks open swaps without a partner before the review RPC', async () => {
+    const rpcMock = vi.fn()
+
+    createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
+    createAdminClientMock.mockReturnValue(
+      makeReviewAdminClient({
+        rpc: rpcMock,
+        post: {
+          id: 'post-1',
+          type: 'swap',
+          status: 'pending',
+          visibility: 'team',
+          recipient_response: null,
+          claimed_by: null,
+        },
+      })
+    )
+
+    const response = await POST(
+      makeRequest({
+        action: 'review_request',
+        requestId: 'post-1',
+        decision: 'approve',
+      })
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain('require a swap partner')
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks pickup approval without an explicit selected responder before the review RPC', async () => {
+    const rpcMock = vi.fn()
+
+    createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
+    createAdminClientMock.mockReturnValue(makeReviewAdminClient({ rpc: rpcMock }))
+
+    const response = await POST(
+      makeRequest({
+        action: 'review_request',
+        requestId: 'post-1',
+        decision: 'approve',
+      })
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain('selected responder')
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks stale selected responders before the review RPC', async () => {
+    const rpcMock = vi.fn()
+
+    createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
+    createAdminClientMock.mockReturnValue(
+      makeReviewAdminClient({
+        rpc: rpcMock,
+        interest: null,
+      })
+    )
+
+    const response = await POST(
+      makeRequest({
+        action: 'review_request',
+        requestId: 'post-1',
+        decision: 'approve',
+        selectedInterestId: 'interest-stale',
+      })
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain('no longer available')
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('denies pickup claimants through the transactional claimant function', async () => {

@@ -87,6 +87,15 @@ type ShiftPostReviewRow = {
   swap_shift_id: string | null
 }
 
+type ReviewPreflightPostRow = {
+  id: string
+  type: 'swap' | 'pickup'
+  status: string
+  visibility: 'team' | 'direct' | null
+  recipient_response: string | null
+  claimed_by: string | null
+}
+
 function asTrimmedString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -115,6 +124,7 @@ function toErrorResponse(message: string): NextResponse {
     lowered.includes('only pending') ||
     lowered.includes('require') ||
     lowered.includes('cannot') ||
+    lowered.includes('must be accepted') ||
     lowered.includes('lead coverage gap') ||
     lowered.includes('double booking') ||
     lowered.includes('no pickup interest') ||
@@ -124,6 +134,7 @@ function toErrorResponse(message: string): NextResponse {
     lowered.includes('recipient is not available') ||
     lowered.includes('same shift type') ||
     lowered.includes('no longer pending') ||
+    lowered.includes('no longer available') ||
     lowered.includes('cannot be created')
   ) {
     return NextResponse.json({ error: message }, { status: 400 })
@@ -141,6 +152,59 @@ async function getActorProfile(userId: string): Promise<ProfileRow | null> {
     .maybeSingle()
 
   return (data ?? null) as ProfileRow | null
+}
+
+async function validateReviewRequestBeforeRpc(params: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase query builders are structurally large; this preflight uses a narrow fluent subset.
+  admin: any
+  requestId: string
+  decision: 'approve' | 'deny'
+  selectedInterestId: string
+  swapPartnerId: string
+}): Promise<string | null> {
+  const { admin, requestId, decision, selectedInterestId, swapPartnerId } = params
+  if (decision === 'deny') return null
+
+  const { data: post, error: postError } = await admin
+    .from('shift_posts')
+    .select('id, type, status, visibility, recipient_response, claimed_by')
+    .eq('id', requestId)
+    .maybeSingle()
+
+  if (postError) return postError.message ?? 'Could not load request for review.'
+  if (!post) return `Shift post ${requestId} was not found.`
+
+  const request = post as ReviewPreflightPostRow
+  const visibility = request.visibility ?? 'team'
+  if (request.status !== 'pending') return 'Only pending shift posts can be reviewed.'
+  if (visibility === 'direct' && request.recipient_response !== 'accepted') {
+    return 'Direct request must be accepted by the recipient before approval.'
+  }
+
+  if (request.type === 'swap' && visibility === 'team' && !swapPartnerId && !request.claimed_by) {
+    return 'Team-visible swap approvals require a swap partner.'
+  }
+
+  if (request.type === 'pickup' && visibility === 'team') {
+    if (!selectedInterestId) return 'Pickup approvals require a selected responder.'
+
+    const { data: interest, error: interestError } = await admin
+      .from('shift_post_interests')
+      .select('id, status')
+      .eq('id', selectedInterestId)
+      .eq('shift_post_id', requestId)
+      .in('status', ['pending', 'selected'])
+      .maybeSingle()
+
+    if (interestError) return interestError.message ?? 'Could not load selected responder.'
+    if (!interest) return 'Selected responder is no longer available for this pickup request.'
+  }
+
+  if (request.type === 'pickup' && visibility === 'direct' && !request.claimed_by) {
+    return `Direct pickup request ${request.id} has no accepted recipient to approve.`
+  }
+
+  return null
 }
 
 function isActiveShiftPostActor(profile: ProfileRow | null): boolean {
@@ -424,6 +488,17 @@ export async function POST(request: Request) {
 
       if (!requestId || (decision !== 'approve' && decision !== 'deny')) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+      }
+
+      const preflightError = await validateReviewRequestBeforeRpc({
+        admin,
+        requestId,
+        decision,
+        selectedInterestId,
+        swapPartnerId,
+      })
+      if (preflightError) {
+        return toErrorResponse(preflightError)
       }
 
       const review = buildShiftPostReviewRpcCall({

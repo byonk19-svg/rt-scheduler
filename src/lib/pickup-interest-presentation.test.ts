@@ -6,7 +6,7 @@ import {
 } from '@/lib/pickup-interest-presentation'
 
 describe('partitionPickupInterestQueue', () => {
-  it('surfaces the selected therapist as the current primary claimant and keeps others as backups', () => {
+  it('surfaces the selected therapist as the first responder and keeps others as backups', () => {
     const queue = partitionPickupInterestQueue([
       {
         id: 'backup-2',
@@ -43,7 +43,7 @@ describe('partitionPickupInterestQueue', () => {
     ])
   })
 
-  it('treats all interested therapists as backups when no primary claimant is selected yet', () => {
+  it('treats all interested therapists as backups when no first responder is selected yet', () => {
     const queue = partitionPickupInterestQueue([
       {
         id: 'interest-2',
@@ -94,16 +94,16 @@ describe('partitionPickupInterestQueue', () => {
 })
 
 describe('getPickupInterestTherapistCopy', () => {
-  it('uses consistent therapist-facing wording for the current primary claimant', () => {
+  it('uses consistent therapist-facing wording for the current first responder', () => {
     expect(getPickupInterestTherapistCopy('selected')).toEqual({
-      roleLabel: 'Primary claimant',
+      roleLabel: 'First responder',
       helperText: 'You are currently first in line for this pickup request.',
     })
   })
 
-  it('uses consistent therapist-facing wording for backup interest', () => {
+  it('uses consistent therapist-facing wording for backup responders', () => {
     expect(getPickupInterestTherapistCopy('pending')).toEqual({
-      roleLabel: 'Backup interest',
+      roleLabel: 'Backup responder',
       helperText: 'You are still interested and listed as a backup for this pickup request.',
     })
   })

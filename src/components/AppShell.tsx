@@ -72,14 +72,14 @@ function initials(name: string): string {
 function Logo() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground shadow-tw-2xs ring-1 ring-sidebar-ring/35">
-        <CalendarDays className="h-4 w-4 text-[color:var(--sidebar-ring)]" aria-hidden />
+      <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground shadow-tw-2xs ring-1 ring-sidebar-ring/35">
+        <CalendarDays className="h-5 w-5 text-[color:var(--sidebar-ring)]" aria-hidden />
       </div>
       <div className="hidden leading-none sm:block">
-        <p className="font-heading text-sm font-bold tracking-[-0.02em] text-sidebar-primary">
+        <p className="font-heading text-xl font-bold tracking-[-0.02em] text-sidebar-primary">
           Teamwise
         </p>
-        <p className="mt-0.5 text-[0.62rem] font-medium tracking-wide text-[color:var(--sidebar-muted)]">
+        <p className="mt-1 text-xs font-medium tracking-wide text-[color:var(--sidebar-muted)]">
           Respiratory Therapy
         </p>
       </div>
@@ -334,11 +334,15 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
     let cancelled = false
 
     async function loadPendingSummary() {
-      const response = await fetch('/api/requests/user-access?summary=1', { cache: 'no-store' })
-      if (!response.ok || cancelled) return
-      const data = (await response.json()) as { pendingCount?: number }
-      if (cancelled) return
-      setFetchedPendingCount(data.pendingCount ?? 0)
+      try {
+        const response = await fetch('/api/requests/user-access?summary=1', { cache: 'no-store' })
+        if (!response.ok || cancelled) return
+        const data = (await response.json()) as { pendingCount?: number }
+        if (cancelled) return
+        setFetchedPendingCount(data.pendingCount ?? 0)
+      } catch {
+        if (!cancelled) setFetchedPendingCount(0)
+      }
     }
 
     void loadPendingSummary()
@@ -358,7 +362,11 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const isTherapistSchedulePage =
     pathname === '/therapist/schedule' || pathname === '/staff/my-schedule'
   const hideLocalSectionNav = pathname.startsWith('/availability')
-  const showWorkflowContextStrip = Boolean(workflowContext) && !isSchedulePage
+  const hideWorkflowContext =
+    pathname === '/schedule' ||
+    pathname === '/coverage' ||
+    pathname === '/shift-board' ||
+    pathname === '/swaps'
 
   return (
     <ThemeProvider>
@@ -394,9 +402,9 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      'relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-150',
+                      'relative flex items-center gap-1.5 rounded-md px-4 py-2.5 text-base font-medium transition-colors duration-150',
                       item.current
-                        ? 'text-sidebar-primary after:absolute after:bottom-[-10px] after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-[var(--attention)]'
+                        ? 'bg-sidebar-accent/70 text-sidebar-primary shadow-tw-2xs after:absolute after:bottom-[-10px] after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-[var(--attention)]'
                         : 'text-sidebar-foreground hover:text-sidebar-accent-foreground'
                     )}
                     aria-current={item.current ? 'page' : undefined}
@@ -437,15 +445,15 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
           }
         />
 
-        <div className="min-h-screen pb-20 pt-11 md:pb-0">
-          {showWorkflowContextStrip && workflowContext ? (
+        <div className="min-h-screen pb-20 pt-16 md:pb-0">
+          {workflowContext && !hideWorkflowContext ? (
             <WorkflowContextStrip context={workflowContext} />
           ) : null}
           <main
             id="main-content"
             tabIndex={-1}
             className={cn(
-              'scroll-mt-16 w-full print:max-w-none',
+              'w-full scroll-mt-20 print:max-w-none',
               isCoveragePage || isSchedulePage || isAvailabilityPage || isTherapistSchedulePage
                 ? 'py-4 md:py-5'
                 : cn(APP_PAGE_MAX_WIDTH_CLASS, 'py-5 md:py-7 print:mx-0 print:px-4 print:py-4')

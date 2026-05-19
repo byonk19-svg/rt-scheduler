@@ -14,7 +14,7 @@ const STATUS_CODE: Record<GridCellStatus, string> = {
   cancelled: 'CX',
   call_in: 'CI',
   left_early: 'LE',
-  off: '·',
+  off: '.',
 }
 
 const STATUS_COLOR: Record<GridCellStatus, string> = {

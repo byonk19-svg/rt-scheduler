@@ -42,7 +42,7 @@ describe('getCellDisplay', () => {
     const display = getCellDisplay(cell)
 
     expect(display.asterisk).toBe(true)
-    expect(display.code).toBe('·')
+    expect(display.code).toBe('.')
   })
 
   it('returns the expected code for each operational status', () => {
@@ -51,7 +51,7 @@ describe('getCellDisplay', () => {
       ['cancelled', 'CX'],
       ['call_in', 'CI'],
       ['left_early', 'LE'],
-      ['off', '·'],
+      ['off', '.'],
     ]
 
     for (const [status, expectedCode] of cases) {
@@ -69,6 +69,7 @@ describe('buildDailyTotals', () => {
         name: 'A',
         isOnFmla: false,
         isActive: true,
+        employmentType: 'full_time',
         shiftType: 'day',
         cells: {
           '2026-05-04': { shiftId: 's1', status: 'lead', hasNeedsOff: false, isIneligible: false },
@@ -80,6 +81,7 @@ describe('buildDailyTotals', () => {
         name: 'B',
         isOnFmla: false,
         isActive: true,
+        employmentType: 'full_time',
         shiftType: 'day',
         cells: {
           '2026-05-04': {
@@ -101,6 +103,7 @@ describe('buildDailyTotals', () => {
         name: 'C',
         isOnFmla: false,
         isActive: true,
+        employmentType: 'prn',
         shiftType: 'day',
         cells: {
           '2026-05-04': {

@@ -82,10 +82,8 @@ describe('schedule route', () => {
     )
 
     expect(loadScheduleGridDataMock).toHaveBeenCalledWith({ cycle: 'cycle-2' })
-    expect(html).toContain('Schedule')
-    expect(html).toContain('State')
-    expect(html).toContain('Access')
-    expect(html).toContain('Manager edit')
+    expect(html).toContain('Team Schedule')
+    expect(html).toContain('Draft staffing, coverage review, and live schedule visibility.')
     expect(html).toContain('Mock Schedule Grid')
     expect(html).toContain('May 3 - Jun 13, 2026')
   })
@@ -112,19 +110,15 @@ describe('schedule route', () => {
     const html = renderToStaticMarkup(await SchedulePage({ searchParams: Promise.resolve({}) }))
 
     expect(html).toContain('No active Schedule Block is available yet.')
-    expect(html).toContain('Managers can open Coverage to start the next Schedule Block')
-    expect(html).toContain(
-      'Staff will see this page once a manager makes the Schedule Block available'
-    )
+    expect(html).toContain('Managers can create or publish a Schedule Block')
+    expect(html).toContain('Staff will see their Team Schedule here after a block is available.')
   })
 
   it('sets unified schedule metadata', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/schedule/page.tsx'), 'utf8')
 
-    expect(source).toContain("title: 'Schedule'")
-    expect(source).toContain('unified respiratory therapy schedule grid')
-    expect(source).toContain('Review your row and the live team schedule')
-    expect(source).toContain('Review the team schedule and update published shift status')
+    expect(source).toContain("title: 'Team Schedule'")
+    expect(source).toContain('unified schedule grid')
   })
 
   it('remounts the grid when the loaded cycle or shift changes', () => {

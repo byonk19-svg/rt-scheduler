@@ -16,8 +16,8 @@ describe('staff history page', () => {
     expect(source).toContain("const visibilityLabel: HistoryItem['visibilityLabel']")
     expect(source).toContain("'Direct'")
     expect(source).toContain("row.requestKind === 'call_in'")
-    expect(source).toContain('Primary claimant')
-    expect(source).toContain('Backup interest')
+    expect(source).toContain('First responder')
+    expect(source).toContain('Backup responder')
     expect(source).toContain('shift_post_interests')
   })
 

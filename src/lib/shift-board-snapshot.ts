@@ -27,6 +27,7 @@ export type ShiftBoardShiftRole = 'lead' | 'staff'
 type ShiftPostRow = {
   id: string
   shift_id: string | null
+  swap_shift_id: string | null
   posted_by: string | null
   claimed_by: string | null
   visibility: 'team' | 'direct' | null
@@ -99,6 +100,11 @@ export type ShiftBoardRequest = {
   shiftDate: string | null
   shiftCycleId: string | null
   shiftId: string | null
+  swapShift: string | null
+  swapShiftDate: string | null
+  swapShiftId: string | null
+  swapShiftType: ShiftBoardShiftType | null
+  swapShiftRole: ShiftBoardShiftRole | null
   message: string
   status: ShiftBoardRequestStatus
   posted: string
@@ -205,7 +211,7 @@ export async function loadShiftBoardSnapshot({
   let postsQuery = supabase
     .from('shift_posts')
     .select(
-      'id, shift_id, posted_by, claimed_by, visibility, recipient_response, request_kind, message, type, status, created_at, override_reason'
+      'id, shift_id, swap_shift_id, posted_by, claimed_by, visibility, recipient_response, request_kind, message, type, status, created_at, override_reason'
     )
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
@@ -333,13 +339,19 @@ export async function loadShiftBoardSnapshot({
   const shiftIds = Array.from(
     new Set(postRows.map((row) => row.shift_id).filter((value): value is string => Boolean(value)))
   )
+  const swapShiftIds = Array.from(
+    new Set(
+      postRows.map((row) => row.swap_shift_id).filter((value): value is string => Boolean(value))
+    )
+  )
+  const lookupShiftIds = Array.from(new Set([...shiftIds, ...swapShiftIds]))
 
   let shiftsById = new Map<string, ShiftLookupRow>()
-  if (shiftIds.length > 0) {
+  if (lookupShiftIds.length > 0) {
     const { data: shiftsData } = await supabase
       .from('shifts')
       .select('id, cycle_id, date, shift_type, role')
-      .in('id', shiftIds)
+      .in('id', lookupShiftIds)
 
     shiftsById = new Map(((shiftsData ?? []) as ShiftLookupRow[]).map((row) => [row.id, row]))
   }
@@ -438,10 +450,12 @@ export async function loadShiftBoardSnapshot({
 
   const requests = visiblePostRows.map((row) => {
     const shift = row.shift_id ? shiftsById.get(row.shift_id) : null
+    const swapShift = row.swap_shift_id ? shiftsById.get(row.swap_shift_id) : null
     const posterName = row.posted_by
       ? (namesById.get(row.posted_by) ?? 'Unknown therapist')
       : 'Unknown therapist'
     const shiftLabel = shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable'
+    const swapShiftLabel = swapShift ? formatShiftLabel(swapShift.date, swapShift.shift_type) : null
 
     const activeInterests = (interestsByPostId.get(row.id) ?? [])
       .filter(
@@ -471,6 +485,11 @@ export async function loadShiftBoardSnapshot({
       shiftDate: shift?.date ?? null,
       shiftCycleId: shift?.cycle_id ?? null,
       shiftId: row.shift_id ?? null,
+      swapShift: swapShiftLabel,
+      swapShiftDate: swapShift?.date ?? null,
+      swapShiftId: row.swap_shift_id ?? null,
+      swapShiftType: swapShift?.shift_type ?? null,
+      swapShiftRole: swapShift?.role ?? null,
       message: row.message,
       status: toRequestUiStatus(row.status, row.created_at) as ShiftBoardRequestStatus,
       posted: formatRelativeTime(row.created_at),
