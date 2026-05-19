@@ -39,6 +39,7 @@ const baseProps = {
   scheduleHref: '/schedule',
   reviewHref: '/approvals',
   activeCycleDateRange: 'Mar 17 - Apr 13',
+  nextCycleCtaHref: '/schedule/planning?cycle=next-cycle',
 }
 
 describe('ManagerTriageDashboard', () => {
@@ -110,6 +111,8 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Review')
     expect(html).toContain('Publish')
     expect(html).toContain('Continue Schedule Block')
+    expect(html).toContain('Plan next Schedule Block')
+    expect(html).toContain('href="/schedule/planning?cycle=next-cycle"')
     expect(html).not.toContain('Scheduling workflow')
     expect(html).not.toContain('Follow these steps each Schedule Block')
     expect(html).not.toContain('Prepare availability')

@@ -71,6 +71,7 @@ describe('app-shell-config', () => {
     expect(scheduleSection?.href).toBe('/schedule')
     expect(scheduleSection?.subItems.map((item) => item.label)).toEqual([
       'Schedule',
+      'Planning',
       'Analytics',
       'Availability',
       'Lottery',
@@ -79,6 +80,9 @@ describe('app-shell-config', () => {
     ])
     expect(scheduleSection?.subItems.find((item) => item.label === 'Schedule')?.href).toBe(
       '/schedule'
+    )
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Planning')?.href).toBe(
+      '/schedule/planning'
     )
   })
 
@@ -93,6 +97,7 @@ describe('app-shell-config', () => {
     expect(usesAppShell('/lottery')).toBe(true)
     expect(context.localNav?.items.map((item) => item.label)).toEqual([
       'Schedule',
+      'Planning',
       'Analytics',
       'Availability',
       'Lottery',

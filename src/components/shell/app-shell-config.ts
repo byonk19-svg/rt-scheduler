@@ -64,6 +64,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 function isManagerScheduleRoute(pathname: string): boolean {
   return (
     pathname === '/schedule' ||
+    pathname === '/schedule/planning' ||
     pathname === '/analytics' ||
     pathname === '/availability' ||
     pathname === '/lottery' ||
@@ -114,6 +115,11 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           href: '/schedule',
           label: 'Schedule',
           active: (pathname) => pathname === '/schedule',
+        },
+        {
+          href: '/schedule/planning',
+          label: 'Planning',
+          active: (pathname) => pathname === '/schedule/planning',
         },
         {
           href: '/analytics',
@@ -269,7 +275,8 @@ export function getMobilePrimaryItems(args: {
       {
         href: '/schedule',
         label: 'Schedule',
-        active: (pathname) => pathname === '/schedule' || pathname === '/coverage',
+        active: (pathname) =>
+          pathname === '/schedule' || pathname === '/schedule/planning' || pathname === '/coverage',
       },
       {
         href: '/availability',
@@ -365,6 +372,15 @@ export function getWorkflowContext(args: {
         workflow: 'Schedule',
         context: 'Unified grid workspace',
         state: 'Draft or published',
+        permission: 'Manager editable',
+      }
+    }
+
+    if (pathname === '/schedule/planning') {
+      return {
+        workflow: 'Schedule Block Planning',
+        context: 'Future Schedule Blocks and target dates',
+        state: 'Draft planning',
         permission: 'Manager editable',
       }
     }

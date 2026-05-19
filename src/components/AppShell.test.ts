@@ -111,6 +111,7 @@ describe('AppShell navigation structure', () => {
 
     expect(scheduleSection).toBeDefined()
     expect(scheduleSection?.isActive('/schedule')).toBe(true)
+    expect(scheduleSection?.isActive('/schedule/planning')).toBe(true)
   })
 
   it('sends the manager Schedule entry to the unified schedule grid', () => {
@@ -119,6 +120,9 @@ describe('AppShell navigation structure', () => {
     expect(scheduleSection?.href).toBe('/schedule')
     expect(scheduleSection?.subItems.find((item) => item.label === 'Schedule')?.href).toBe(
       '/schedule'
+    )
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Planning')?.href).toBe(
+      '/schedule/planning'
     )
     expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')).toBeUndefined()
     expect(scheduleSection?.subItems.find((item) => item.label === 'Roster View')).toBeUndefined()
@@ -153,8 +157,9 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'people'")
   })
 
-  it('puts Schedule, Availability, Lottery, Publish, and Approvals under the Schedule section', () => {
+  it('puts Schedule, Planning, Availability, Lottery, Publish, and Approvals under the Schedule section', () => {
     expect(shellConfigSource).toContain("label: 'Schedule'")
+    expect(shellConfigSource).toContain("label: 'Planning'")
     expect(shellConfigSource).not.toContain("label: 'Coverage'")
     expect(shellConfigSource).not.toContain("label: 'Roster View'")
     expect(shellConfigSource).toContain("label: 'Availability'")

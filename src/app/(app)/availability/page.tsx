@@ -577,6 +577,12 @@ export default async function AvailabilityPage({
                 Shift board
               </Link>
               <Link
+                href="/schedule/planning"
+                className="flex h-11 items-center rounded-sm px-3 py-2 text-sm hover:bg-secondary"
+              >
+                Schedule Block Planning
+              </Link>
+              <Link
                 href={intakeHref}
                 className="flex h-11 items-center rounded-sm px-3 py-2 text-sm hover:bg-secondary"
               >

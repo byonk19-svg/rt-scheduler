@@ -6,13 +6,65 @@ Scheduling operations for respiratory therapy teams, including availability, pub
 
 **Schedule Block**:
 A non-overlapping 6-week respiratory therapy scheduling period for one site that always starts on Sunday. Schedule Blocks may have date gaps between them; they do not have to be perfectly back-to-back.
+Normal operations use a consistent six-week cadence: the next Schedule Block usually starts the Sunday after the previous block ends.
 Multiple Schedule Blocks may exist in different lifecycle states for the same site as long as their date ranges do not overlap, including multiple future Draft blocks.
 Schedule Block dates are editable only before dependent availability, assignment, preliminary, or publish history exists.
+Future Schedule Blocks should have an availability due date before they are visible for therapist submissions, so therapists always know the deadline for that block.
+Preliminary and Final Publish target dates are manager planning milestones; they should guide schedule work but should not block therapist availability submission.
+Therapist availability visibility is derived from the future Schedule Block having an availability due date; there should not be a separate manager visibility toggle.
+Multiple future non-overlapping Schedule Blocks may be therapist-visible at the same time when each has an availability due date.
 The current product can behave as single-location, while schema constraints may remain site-scoped for future-proofing.
 _Avoid_: cycle, period, schedule cycle, roster cycle in user-facing UI
 _Avoid_: forcing contiguous Schedule Blocks when adoption starts midstream or historical ranges are skipped
 _Avoid_: changing Schedule Block dates after planning data exists; use Start Schedule Block Over or create a new block instead
+_Avoid_: showing future therapist availability submission without a due date unless the block is still an internal manager draft
+_Avoid_: hiding therapist availability submission just because Preliminary or Final Publish target dates are missing
+_Avoid_: adding a separate "make visible" switch for normal future availability submission
+_Avoid_: limiting therapist availability submission to only one future Schedule Block when multiple planned blocks exist
 _Avoid_: overbuilding multi-site UX before the department needs it
+
+**Schedule Block Planning**:
+The manager-facing planning utility for creating or selecting future Schedule Blocks, setting the availability due date, and setting manager target dates for Send Preliminary and Final Publish.
+When no future Schedule Block exists, Schedule Block Planning should suggest the next Sunday-start six-week block from the latest existing Schedule Block and prefill reasonable target dates for manager review.
+The first Schedule Block Planning flow should focus on saving the next suggested block. A later bulk planning action may create several future non-overlapping Schedule Blocks at once with suggested planning dates for manager review.
+Suggested Schedule Blocks are previews until the manager saves. Opening Schedule Block Planning should not automatically create draft Schedule Block rows.
+Schedule Block labels should be generated from the date range by default. Custom labels may remain editable as a secondary option, but managers should not have to name standard blocks manually.
+Default planning suggestions are availability due three weeks before the Schedule Block starts, Send Preliminary target two weeks before start, and Final Publish target one week before start.
+Schedule Block Planning must not save overlapping Schedule Blocks. When a proposed block overlaps an existing one, the UI should explain the conflict and suggest the next valid Sunday-start block.
+Schedule Block start and end dates may be edited only while the block has no dependent availability submissions, assignments, preliminary snapshots, or publish history. After dependent data exists, recovery uses a new block or a named lifecycle action rather than silent date edits.
+Managers choose planning dates as calendar days, not times. Availability due, Send Preliminary target, and Final Publish target are all date-only in manager UI. The system may normalize date-only availability deadlines to an end-of-day timestamp internally, but the manager UI should not ask for a time.
+Availability due dates should be before the Schedule Block start date. Late recovery after a block starts belongs in manager-managed late availability, not normal Schedule Block Planning.
+Planning dates should follow this order: availability due on or before Send Preliminary target, Send Preliminary target on or before Final Publish target, and Final Publish target before the Schedule Block start date. Same-day planning targets may be allowed with a compressed-timeline warning.
+Managers may edit planning dates after saving. Moving the availability due date later is ordinary; moving it earlier after therapists can see the block should require confirmation because it changes staff expectations.
+After a Schedule Block becomes therapist-visible for availability, its availability due date may be replaced with another date but should not be cleared entirely. Removing therapist visibility should happen by deleting or archiving a safe empty draft block, not by erasing the deadline.
+Preliminary and Final Publish target dates may be edited until the actual Send Preliminary or Final Publish action happens. Actual lifecycle actions record exact timestamps when they happen; after the actual action happens, the target date becomes historical planning context rather than the lifecycle authority.
+Saving Schedule Block Planning should notify therapists only when the block becomes therapist-visible for availability for the first time, or when a visible availability due date changes materially. Editing manager-only Preliminary or Final Publish target dates should stay quiet.
+Schedule Block Planning changes should be audit logged for manager traceability, including creating a therapist-visible Schedule Block, changing a visible availability due date, changing the Send Preliminary target date, and changing the Final Publish target date. Audit logging does not imply therapist notification.
+Schedule Block Planning belongs under the Schedule workflow as a secondary Planning route such as `/schedule/planning`, and may be linked from the manager dashboard when the next Schedule Block is missing planning dates.
+The route should prioritize future Schedule Blocks in two groups: needs planning and planned. Current or recent blocks may appear as read-only context, while old publish history and recovery actions stay in Publish History.
+The manager dashboard should surface Schedule Block planning attention items, including missing next block, missing availability due date, availability due soon or past due, Preliminary target coming up, and Final Publish target coming up. Dashboard actions should link to the page where the manager can resolve the item, such as Schedule Block Planning, Availability, or Schedule.
+The Schedule section's local Planning tab may show a small count for missing or overdue planning items, while primary urgency stays on the manager dashboard.
+_Avoid_: making managers calculate standard six-week block dates manually
+_Avoid_: making bulk multi-block creation the only way to plan the next Schedule Block
+_Avoid_: creating empty draft Schedule Blocks just because a manager opened the planning page
+_Avoid_: requiring managers to invent custom names for normal six-week Schedule Blocks
+_Avoid_: treating suggested planning offsets as uneditable hard rules
+_Avoid_: allowing overlapping Schedule Blocks, even temporarily
+_Avoid_: changing Schedule Block date ranges after availability, assignment, preliminary, or publish dependencies exist
+_Avoid_: asking managers to enter deadline times for normal Schedule Block Planning
+_Avoid_: setting a normal availability due date after the Schedule Block has started
+_Avoid_: saving planning target dates in an order that contradicts the Schedule Block lifecycle
+_Avoid_: silently making a therapist-facing due date stricter after staff have already seen the Schedule Block
+_Avoid_: clearing a due date from a Schedule Block after therapists could already submit against it
+_Avoid_: treating planning target edits as the same thing as Send Preliminary or Final Publish
+_Avoid_: notifying therapists for manager-only target date edits
+_Avoid_: treating audit logging as staff notification
+_Avoid_: adding Schedule Block Planning as a separate top-level primary navigation item
+_Avoid_: turning Schedule Block Planning into a full historical Schedule Block archive
+_Avoid_: surfacing dashboard planning reminders that dead-end somewhere the manager cannot act
+_Avoid_: making primary navigation feel urgent for every routine planning reminder
+_Avoid_: treating Schedule Block Planning as the place where preliminary or final publish actions actually happen
+_Avoid_: exposing Schedule Block Planning as a therapist workflow
 
 **Shift Visibility**:
 Therapists default to their own shift; Team Schedule may show both Day shift and Night shift as read-only visibility, while My Shifts stays personally scoped. Leads and managers may toggle Day/Night wherever their role has schedule access.
@@ -89,6 +141,8 @@ _Avoid_: treating PTO as separate from Need Off
 **Availability Submission**:
 A therapist's confirmation that they reviewed a specific Schedule Block. A submission may contain Need Off or Need to Work exceptions, or no exceptions.
 Each therapist has one current Availability Submission per Schedule Block; edits during the open window update that current truth while optional history may be retained.
+Therapists may submit availability for any future Schedule Block as soon as that Schedule Block exists; there is no separate availability opening date.
+Therapist availability screens should lead with the next future Schedule Block needing their response, while still allowing the therapist to switch to later visible future Schedule Blocks.
 Availability belongs to the target therapist, while entry provenance records who entered or updated it.
 _Avoid_: assuming submitted availability always contains day-level entries
 _Avoid_: storing availability as an unscoped date range that is not tied to the Schedule Block lifecycle
@@ -112,7 +166,8 @@ _Avoid_: making empty Flexible PRN availability look like the therapist agreed t
 _Avoid_: using force-on when the therapist explicitly told the manager they can or need to work; enter that as Manager-entered Availability instead
 
 **Availability Edit Window**:
-The period before availability closes or schedule building starts when a therapist may edit a submitted Availability Submission. After the window closes, changes become manager-managed or move to later workflows.
+The period before availability closes or schedule building starts when a therapist may edit a submitted Availability Submission. Future Schedule Blocks do not need an availability opening date; the manager only sets the due date for when submissions should be complete. After the window closes, changes become manager-managed or move to later workflows.
+_Avoid_: adding a separate availability-open milestone when the Schedule Block already exists for future submission
 _Avoid_: silently changing availability after managers have started schedule planning
 
 **Availability Locked**:
@@ -630,6 +685,7 @@ _Avoid_: embedded form, generic request page, mini composer
 - For **Flexible PRN**, **Need to Work** counts as explicit availability and hard auto-draft assignment for that date
 - Schedule Block-specific PRN exceptions should be represented by date-level availability entries, **Manager-entered Availability**, or **Manager Force-on PRN** reasons, not by changing the therapist's durable PRN mode
 - Schedule Blocks must be 6 weeks, start on Sunday, and never overlap for the same site, but gaps between Schedule Blocks are allowed and multiple non-overlapping blocks may exist in different lifecycle states, including multiple Draft blocks
+- The normal operating cadence is consecutive six-week Schedule Blocks, so manager UI should suggest the next Sunday-start block from the latest existing block while still allowing intentional gaps before dependent planning data exists
 - The app may behave as single-location for now, but site-scoped schema constraints are acceptable future-proofing
 - Schedule Block date ranges become locked once dependent availability, assignment, preliminary, or publish history exists; recovery uses **Start Schedule Block Over** or a new block, not silent date edits
 - **Daily Assignment Uniqueness** prevents assigning the same therapist to both Day and Night on the same calendar date in the same Schedule Block
@@ -657,6 +713,9 @@ _Avoid_: embedded form, generic request page, mini composer
 - An **Availability Submission** can be valid with no exceptions; it records that the therapist reviewed the Schedule Block
 - **Availability Submission** records are scoped to one Schedule Block, not a general date range, so lock/reopen/start-over and preliminary workflows know exactly which six-week block they apply to
 - A therapist has one current **Availability Submission** per Schedule Block; while availability is open, resubmitting updates the current submission rather than creating competing active submissions
+- Therapists may submit availability for future Schedule Blocks as soon as those Schedule Blocks exist; the workflow does not need a separate availability opening date
+- Therapist availability should default to the next visible Schedule Block needing that therapist's response, with later future visible blocks available through selection rather than hidden
+- When multiple future Schedule Blocks are visible, therapist and manager views should sort them by availability due date first, then Schedule Block start date
 - Availability records must distinguish the target therapist from the user who entered or updated the availability
 - **Manager-entered Availability** is valid scheduling input when a manager transcribes therapist-provided availability from email, verbal, or paper sources; it must preserve attribution instead of pretending the therapist entered it in-app, but typed source notes are optional
 - **Manager-entered Availability** counts as received availability in readiness summaries, while still showing that it was entered by a manager rather than submitted in app by the therapist
@@ -666,6 +725,8 @@ _Avoid_: embedded form, generic request page, mini composer
 - **Manager Force-on PRN** applies only when no therapist-provided availability exists for that Flexible PRN date; if the therapist told the manager they can or need to work, use **Manager-entered Availability** instead
 - True **Manager Force-on PRN** requires a manager reason before Final Publish because no therapist-provided availability exists for that date
 - Therapists may edit an **Availability Submission** only during the **Availability Edit Window**; after schedule building starts or the window closes, changes are manager-managed or handled through later workflows
+- The manager-set availability due date is a deadline for therapist expectations and manager reminders, not an opening gate
+- A future Schedule Block should not be therapist-visible for availability submission until the manager has set its availability due date
 - Late Need Off or Need to Work changes after **Availability Locked** are manager-managed; therapists should not silently edit locked availability
 - Late therapist availability changes after **Availability Locked** should be captured for manager review rather than silently replacing the current submission or being lost
 - Approved late availability changes before Final Publish should surface schedule impact for manager action instead of automatically mutating draft or preliminary assignments

@@ -59,6 +59,8 @@ describe('therapist availability route', () => {
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain(".eq('published', false)")
+    expect(source).toContain('isTherapistVisibleForAvailability(cycle, todayKey)')
+    expect(source).toContain('sortVisibleAvailabilityCycles')
   })
 
   it('loads active-cycle scheduled shifts and passes conflicts into the therapist workspace', () => {

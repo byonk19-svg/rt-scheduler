@@ -35,6 +35,7 @@ describe('ManagerSchedulingInputs', () => {
             start_date: '2026-03-22',
             end_date: '2026-05-02',
             published: false,
+            availability_due_at: null,
           },
         ],
         therapists: [
@@ -104,6 +105,9 @@ describe('ManagerSchedulingInputs', () => {
     expect(html).toContain('Schedule Block')
     expect(html).toContain('Therapist search')
     expect(html).toContain('Availability Manager')
+    expect(html).toContain('Manager draft')
+    expect(html).toContain('Not visible to therapists until a due date is set.')
+    expect(html).toContain('href="/schedule/planning?cycle=cycle-1"')
     expect(html).not.toContain('Selected therapist</span><select')
     expect(source).toContain('AvailabilityStatusSummary')
     expect(source).toContain('TherapistContextPanel')
@@ -136,7 +140,7 @@ describe('ManagerSchedulingInputs', () => {
     )
 
     expect(html).toContain('No Schedule Block is ready for availability.')
-    expect(html).toContain('Create a Schedule Block from Schedule')
+    expect(html).toContain('Create or plan a Schedule Block')
   })
 
   it('uses Next router state instead of forcing a full page reload for planner selection changes', () => {
