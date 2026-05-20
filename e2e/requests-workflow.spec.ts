@@ -1064,7 +1064,11 @@ test.describe.serial('requests workflow', () => {
         .filter({ has: managerPage.getByText(requestMessage) })
         .first()
       await expect(requestCard).toBeVisible({ timeout: 20_000 })
-      await expect(requestCard.getByText('Suggested partner:')).toBeVisible()
+      await expect(
+        requestCard.getByText(
+          'You suggested a swap partner. A manager still has to approve the swap.'
+        )
+      ).toBeVisible()
       const approveResponsePromise = waitForShiftPostMutation(managerPage)
       await requestCard.getByRole('button', { name: 'Approve' }).click()
       const approveResponse = await approveResponsePromise

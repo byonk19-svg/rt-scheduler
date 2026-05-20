@@ -24,7 +24,7 @@ function formatDateLabelE2E(iso: string): string {
 }
 
 async function expectShiftTabActive(page: import('@playwright/test').Page, tab: 'day' | 'night') {
-  const label = tab === 'day' ? 'Day' : 'Night'
+  const label = tab === 'day' ? 'Day shift' : 'Night shift'
   const btn = page.getByRole('button', { name: label }).first()
   await expect(btn).toBeVisible()
   const cls = await btn.evaluate((el) => el.className)
@@ -128,6 +128,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
         start_date: availabilityStartKey,
         end_date: availabilityEndKey,
         published: false,
+        availability_due_at: `${availabilityStartKey}T17:00:00.000Z`,
         site_id: siteId,
       })
       .select('id')
@@ -249,7 +250,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await noteBox.fill(noteText)
 
     await page.getByRole('button', { name: /submit availability/i }).click()
-    await expect(page.getByText('Submitted with Schedule Block changes.')).toBeVisible({
+    await expect(page.getByText('Submitted with changes for this Schedule Block.')).toBeVisible({
       timeout: 45_000,
     })
 
@@ -350,7 +351,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await expect(page.getByRole('heading', { name: nightTherapist.name })).toBeVisible({
       timeout: 20_000,
     })
-    await expect(page.getByText('No official submission yet.')).toBeVisible()
+    await expect(page.getByText('Not submitted')).toBeVisible()
 
     await supabase.from('therapist_availability_submissions').insert({
       therapist_id: nightTherapist.id,
@@ -364,7 +365,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await expect(page.getByRole('heading', { name: nightTherapist.name })).toBeVisible({
       timeout: 20_000,
     })
-    await expect(page.getByText('Submitted', { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Submitted with exceptions 1/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Submitted with requests' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Submitted with requests 1/ })).toBeVisible()
   })
 })

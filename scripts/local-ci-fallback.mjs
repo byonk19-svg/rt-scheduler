@@ -13,6 +13,7 @@ const quick = args.has('--quick')
 const includeE2E = args.has('--e2e')
 const skipSecurity = args.has('--skip-security')
 const skipTypecheck = args.has('--skip-typecheck')
+const skipCleanup = args.has('--skip-cleanup')
 
 const env = {
   ...process.env,
@@ -31,6 +32,21 @@ const securityRegressionTests = [
 
 /** @type {Array<{name:string, cmd:string, args:string[]} | {name:string, run:() => void}>} */
 const steps = [
+  {
+    name: 'Cleanup local artifacts',
+    run: () => {
+      if (skipCleanup) {
+        console.log('Skipping local artifact cleanup.')
+        return
+      }
+
+      execFileSync(process.execPath, ['scripts/cleanup-local-artifacts.mjs', '--execute'], {
+        cwd: process.cwd(),
+        env,
+        stdio: 'inherit',
+      })
+    },
+  },
   {
     name: 'Format check',
     run: () => {

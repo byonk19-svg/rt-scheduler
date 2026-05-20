@@ -2,6 +2,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 import { getEnv } from './env'
 
+let warnedAboutMissingSeededEnv = false
+
 export type E2ERole = 'manager' | 'therapist' | 'lead'
 export type E2EEmploymentType = 'full_time' | 'part_time' | 'prn'
 export type E2EShiftType = 'day' | 'night'
@@ -21,7 +23,15 @@ export type E2EUserPayload = {
 export function createServiceRoleClientOrNull(): SupabaseClient | null {
   const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL')
   const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY')
-  if (!supabaseUrl || !serviceRoleKey) return null
+  if (!supabaseUrl || !serviceRoleKey) {
+    if (!warnedAboutMissingSeededEnv) {
+      console.warn(
+        'Seeded E2E coverage is reduced: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing.'
+      )
+      warnedAboutMissingSeededEnv = true
+    }
+    return null
+  }
 
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },

@@ -305,14 +305,14 @@ test.describe.serial('coverage display regressions', () => {
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
     await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined)
 
-    await expect(page.getByRole('columnheader')).toHaveCount(44, { timeout: 15_000 })
+    await expect(page.getByRole('columnheader')).toHaveCount(43, { timeout: 15_000 })
     await expect(
       page.getByRole('rowheader').filter({ hasText: ctx!.expectedNames[0] })
     ).toBeVisible()
 
     await page.getByRole('button', { name: 'Night' }).click()
     await expect(page).toHaveURL(/shift=night/, { timeout: 15_000 })
-    await expect(page.getByRole('columnheader')).toHaveCount(44, { timeout: 15_000 })
+    await expect(page.getByRole('columnheader')).toHaveCount(43, { timeout: 15_000 })
     await expect(page.getByRole('rowheader').filter({ hasText: ctx!.nightLeadName })).toBeVisible()
   })
 

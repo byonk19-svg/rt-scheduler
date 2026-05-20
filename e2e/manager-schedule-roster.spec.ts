@@ -434,7 +434,7 @@ test.describe.serial('unified schedule grid route', () => {
       'OC'
     )
     await expect(page.getByTestId(cellTestId(smoke.dayCore.id, smoke.draftCycle.day2))).toHaveText(
-      '·*'
+      '.*'
     )
 
     await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined)
@@ -459,7 +459,7 @@ test.describe.serial('unified schedule grid route', () => {
     await gotoWithRetry(page, `/schedule?cycle=${smoke.draftCycle.id}&shift=day`)
 
     const requestedOffCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.draftCycle.day2))
-    await expect(requestedOffCell).toHaveText('·*')
+    await expect(requestedOffCell).toHaveText('.*')
     await postScheduleDragDrop(page, {
       action: 'assign',
       cycleId: smoke.draftCycle.id,
@@ -494,7 +494,7 @@ test.describe.serial('unified schedule grid route', () => {
       shiftId: inserted.data!.id,
     })
     await gotoWithRetry(page, `/schedule?cycle=${smoke.draftCycle.id}&shift=day`)
-    await expect(requestedOffCell).toHaveText('·*', { timeout: 30_000 })
+    await expect(requestedOffCell).toHaveText('.*', { timeout: 30_000 })
 
     await expect
       .poll(

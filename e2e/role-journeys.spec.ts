@@ -242,7 +242,7 @@ async function createSimpleDraftCycle(params: {
 }
 
 async function expectShiftTabActive(page: Page, tab: 'day' | 'night') {
-  const label = tab === 'day' ? 'Day' : 'Night'
+  const label = tab === 'day' ? 'Day shift' : 'Night shift'
   const button = page.getByRole('button', { name: new RegExp(`^${label}$`) }).first()
   await expect(button).toBeVisible()
   await expect(button).toHaveClass(/bg-primary/)
@@ -1044,9 +1044,13 @@ test.describe.serial('role journeys', () => {
     const managerPage = await managerContext.newPage()
     try {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
-      await managerPage.goto('/shift-board')
+      await gotoWithRetry(managerPage, '/shift-board')
+      await managerPage.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined)
+      await expect(managerPage.getByRole('heading', { name: 'My Requests' })).toBeVisible({
+        timeout: 20_000,
+      })
 
-      await expect(managerPage.getByText(requestMessage).first()).toBeVisible()
+      await expect(managerPage.locator('main')).toContainText(requestMessage, { timeout: 20_000 })
       const denyResult = await ctx!.supabase
         .from('shift_posts')
         .update({ status: 'denied' })
