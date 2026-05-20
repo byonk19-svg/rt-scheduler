@@ -132,6 +132,45 @@ describe('availability workspace model', () => {
     expect(clearAvailabilityDraft()).toEqual({ statusByDate: {}, notesByDate: {} })
   })
 
+  it('does not mark the draft dirty when notes only differ by surrounding whitespace', () => {
+    expect(
+      hasAvailabilityDraftChanges(
+        { '2026-05-04': 'force_off' },
+        { '2026-05-04': 'force_off' },
+        { '2026-05-04': 'Appointment' },
+        { '2026-05-04': '  Appointment  ' }
+      )
+    ).toBe(false)
+  })
+
+  it('sorts multiple Need to Work and Need Off dates in the submission summary', () => {
+    const summary = buildAvailabilityDraftSummary({
+      statusByDate: {
+        '2026-05-07': 'force_off',
+        '2026-05-03': 'force_on',
+        '2026-05-06': 'force_on',
+        '2026-05-04': 'force_off',
+      },
+      notesByDate: {
+        '2026-05-07': 'Late appointment',
+        '2026-05-03': 'Extra day',
+        '2026-05-06': 'Can cover',
+        '2026-05-04': 'School event',
+      },
+    })
+
+    expect(summary.canWorkDates).toEqual(['2026-05-03', '2026-05-06'])
+    expect(summary.cannotWorkDates).toEqual(['2026-05-04', '2026-05-07'])
+    expect(summary.notesPayload).toBe(
+      JSON.stringify({
+        '2026-05-07': 'Late appointment',
+        '2026-05-03': 'Extra day',
+        '2026-05-06': 'Can cover',
+        '2026-05-04': 'School event',
+      })
+    )
+  })
+
   it('copies previous cycle overrides into the selected cycle while respecting the baseline', () => {
     const copied = buildCopiedCycleDraft({
       cycles: [
@@ -170,6 +209,76 @@ describe('availability workspace model', () => {
       statusByDate: { '2026-05-05': 'force_off' },
       notesByDate: { '2026-05-05': 'Vacation' },
     })
+  })
+
+  it('clears copied draft overrides when the previous cycle has no overrides', () => {
+    const copied = buildCopiedCycleDraft({
+      cycles: [
+        {
+          id: 'cycle-old',
+          start_date: '2026-04-05',
+          end_date: '2026-04-11',
+        },
+        {
+          id: 'cycle-new',
+          start_date: '2026-05-03',
+          end_date: '2026-05-09',
+        },
+      ],
+      availabilityRows: [
+        {
+          cycleId: 'other-cycle',
+          date: '2026-04-05',
+          entryType: 'force_off',
+          reason: 'Not the source cycle',
+          shiftType: 'both',
+        },
+      ],
+      selectedCycleId: 'cycle-new',
+      baselineByDate: baseline,
+    })
+
+    expect(copied).toEqual({ statusByDate: {}, notesByDate: {} })
+  })
+
+  it('drops copied overrides that match the selected cycle recurring baseline', () => {
+    const copied = buildCopiedCycleDraft({
+      cycles: [
+        {
+          id: 'cycle-old',
+          start_date: '2026-04-05',
+          end_date: '2026-04-11',
+        },
+        {
+          id: 'cycle-new',
+          start_date: '2026-05-03',
+          end_date: '2026-05-09',
+        },
+      ],
+      availabilityRows: [
+        {
+          cycleId: 'cycle-old',
+          date: '2026-04-05',
+          entryType: 'force_on',
+          reason: 'Already normal work',
+          shiftType: 'both',
+        },
+        {
+          cycleId: 'cycle-old',
+          date: '2026-04-06',
+          entryType: 'force_off',
+          reason: 'Already normal off',
+          shiftType: 'both',
+        },
+      ],
+      selectedCycleId: 'cycle-new',
+      baselineByDate: {
+        '2026-05-03': { baselineStatus: 'available' },
+        '2026-05-04': { baselineStatus: 'off' },
+      },
+    })
+
+    expect(copied).toEqual({ statusByDate: {}, notesByDate: {} })
   })
 
   it('leaves the draft unchanged when there is no previous cycle to copy', () => {
