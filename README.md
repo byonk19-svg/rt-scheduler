@@ -57,7 +57,7 @@ The page:
 
 ## Tech Stack
 
-- Next.js (App Router; **16.2.3**) + TypeScript + Tailwind + shadcn/ui
+- Next.js (App Router; **16.2.6**) + TypeScript + Tailwind + shadcn/ui
 - Supabase (Postgres + Auth + RLS)
 
 Local tooling noise (Playwright MCP dumps, generated `artifacts/`) is gitignored — see `.gitignore`.
