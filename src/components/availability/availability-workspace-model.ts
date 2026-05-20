@@ -268,13 +268,13 @@ export function buildCopiedCycleDraft({
   availabilityRows: readonly AvailabilityWorkspaceRow[]
   selectedCycleId: string
   baselineByDate: AvailabilityBaselineByDate
-}): AvailabilityDraft {
+}): AvailabilityDraft | null {
   const cycleIndex = cycles.findIndex((cycle) => cycle.id === selectedCycleId)
   const selectedCycle = cycles[cycleIndex] ?? null
-  if (cycleIndex <= 0 || !selectedCycle) return clearAvailabilityDraft()
+  if (cycleIndex <= 0 || !selectedCycle) return null
 
   const previousCycle = cycles[cycleIndex - 1]
-  if (!previousCycle) return clearAvailabilityDraft()
+  if (!previousCycle) return null
 
   const previousRows = availabilityRows.filter((row) => row.cycleId === previousCycle.id)
   const copiedRows = shiftOverridesToCycle({

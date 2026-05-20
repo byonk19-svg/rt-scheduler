@@ -310,6 +310,7 @@ export function TherapistAvailabilityWorkspace({
       selectedCycleId,
       baselineByDate,
     })
+    if (!nextDraft) return
     setDraftStatusByDate(nextDraft.statusByDate)
     setDraftNotesByDate(nextDraft.notesByDate)
   }

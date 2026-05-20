@@ -171,4 +171,38 @@ describe('availability workspace model', () => {
       notesByDate: { '2026-05-05': 'Vacation' },
     })
   })
+
+  it('leaves the draft unchanged when there is no previous cycle to copy', () => {
+    const copied = buildCopiedCycleDraft({
+      cycles: [
+        {
+          id: 'cycle-first',
+          start_date: '2026-05-03',
+          end_date: '2026-05-09',
+        },
+      ],
+      availabilityRows: [],
+      selectedCycleId: 'cycle-first',
+      baselineByDate: baseline,
+    })
+
+    expect(copied).toBeNull()
+  })
+
+  it('leaves the draft unchanged when the selected cycle is missing', () => {
+    const copied = buildCopiedCycleDraft({
+      cycles: [
+        {
+          id: 'cycle-first',
+          start_date: '2026-05-03',
+          end_date: '2026-05-09',
+        },
+      ],
+      availabilityRows: [],
+      selectedCycleId: 'missing-cycle',
+      baselineByDate: baseline,
+    })
+
+    expect(copied).toBeNull()
+  })
 })
