@@ -30,6 +30,35 @@ export async function closeAvailabilityWindowAction(formData: FormData) {
   }
 
   const admin = createAdminClient()
+  const { data: cycle, error: cycleError } = await admin
+    .from('schedule_cycles')
+    .select('id, published, status, archived_at, availability_closed_at, availability_reopened_at')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (
+    cycleError ||
+    !cycle ||
+    cycle.published ||
+    cycle.archived_at ||
+    cycle.status === 'preliminary' ||
+    cycle.status === 'final' ||
+    cycle.status === 'offline' ||
+    cycle.status === 'archived'
+  ) {
+    redirect(buildAvailabilityUrl({ error: 'availability_window_failed', cycle: cycleId }))
+  }
+
+  const closedAt = cycle.availability_closed_at
+    ? new Date(cycle.availability_closed_at).getTime()
+    : null
+  const reopenedAt = cycle.availability_reopened_at
+    ? new Date(cycle.availability_reopened_at).getTime()
+    : null
+  if (closedAt !== null && (reopenedAt === null || closedAt >= reopenedAt)) {
+    redirect(buildAvailabilityUrl({ error: 'availability_window_already_locked', cycle: cycleId }))
+  }
+
   const { error } = await admin
     .from('schedule_cycles')
     .update({
@@ -57,7 +86,7 @@ export async function reopenAvailabilityWindowAction(formData: FormData) {
   const admin = createAdminClient()
   const { data: cycle, error: cycleError } = await admin
     .from('schedule_cycles')
-    .select('id, published, status, archived_at')
+    .select('id, published, status, archived_at, availability_closed_at, availability_reopened_at')
     .eq('id', cycleId)
     .maybeSingle()
 
@@ -72,6 +101,16 @@ export async function reopenAvailabilityWindowAction(formData: FormData) {
     cycle.status === 'archived'
   ) {
     redirect(buildAvailabilityUrl({ error: 'availability_window_failed', cycle: cycleId }))
+  }
+
+  const closedAt = cycle.availability_closed_at
+    ? new Date(cycle.availability_closed_at).getTime()
+    : null
+  const reopenedAt = cycle.availability_reopened_at
+    ? new Date(cycle.availability_reopened_at).getTime()
+    : null
+  if (closedAt === null || (reopenedAt !== null && reopenedAt > closedAt)) {
+    redirect(buildAvailabilityUrl({ error: 'availability_window_not_locked', cycle: cycleId }))
   }
 
   const { error } = await admin

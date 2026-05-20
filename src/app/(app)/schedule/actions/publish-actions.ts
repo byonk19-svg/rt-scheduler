@@ -123,21 +123,32 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     redirect(buildReturnUrl(undefined, viewParams))
   }
 
-  if (currentlyPublished) {
+  const { data: currentCycle, error: currentCycleError } = await supabase
+    .from('schedule_cycles')
+    .select('label, start_date, end_date, status, site_id, published')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (currentCycleError || !currentCycle) {
+    console.error('Failed to load cycle for publish validation:', currentCycleError)
+    redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
+  }
+
+  if (Boolean(currentCycle.published) !== currentlyPublished) {
+    redirect(
+      buildReturnUrl(cycleId, {
+        ...viewParams,
+        error: currentlyPublished ? 'unpublish_state_changed' : 'publish_state_changed',
+      })
+    )
+  }
+
+  if (currentCycle.published) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'take_offline_from_publish_history' }))
   }
 
-  if (!currentlyPublished) {
-    const { data: cycle, error: cycleError } = await supabase
-      .from('schedule_cycles')
-      .select('label, start_date, end_date, status, site_id')
-      .eq('id', cycleId)
-      .maybeSingle()
-
-    if (cycleError || !cycle) {
-      console.error('Failed to load cycle for publish validation:', cycleError)
-      redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
-    }
+  if (!currentCycle.published) {
+    const cycle = currentCycle
     publishCycleDetails = {
       label: cycle.label,
       startDate: cycle.start_date,

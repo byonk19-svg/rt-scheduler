@@ -22,4 +22,13 @@ describe('publish actions immediate email processing', () => {
     expect(source).toContain("'publish_missing_availability_warning'")
     expect(source).toContain("from('therapist_availability_submissions')")
   })
+
+  it('derives current publish state from the database before mutating', () => {
+    const filePath = resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('const { data: currentCycle, error: currentCycleError }')
+    expect(source).toContain('Boolean(currentCycle.published) !== currentlyPublished')
+    expect(source).toContain("'publish_state_changed'")
+  })
 })

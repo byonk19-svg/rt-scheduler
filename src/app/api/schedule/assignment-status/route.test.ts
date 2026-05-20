@@ -341,7 +341,7 @@ describe('assignment status API', () => {
         headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           assignmentId: 'shift-1',
-          status: 'call_in',
+          status: 'on_call',
           note: 'Traffic delay',
         }),
       })
@@ -351,7 +351,7 @@ describe('assignment status API', () => {
     expect(supabase.rpc).not.toHaveBeenCalled()
     expect(admin.rpc).toHaveBeenCalledWith('update_assignment_status', {
       p_assignment_id: 'shift-1',
-      p_status: 'call_in',
+      p_status: 'on_call',
       p_note: 'Traffic delay',
       p_left_early_time: null,
       p_actor_id: 'lead-1',
@@ -359,7 +359,7 @@ describe('assignment status API', () => {
     expect(updateAssignmentStatusWithLotteryMock).toHaveBeenCalledWith(
       expect.objectContaining({
         shiftId: 'shift-1',
-        nextStatus: 'call_in',
+        nextStatus: 'on_call',
         note: 'Traffic delay',
         actor: expect.objectContaining({
           userId: 'lead-1',
@@ -418,6 +418,155 @@ describe('assignment status API', () => {
 
     expect(response.status).toBe(403)
     expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+
+  it('requires a time when marking a shift left early', async () => {
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      userId: 'manager-1',
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'left_early',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Left early status requires the time the shift ended.',
+    })
+    expect(createAdminClientMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects left-early times on other assignment statuses', async () => {
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      userId: 'manager-1',
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'scheduled',
+          leftEarlyTime: '14:00:00',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Left early time can only be set with left early status.',
+    })
+    expect(createAdminClientMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects impossible left-early times before mutation work', async () => {
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      userId: 'manager-1',
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'left_early',
+          leftEarlyTime: '27:99',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Left early time must be HH:MM or HH:MM:SS.',
+    })
+    expect(createAdminClientMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks incident statuses before the Schedule Block is published', async () => {
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      userId: 'manager-1',
+      shiftLookup: {
+        date: '2026-02-23',
+        shift_type: 'day',
+        user_id: 'therapist-1',
+        published: false,
+      },
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'call_in',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Incident statuses can only be applied after the Schedule Block is published.',
+    })
+    expect(createAdminClientMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks incident statuses on unassigned shift rows', async () => {
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      userId: 'manager-1',
+      shiftLookup: {
+        date: '2026-02-23',
+        shift_type: 'day',
+        user_id: null,
+        published: true,
+      },
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'cancelled',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Incident statuses require an assigned therapist.',
+    })
+    expect(createAdminClientMock).not.toHaveBeenCalled()
   })
 
   it('allows manager to update status', async () => {
