@@ -84,6 +84,10 @@ function isAllowedAssignmentStatus(value: string): value is AssignmentStatus {
   return ASSIGNMENT_STATUS_VALUES.includes(value as AssignmentStatus)
 }
 
+function isIncidentAssignmentStatus(value: AssignmentStatus) {
+  return value === 'call_in' || value === 'cancelled' || value === 'left_early'
+}
+
 function shouldNotifyAffectedTherapist(nextStatus: AssignmentStatus) {
   return nextStatus !== 'left_early'
 }
@@ -105,14 +109,29 @@ export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as UpdateAssignmentStatusRequest | null
   const assignmentId = String(payload?.assignmentId ?? '').trim()
   const status = String(payload?.status ?? '').trim()
-  const note = typeof payload?.note === 'string' ? payload.note : null
-  const leftEarlyTimeRaw = typeof payload?.leftEarlyTime === 'string' ? payload.leftEarlyTime : null
+  const note = typeof payload?.note === 'string' ? payload.note.trim() || null : null
+  const leftEarlyTimeRaw =
+    typeof payload?.leftEarlyTime === 'string' ? payload.leftEarlyTime.trim() || null : null
 
   if (!assignmentId || !status || !isAllowedAssignmentStatus(status)) {
     return NextResponse.json({ error: 'Invalid status update payload.' }, { status: 400 })
   }
 
-  if (leftEarlyTimeRaw && !/^\d{2}:\d{2}(:\d{2})?$/.test(leftEarlyTimeRaw)) {
+  if (status === 'left_early' && !leftEarlyTimeRaw) {
+    return NextResponse.json(
+      { error: 'Left early status requires the time the shift ended.' },
+      { status: 400 }
+    )
+  }
+
+  if (status !== 'left_early' && leftEarlyTimeRaw) {
+    return NextResponse.json(
+      { error: 'Left early time can only be set with left early status.' },
+      { status: 400 }
+    )
+  }
+
+  if (leftEarlyTimeRaw && !/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(leftEarlyTimeRaw)) {
     return NextResponse.json(
       { error: 'Left early time must be HH:MM or HH:MM:SS.' },
       { status: 400 }
@@ -144,7 +163,7 @@ export async function POST(request: Request) {
 
   const { data: preflightShiftLookup, error: preflightShiftError } = await supabase
     .from('shifts')
-    .select('id, schedule_cycles(published, status, archived_at)')
+    .select('id, user_id, schedule_cycles(published, status, archived_at)')
     .eq('id', assignmentId)
     .maybeSingle()
 
@@ -178,6 +197,21 @@ export async function POST(request: Request) {
   ) {
     return NextResponse.json(
       { error: 'This Schedule Block is read-only until it is republished.' },
+      { status: 409 }
+    )
+  }
+
+  const preflightShift = preflightShiftLookup as { user_id?: string | null }
+  if (isIncidentAssignmentStatus(status) && !preflightCycle?.published) {
+    return NextResponse.json(
+      { error: 'Incident statuses can only be applied after the Schedule Block is published.' },
+      { status: 409 }
+    )
+  }
+
+  if (isIncidentAssignmentStatus(status) && !preflightShift.user_id) {
+    return NextResponse.json(
+      { error: 'Incident statuses require an assigned therapist.' },
       { status: 409 }
     )
   }

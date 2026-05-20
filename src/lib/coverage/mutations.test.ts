@@ -230,6 +230,33 @@ describe('CoverageShiftMutator.updateStatus', () => {
       }),
     })
   })
+
+  it('passes status notes and left-early time through to the status API', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ assignment: { id: 'shift-99' } }), { status: 200 })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createCoverageShiftMutator().updateStatus('shift-99', {
+      assignment_status: 'left_early',
+      status: 'scheduled',
+      note: 'Left after first treatment round.',
+      leftEarlyTime: '14:00:00',
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/schedule/assignment-status', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        assignmentId: 'shift-99',
+        status: 'left_early',
+        note: 'Left after first treatment round.',
+        leftEarlyTime: '14:00:00',
+      }),
+    })
+  })
 })
 
 describe('createCoverageShiftMutator', () => {

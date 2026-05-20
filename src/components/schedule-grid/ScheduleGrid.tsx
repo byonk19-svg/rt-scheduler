@@ -184,14 +184,18 @@ export function ScheduleGrid({
   }, [activeCellTarget, cellsLocked, initialDataset, mutator, refreshAfterMutation])
 
   const handleStatusChange = useCallback(
-    async (status: AssignmentStatusValue) => {
+    async (
+      status: AssignmentStatusValue,
+      change?: { note?: string | null; leftEarlyTime?: string | null }
+    ) => {
       if (!activeCellTarget?.cell.shiftId) return
       if (cellsLocked) return
       if (!initialDataset.canManageCoverage && !initialDataset.canUpdateAssignmentStatus) return
-      const { error } = await mutator.updateStatus(
-        activeCellTarget.cell.shiftId,
-        toCoveragePayload(status)
-      )
+      const { error } = await mutator.updateStatus(activeCellTarget.cell.shiftId, {
+        ...toCoveragePayload(status),
+        note: change?.note ?? null,
+        leftEarlyTime: status === 'left_early' ? (change?.leftEarlyTime ?? null) : null,
+      })
       if (error) {
         window.alert('Could not update this shift status. Refresh Schedule and try again.')
         return

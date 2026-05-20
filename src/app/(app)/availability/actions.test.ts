@@ -60,6 +60,11 @@ type TestContext = {
   archivedAt?: string | null
   therapistSubmissionExists?: boolean
   draftShiftCount?: number
+  cyclePublished?: boolean
+  cycleStatus?: string | null
+  cycleArchivedAt?: string | null
+  availabilityClosedAt?: string | null
+  availabilityReopenedAt?: string | null
 }
 
 function createSupabaseMock(context: TestContext = {}) {
@@ -202,6 +207,11 @@ function createSupabaseMock(context: TestContext = {}) {
                 label: 'Block 1',
                 start_date: '2026-03-22',
                 end_date: '2026-05-02',
+                published: context.cyclePublished ?? false,
+                status: context.cycleStatus ?? 'draft',
+                archived_at: context.cycleArchivedAt ?? null,
+                availability_closed_at: context.availabilityClosedAt ?? null,
+                availability_reopened_at: context.availabilityReopenedAt ?? null,
               },
               error: null,
             }
@@ -543,18 +553,57 @@ describe('availability actions', () => {
 
     vi.clearAllMocks()
     createClientMock.mockResolvedValue(supabase)
-    createAdminClientMock.mockReturnValue(admin)
+    createAdminClientMock.mockReturnValue(
+      createSupabaseMock({
+        userId: 'manager-1',
+        role: 'manager',
+        availabilityClosedAt: '2026-04-01T12:00:00.000Z',
+      })
+    )
 
     await expect(reopenAvailabilityWindowAction(formData)).rejects.toThrow(
       'REDIRECT:/availability?success=availability_reopened&cycle=cycle-1'
     )
-    expect(admin.state.updates.at(-1)).toMatchObject({
+    const reopenAdmin = createAdminClientMock.mock.results.at(-1)?.value
+    expect(reopenAdmin.state.updates.at(-1)).toMatchObject({
       table: 'schedule_cycles',
       payload: expect.objectContaining({
         availability_reopened_by: 'manager-1',
       }),
       filters: { id: 'cycle-1' },
     })
+  })
+
+  it('does not lock an already locked availability window again', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    const admin = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      availabilityClosedAt: '2026-04-01T12:00:00.000Z',
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+    const formData = new FormData()
+    formData.set('cycle_id', 'cycle-1')
+
+    await expect(closeAvailabilityWindowAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=availability_window_already_locked&cycle=cycle-1'
+    )
+    expect(admin.state.updates).toHaveLength(0)
+  })
+
+  it('does not reopen an availability window that was not locked first', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    const admin = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+    const formData = new FormData()
+    formData.set('cycle_id', 'cycle-1')
+
+    await expect(reopenAvailabilityWindowAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=availability_window_not_locked&cycle=cycle-1'
+    )
+    expect(admin.state.updates).toHaveLength(0)
   })
 
   it('lets a manager clear planner dates for one therapist and mode', async () => {

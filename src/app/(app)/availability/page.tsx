@@ -286,6 +286,18 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
       variant: 'error',
     }
   }
+  if (error === 'availability_window_already_locked') {
+    return {
+      message: 'Availability is already locked for this Schedule Block.',
+      variant: 'error',
+    }
+  }
+  if (error === 'availability_window_not_locked') {
+    return {
+      message: 'Availability is not locked for this Schedule Block, so there is nothing to reopen.',
+      variant: 'error',
+    }
+  }
 
   if (error === 'copy_no_source') {
     return {

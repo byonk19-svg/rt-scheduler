@@ -9,7 +9,11 @@ vi.mock('@/components/ui/popover', () => ({
     createElement('div', { 'data-testid': 'popover-content' }, children),
 }))
 
-import { StatusCellPopover } from './StatusCellPopover'
+import {
+  StatusCellPopover,
+  getStatusConfirmationCopy,
+  normalizeLeftEarlyTime,
+} from './StatusCellPopover'
 import type { GridCell } from './schedule-grid-types'
 
 const assignedCell: GridCell = {
@@ -49,6 +53,24 @@ function renderPopover({
 }
 
 describe('StatusCellPopover', () => {
+  it('normalizes left-early times before they are sent to the API', () => {
+    expect(normalizeLeftEarlyTime('14:05')).toBe('14:05:00')
+    expect(normalizeLeftEarlyTime('14:05:30')).toBe('14:05:30')
+    expect(normalizeLeftEarlyTime('2:05')).toBeNull()
+  })
+
+  it('explains call-in side effects before confirmation', () => {
+    expect(getStatusConfirmationCopy('call_in', 'Alice Johnson')).toMatchObject({
+      title: 'Create Call-In Alert?',
+      confirmLabel: 'Mark Call-In',
+      requiresTime: false,
+    })
+    expect(getStatusConfirmationCopy('left_early', 'Alice Johnson')).toMatchObject({
+      title: 'Mark Left Early?',
+      requiresTime: true,
+    })
+  })
+
   it('shows lead status options without structural controls', () => {
     const html = renderPopover({
       allowStatusChange: true,

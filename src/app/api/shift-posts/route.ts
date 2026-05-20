@@ -163,7 +163,6 @@ async function validateReviewRequestBeforeRpc(params: {
   swapPartnerId: string
 }): Promise<string | null> {
   const { admin, requestId, decision, selectedInterestId, swapPartnerId } = params
-  if (decision === 'deny') return null
 
   const { data: post, error: postError } = await admin
     .from('shift_posts')
@@ -177,6 +176,8 @@ async function validateReviewRequestBeforeRpc(params: {
   const request = post as ReviewPreflightPostRow
   const visibility = request.visibility ?? 'team'
   if (request.status !== 'pending') return 'Only pending shift posts can be reviewed.'
+  if (decision === 'deny') return null
+
   if (visibility === 'direct' && request.recipient_response !== 'accepted') {
     return 'Direct request must be accepted by the recipient before approval.'
   }
