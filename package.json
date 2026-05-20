@@ -33,6 +33,7 @@
     "shots:sitemap": "node scripts/site-shots.mjs --mode sitemap",
     "shots:links": "node scripts/site-shots.mjs --mode links",
     "test:e2e": "playwright test",
+    "test:e2e:pickup-concurrency": "playwright test e2e/pickup-interest-concurrency.spec.ts --project=chromium --workers=1",
     "test:unit": "vitest run"
   },
   "dependencies": {

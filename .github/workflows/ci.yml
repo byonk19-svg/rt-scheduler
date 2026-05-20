@@ -89,6 +89,7 @@ jobs:
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
       E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
 
@@ -109,11 +110,13 @@ jobs:
         id: seeded
         shell: bash
         run: |
-          if [[ -n "${NEXT_PUBLIC_SUPABASE_URL}" && -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY}" ]]; then
+          if [[ -n "${NEXT_PUBLIC_SUPABASE_URL}" && -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY}" && -n "${SUPABASE_SERVICE_ROLE_KEY}" ]]; then
             echo "run_seeded=true" >> "$GITHUB_OUTPUT"
+            echo "Seeded E2E enabled; DB-backed pickup concurrency coverage is included."
           else
             echo "run_seeded=false" >> "$GITHUB_OUTPUT"
-            echo "Seeded Supabase secrets not set; running only non-seeded e2e coverage."
+            echo "Seeded Supabase secrets not fully set; running only reduced non-seeded e2e coverage."
+            echo "Reduced E2E excludes DB-backed pickup concurrency coverage."
           fi
 
       - name: Install Playwright browser

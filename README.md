@@ -405,7 +405,10 @@ Workflow: `.github/workflows/ci.yml`
 - `Playwright E2E` runs when the following repository secrets are set:
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
   - optional: `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`
+
+When all seeded Supabase secrets are present, the CI Playwright lane includes DB-backed pickup concurrency coverage. Without those secrets, CI runs reduced public/auth E2E coverage and explicitly excludes DB-backed concurrency coverage.
 
 ## Local CI Fallback (when GitHub Actions is unavailable)
 
