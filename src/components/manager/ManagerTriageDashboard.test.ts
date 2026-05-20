@@ -118,6 +118,28 @@ describe('ManagerTriageDashboard', () => {
     expect(html).not.toContain('Prepare availability')
   })
 
+  it('keeps availability planning states distinct from ready schedule work', () => {
+    const notStartedHtml = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        ...baseProps,
+        nextCycleLabel: 'Set availability due date',
+        nextCycleDetail: 'The block is not visible to therapists yet.',
+      })
+    )
+    const pendingHtml = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        ...baseProps,
+        nextCycleLabel: 'Availability past due May 31',
+        nextCycleDetail: 'Review availability responses.',
+      })
+    )
+
+    expect(notStartedHtml).toContain('Set availability due date')
+    expect(notStartedHtml).toContain('Not started')
+    expect(pendingHtml).toContain('Availability past due May 31')
+    expect(pendingHtml).toContain('Pending')
+  })
+
   it('hides low-value empty sections and avoids duplicated metrics', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {

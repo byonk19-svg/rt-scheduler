@@ -70,6 +70,17 @@ function targetDateChanged(oldValue: string | null | undefined, newValue: string
   return (oldValue ?? null) !== (newValue ?? null)
 }
 
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function isFutureDraftPlanningBlock(cycle: PlanningCycleRow, today: string): boolean {
+  if (cycle.archived_at) return false
+  if (cycle.published) return false
+  if (cycle.status && cycle.status !== 'draft') return false
+  return cycle.start_date > today
+}
+
 async function loadActorSite(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string
@@ -229,6 +240,10 @@ export async function createScheduleBlockPlanningAction(formData: FormData) {
     redirect(buildPlanningUrl(undefined, { error: firstValidationError(validation.errors) }))
   }
 
+  if (startDate <= todayKey()) {
+    redirect(buildPlanningUrl(undefined, { error: 'planning_block_not_future' }))
+  }
+
   const availabilityDueAt = availabilityDueDate
     ? normalizeAvailabilityDueDate(availabilityDueDate)
     : null
@@ -315,8 +330,12 @@ export async function updateScheduleBlockPlanningAction(formData: FormData) {
     redirect(buildPlanningUrl(undefined, { error: 'planning_cycle_not_found' }))
   }
 
-  const todayKey = new Date().toISOString().slice(0, 10)
-  const wasTherapistVisible = isTherapistVisibleForAvailability(currentCycle, todayKey)
+  const today = todayKey()
+  if (!isFutureDraftPlanningBlock(currentCycle, today)) {
+    redirect(buildPlanningUrl(cycleId, { error: 'planning_lifecycle_locked' }))
+  }
+
+  const wasTherapistVisible = isTherapistVisibleForAvailability(currentCycle, today)
   const startDate = firstDateValue(formData, 'start_date') ?? currentCycle.start_date
   const endDate = firstDateValue(formData, 'end_date') ?? currentCycle.end_date
   const availabilityDueDate = firstDateValue(formData, 'availability_due_date')
@@ -355,7 +374,12 @@ export async function updateScheduleBlockPlanningAction(formData: FormData) {
     availabilityDueDate < oldDueDate &&
     String(formData.get('confirm_earlier_due_date') ?? '') !== 'true'
   ) {
-    redirect(buildPlanningUrl(cycleId, { error: 'planning_due_earlier_requires_confirm' }))
+    redirect(
+      buildPlanningUrl(cycleId, {
+        error: 'planning_due_earlier_requires_confirm',
+        pending_due_date: availabilityDueDate,
+      })
+    )
   }
 
   const preliminaryChanged = targetDateChanged(

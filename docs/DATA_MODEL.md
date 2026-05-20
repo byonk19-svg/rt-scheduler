@@ -87,6 +87,8 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
 ## Lifecycle Notes
 
 - The cycle itself lives in `schedule_cycles`.
+- Schedule Block Planning fields on `schedule_cycles` are planning metadata, not lifecycle authority. Normal planning edits are restricted to future draft blocks; after a block starts, advances to Preliminary/Final, goes Offline, or is Archived, planning values become historical context.
+- `availability_due_at` is the therapist visibility gate for future availability. Once a block is visible, the due date may be changed but should not be cleared through normal planning UI.
 - Publish history lives in `publish_events`.
 - If an old cycle should disappear from Coverage and Availability, archive the `schedule_cycles` row; deleting `publish_events` alone is not enough.
 - Public signup lifecycle:

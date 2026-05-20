@@ -51,6 +51,7 @@ type SearchParams = {
   success?: string | string[]
   error?: string | string[]
   warning?: string | string[]
+  pending_due_date?: string | string[]
 }
 
 type ProfileRow = {
@@ -105,17 +106,17 @@ function feedbackMessage(
   const error = getSearchParam(params?.error)
   const warning = getSearchParam(params?.warning)
 
-  if (success === 'planning_created') {
-    return { tone: 'success', text: 'Schedule Block Planning saved.' }
-  }
-  if (success === 'planning_saved') {
-    return { tone: 'success', text: 'Planning dates updated.' }
-  }
   if (warning === 'compressed_timeline') {
     return {
       tone: 'warning',
       text: 'Planning dates are close together. Review the timeline before relying on it.',
     }
+  }
+  if (success === 'planning_created') {
+    return { tone: 'success', text: 'Schedule Block Planning saved.' }
+  }
+  if (success === 'planning_saved') {
+    return { tone: 'success', text: 'Planning dates updated.' }
   }
   if (!error) return null
 
@@ -136,6 +137,9 @@ function feedbackMessage(
       'Preliminary target is locked after Preliminary has been sent.',
     planning_publish_target_locked:
       'Final Publish target is locked after Final Publish has happened.',
+    planning_block_not_future: 'Schedule Block Planning is only for future blocks.',
+    planning_lifecycle_locked:
+      'Planning dates are locked after the Schedule Block starts, advances, or goes offline.',
   }
 
   return {
@@ -238,6 +242,10 @@ function contextPlanningDatesLabel(cycle: PlanningCycleRow): string {
   return 'Missing historical targets'
 }
 
+function safeDateParam(value: string | undefined): string | null {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
+}
+
 function PlanningBadge({
   children,
   tone = 'neutral',
@@ -305,6 +313,7 @@ function PlanningFields({
   mode,
   includeBlockFields = mode === 'create',
   submitLabel,
+  confirmEarlierDueDate = false,
 }: {
   cycle: {
     id?: string
@@ -318,6 +327,7 @@ function PlanningFields({
   mode: 'create' | 'update'
   includeBlockFields?: boolean
   submitLabel?: string
+  confirmEarlierDueDate?: boolean
 }) {
   const action =
     mode === 'create' ? createScheduleBlockPlanningAction : updateScheduleBlockPlanningAction
@@ -336,6 +346,9 @@ function PlanningFields({
   return (
     <form action={action} className="space-y-3">
       {cycle.id ? <input type="hidden" name="cycle_id" value={cycle.id} /> : null}
+      {confirmEarlierDueDate ? (
+        <input type="hidden" name="confirm_earlier_due_date" value="true" />
+      ) : null}
       {includeBlockFields ? (
         <>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -408,6 +421,11 @@ function PlanningFields({
           These milestones are close together.
         </p>
       ) : null}
+      {confirmEarlierDueDate ? (
+        <p className="text-xs font-medium text-[var(--warning-text)]">
+          Saving again confirms the earlier availability due date.
+        </p>
+      ) : null}
       <div className="flex justify-end">
         <Button type="submit" size="sm">
           {submitLabel ?? (mode === 'create' ? 'Save Schedule Block' : 'Save planning')}
@@ -417,15 +435,35 @@ function PlanningFields({
   )
 }
 
-function PlanningCycleCard({ cycle }: { cycle: PlanningCycleRow }) {
-  const dueDate = availabilityDueDateKey(cycle.availability_due_at)
-  const checklist = planningChecklist(cycle)
+function PlanningCycleCard({
+  cycle,
+  selected,
+  pendingDueDate,
+  confirmEarlierDueDate,
+}: {
+  cycle: PlanningCycleRow
+  selected: boolean
+  pendingDueDate: string | null
+  confirmEarlierDueDate: boolean
+}) {
+  const dueDate = pendingDueDate ?? availabilityDueDateKey(cycle.availability_due_at)
+  const checklist = planningChecklist({
+    availability_due_date: dueDate,
+    preliminary_target_date: cycle.preliminary_target_date,
+    final_publish_target_date: cycle.final_publish_target_date,
+  })
   const missingCount = checklist.filter((item) => item.missing).length
   const editLabel = missingCount > 0 ? 'Set planning dates' : 'Edit planning dates'
   const planningLabel = missingCount > 0 ? 'Needs dates' : 'Dates set'
 
   return (
-    <article className="rounded-lg border border-border bg-card p-4 shadow-tw-sm">
+    <article
+      id={`schedule-block-${cycle.id}`}
+      className={cn(
+        'rounded-lg border bg-card p-4 shadow-tw-sm',
+        selected ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+      )}
+    >
       <div className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -446,7 +484,7 @@ function PlanningCycleCard({ cycle }: { cycle: PlanningCycleRow }) {
         <PlanningChecklist items={checklist} />
       </div>
 
-      <details className="group mt-3 border-t border-border pt-3">
+      <details className="group mt-3 border-t border-border pt-3" open={selected}>
         <summary className="flex cursor-pointer list-none items-center justify-end gap-2 marker:hidden">
           <span
             className={cn(
@@ -485,6 +523,7 @@ function PlanningCycleCard({ cycle }: { cycle: PlanningCycleRow }) {
               preliminary_target_date: cycle.preliminary_target_date,
               final_publish_target_date: cycle.final_publish_target_date,
             }}
+            confirmEarlierDueDate={confirmEarlierDueDate}
           />
         </div>
       </details>
@@ -628,6 +667,9 @@ export default async function ScheduleBlockPlanningPage({
   const suggestedBlock = suggestNextScheduleBlock(cycles) ?? fallbackSuggestedBlock(today)
   const suggestedDates = suggestPlanningDates(suggestedBlock.startDate)
   const feedback = feedbackMessage(params)
+  const selectedCycleId = getSearchParam(params.cycle)
+  const selectedError = getSearchParam(params.error)
+  const pendingDueDate = safeDateParam(getSearchParam(params.pending_due_date))
 
   if (cycleError) {
     console.error('Failed to load Schedule Blocks for Planning:', cycleError)
@@ -698,10 +740,30 @@ export default async function ScheduleBlockPlanningPage({
         ) : (
           <div className="space-y-3">
             {grouped.needsPlanning.map((cycle) => (
-              <PlanningCycleCard key={cycle.id} cycle={cycle} />
+              <PlanningCycleCard
+                key={cycle.id}
+                cycle={cycle}
+                selected={selectedCycleId === cycle.id}
+                pendingDueDate={selectedCycleId === cycle.id ? pendingDueDate : null}
+                confirmEarlierDueDate={
+                  selectedCycleId === cycle.id &&
+                  selectedError === 'planning_due_earlier_requires_confirm' &&
+                  Boolean(pendingDueDate)
+                }
+              />
             ))}
             {grouped.planned.map((cycle) => (
-              <PlanningCycleCard key={cycle.id} cycle={cycle} />
+              <PlanningCycleCard
+                key={cycle.id}
+                cycle={cycle}
+                selected={selectedCycleId === cycle.id}
+                pendingDueDate={selectedCycleId === cycle.id ? pendingDueDate : null}
+                confirmEarlierDueDate={
+                  selectedCycleId === cycle.id &&
+                  selectedError === 'planning_due_earlier_requires_confirm' &&
+                  Boolean(pendingDueDate)
+                }
+              />
             ))}
           </div>
         )}

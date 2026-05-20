@@ -24,7 +24,15 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
 
 ## 1) Manager: Build and Publish a Cycle
 
-1. Create or select a cycle in `/schedule`.
+1. Plan future Schedule Blocks in `/schedule/planning`.
+   - The page suggests the next Sunday-start six-week block from the latest existing Schedule Block.
+   - Suggested blocks are previews until a manager saves them.
+   - Managers set date-only planning values: availability due date, Send Preliminary target, and Final Publish target.
+   - A future block becomes visible for therapist availability only after it has an availability due date.
+   - Planning edits are limited to future draft blocks. Current, Preliminary, Final, Offline, or Archived blocks are read-only here.
+   - Moving a therapist-visible availability due date earlier requires an explicit confirmation save.
+   - Therapist notifications are sent only when availability first becomes visible or a visible due date changes. Preliminary and Final Publish target edits are audit-only.
+2. Create or select a cycle in `/schedule`.
    - `New 6-week block` creates a draft cycle.
    - `/schedule` is the canonical authenticated schedule grid for managers, leads, and therapists.
    - Managers edit draft assignments inline from grid cells; leads can update published assignment status but cannot assign new therapists.
@@ -32,17 +40,17 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
    - The `/schedule` Day/Night toggle filters the grid by shift and preserves the `shift` query param.
    - `/coverage`, `/staff/schedule`, `/staff/my-schedule`, and `/therapist/schedule` redirect to `/schedule` for bookmark compatibility.
    - The fixed manager secondary nav must stay horizontally scrollable on narrow widths rather than shrinking or clipping workflow tabs.
-2. Build draft assignments:
+3. Build draft assignments:
    - Manual assign, unassign, status update, or set lead from grid cell popovers.
    - Auto-generate (`generateDraftScheduleAction`) using recurring patterns and cycle overrides.
    - Auto-draft now runs a pre-flight report first so managers can review likely unfilled slots, missing leads, and forced must-work misses before generation.
    - `Clear draft` removes all draft assignments for the active unpublished cycle.
    - Managers can save a published cycle as a staffing template and apply a saved template to a draft cycle. Template data is shift-only (`day_of_cycle`) and intentionally excludes availability overrides.
-3. Resolve blockers in Schedule:
+4. Resolve blockers in Schedule:
    - under or over coverage
    - missing, multiple, or ineligible lead
    - unfilled slots due to constraints
-4. Publish (`toggleCyclePublishedAction`):
+5. Publish (`toggleCyclePublishedAction`):
    - validates weekly and slot rules
    - writes `publish_events`
    - queues email rows in `notification_outbox`
