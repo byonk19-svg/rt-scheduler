@@ -130,6 +130,24 @@ describe('manager Shift Board action model', () => {
     expect(model.showsApprove).toBe(false)
   })
 
+  it('approves a direct pickup after the teammate accepts', () => {
+    const model = getRequestActionModel({
+      req: request({
+        visibility: 'direct',
+        recipientResponse: 'accepted',
+        claimedById: 'off-day-partner',
+        swapWithId: 'off-day-partner',
+      }),
+      canReview: true,
+      hasSwapPartner: false,
+      hasBackupResponder: false,
+    })
+
+    expect(model.primary).toBe('Approve pickup')
+    expect(model.secondary).toContain('View shift')
+    expect(model.showsApprove).toBe(true)
+  })
+
   it('shows Choose partner for an open swap without a selected partner', () => {
     const model = getRequestActionModel({
       req: request({ type: 'swap', visibility: 'team', swapWithId: null }),
@@ -195,6 +213,24 @@ describe('manager Shift Board action model', () => {
     expect(html).toContain('scroll-mt-24')
     expect(html).not.toContain('First response:')
     expect(html).not.toMatch(/claimant|seeded|test user|demo therapist/i)
+  })
+
+  it('renders direct accepted pickup as ready for manager approval', () => {
+    const html = renderManagerCard({
+      type: 'pickup',
+      visibility: 'direct',
+      recipientResponse: 'accepted',
+      claimedById: 'off-day-partner',
+      swapWithId: 'off-day-partner',
+      swapWithName: 'Off Day Partner',
+      pendingInterestCount: 0,
+    })
+
+    expect(html).toContain('Ready for decision')
+    expect(html).toContain('Off Day Partner will be added to Sun, May 10 - Night.')
+    expect(html).toContain('Ready because Off Day Partner is selected and coverage remains safe.')
+    expect(html).toContain('Approve pickup')
+    expect(html).not.toContain('View open post')
   })
 
   it('keeps long responder and requester names readable inside the card', () => {

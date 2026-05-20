@@ -1064,11 +1064,14 @@ test.describe.serial('requests workflow', () => {
         .filter({ has: managerPage.getByText(requestMessage) })
         .first()
       await expect(requestCard).toBeVisible({ timeout: 20_000 })
+      await expect(requestCard.getByText('Ready for decision')).toBeVisible()
+      await expect(requestCard.getByText('Requests User swaps with Requests Partner')).toBeVisible()
       await expect(
         requestCard.getByText(
-          'You suggested a swap partner. A manager still has to approve the swap.'
+          'Requests User and Requests Partner trade assigned shifts; staffing count does not change.'
         )
       ).toBeVisible()
+      await expect(requestCard.getByRole('button', { name: 'Approve swap' })).toBeVisible()
       const approveResponsePromise = waitForShiftPostMutation(managerPage)
       await requestCard.getByRole('button', { name: 'Approve' }).click()
       const approveResponse = await approveResponsePromise

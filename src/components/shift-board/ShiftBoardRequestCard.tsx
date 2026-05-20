@@ -110,7 +110,9 @@ export function ManagerRequestCard({
     pickupQueue?.primaryCandidate ??
     pickupQueue?.orderedCandidates[0] ??
     null
-  const selectedResponderName = selectedPickupCandidate?.therapistName ?? null
+  const directPickupResponderName =
+    req.type === 'pickup' && req.visibility === 'direct' ? req.swapWithName : null
+  const selectedResponderName = selectedPickupCandidate?.therapistName ?? directPickupResponderName
   const swapPartnerName =
     req.swapWithName ??
     therapists.find((therapist) => therapist.id === swapPartnerId)?.full_name ??

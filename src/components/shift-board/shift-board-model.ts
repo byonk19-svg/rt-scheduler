@@ -119,17 +119,30 @@ export function isOpenSwapWithoutPartner(req: ShiftBoardRequest): boolean {
 }
 
 export function isPickupWithResponders(req: ShiftBoardRequest): boolean {
-  return req.status === 'pending' && req.type === 'pickup' && req.pendingInterestCount > 0
+  return (
+    req.status === 'pending' &&
+    req.type === 'pickup' &&
+    req.visibility === 'team' &&
+    req.pendingInterestCount > 0
+  )
 }
 
 export function isPickupWithoutResponders(req: ShiftBoardRequest): boolean {
-  return req.status === 'pending' && req.type === 'pickup' && req.pendingInterestCount === 0
+  return (
+    req.status === 'pending' &&
+    req.type === 'pickup' &&
+    req.visibility === 'team' &&
+    req.pendingInterestCount === 0
+  )
 }
 
 export function isReadyForManagerDecision(req: ShiftBoardRequest): boolean {
   if (req.status !== 'pending') return false
   if (isWaitingOnTeammate(req)) return false
   if (isPickupWithResponders(req)) return true
+  if (req.type === 'pickup' && req.visibility === 'direct') {
+    return req.recipientResponse === 'accepted' && Boolean(req.claimedById)
+  }
   if (req.type === 'swap') return Boolean(req.swapWithId)
   return false
 }
@@ -234,7 +247,13 @@ export function getRequestActionModel({
 }: {
   req: Pick<
     ShiftBoardRequest,
-    'status' | 'type' | 'visibility' | 'recipientResponse' | 'pendingInterestCount' | 'swapWithId'
+    | 'status'
+    | 'type'
+    | 'visibility'
+    | 'recipientResponse'
+    | 'pendingInterestCount'
+    | 'swapWithId'
+    | 'claimedById'
   >
   canReview: boolean
   hasSwapPartner: boolean
