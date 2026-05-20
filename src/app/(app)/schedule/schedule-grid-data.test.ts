@@ -32,6 +32,13 @@ vi.mock('@/lib/coverage/pre-flight', () => ({
 }))
 
 import { loadScheduleGridData } from './schedule-grid-data'
+import {
+  buildAvailableCycleOptions,
+  buildTherapistGridRows,
+  mapShiftToGridStatus,
+  selectScheduleCycle,
+  shapePreFlightSummary,
+} from './schedule-grid-model'
 
 type Cycle = {
   id: string
@@ -286,5 +293,154 @@ describe('loadScheduleGridData visibility', () => {
     expect(result.status).toBe('ok')
     if (result.status !== 'ok') return
     expect(result.dataset.therapistRows[0]?.employmentType).toBe('full_time')
+  })
+})
+
+describe('schedule grid model helpers', () => {
+  it('keeps manager cycle options broad and honors a requested draft cycle', () => {
+    const result = selectScheduleCycle({
+      cycles: [publishedCycle, draftCycle],
+      cycleIdFromUrl: 'draft-cycle',
+      canManageCoverage: true,
+    })
+
+    expect(result.selectedCycle?.id).toBe('draft-cycle')
+    expect(buildAvailableCycleOptions(result.visibleCycles)).toEqual([
+      { id: 'published-cycle', label: 'Published cycle' },
+      { id: 'draft-cycle', label: 'Draft cycle' },
+    ])
+  })
+
+  it('limits therapist cycle options to published cycles and ignores requested drafts', () => {
+    const result = selectScheduleCycle({
+      cycles: [draftCycle, publishedCycle],
+      cycleIdFromUrl: 'draft-cycle',
+      canManageCoverage: false,
+    })
+
+    expect(result.selectedCycle?.id).toBe('published-cycle')
+    expect(result.visibleCycles.map((cycle) => cycle.id)).toEqual(['published-cycle'])
+  })
+
+  it('prefers draft cycles before published cycles when no cycle is requested for managers', () => {
+    const result = selectScheduleCycle({
+      cycles: [publishedCycle, draftCycle],
+      cycleIdFromUrl: undefined,
+      canManageCoverage: true,
+    })
+
+    expect(result.selectedCycle?.id).toBe('draft-cycle')
+  })
+
+  it('marks requested-off force-off days on matching shift tabs', () => {
+    const [row] = buildTherapistGridRows({
+      therapists: [
+        {
+          id: 'therapist-1',
+          full_name: 'Day Therapist',
+          shift_type: 'day',
+          employment_type: 'full_time',
+          on_fmla: false,
+          is_active: true,
+          archived_at: null,
+          role: 'therapist',
+          max_work_days_per_week: null,
+        },
+      ],
+      cycleDates: ['2026-05-04', '2026-05-05'],
+      shiftType: 'day',
+      shifts: [],
+      forceOffOverrides: [
+        { therapist_id: 'therapist-1', date: '2026-05-04', shift_type: 'both' },
+        { therapist_id: 'therapist-1', date: '2026-05-05', shift_type: 'day' },
+        { therapist_id: 'therapist-1', date: '2026-05-05', shift_type: 'night' },
+      ],
+      activeOperationalDetails: new Map(),
+    })
+
+    expect(row?.cells['2026-05-04']?.hasNeedsOff).toBe(true)
+    expect(row?.cells['2026-05-05']?.hasNeedsOff).toBe(true)
+  })
+
+  it('lets active operational codes override assignment status and keeps called-off fallback', () => {
+    expect(
+      mapShiftToGridStatus({
+        isLead: false,
+        assignmentStatus: 'on_call',
+        shiftStatus: 'scheduled',
+        operationalCode: 'call_in',
+      })
+    ).toBe('call_in')
+    expect(
+      mapShiftToGridStatus({
+        isLead: false,
+        assignmentStatus: null,
+        shiftStatus: 'called_off',
+        operationalCode: null,
+      })
+    ).toBe('cancelled')
+  })
+
+  it('marks extra off days ineligible after weekly max work days are reached', () => {
+    const [row] = buildTherapistGridRows({
+      therapists: [
+        {
+          id: 'therapist-1',
+          full_name: 'Day Therapist',
+          shift_type: 'day',
+          employment_type: 'full_time',
+          on_fmla: false,
+          is_active: true,
+          archived_at: null,
+          role: 'therapist',
+          max_work_days_per_week: 2,
+        },
+      ],
+      cycleDates: ['2026-05-04', '2026-05-05', '2026-05-06'],
+      shiftType: 'day',
+      shifts: [
+        {
+          id: 'shift-1',
+          user_id: 'therapist-1',
+          date: '2026-05-04',
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: null,
+          role: 'staff',
+        },
+        {
+          id: 'shift-2',
+          user_id: 'therapist-1',
+          date: '2026-05-05',
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: null,
+          role: 'staff',
+        },
+      ],
+      forceOffOverrides: [],
+      activeOperationalDetails: new Map(),
+    })
+
+    expect(row?.cells['2026-05-06']).toMatchObject({
+      status: 'off',
+      isIneligible: true,
+    })
+  })
+
+  it('keeps pre-flight summary shape compatible with the grid contract', () => {
+    expect(
+      shapePreFlightSummary({
+        unfilledSlots: 3,
+        missingLeadSlots: 1,
+        forcedMustWorkMisses: 2,
+        details: [{ date: '2026-05-04', shiftType: 'day', missingCount: 1 }],
+      })
+    ).toEqual({
+      unfilledSlots: 3,
+      missingLeadSlots: 1,
+      forcedMustWorkMisses: 2,
+      details: [{ date: '2026-05-04', shiftType: 'day', missingCount: 1 }],
+    })
   })
 })
