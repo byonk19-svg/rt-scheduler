@@ -4,27 +4,21 @@ import type { ReactNode, RefObject } from 'react'
 
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { formatDisplayDate } from '@/lib/calendar-utils'
+import {
+  toScheduleGridAssignmentStatus,
+  type ScheduleGridAssignmentStatus,
+} from '@/lib/schedule/schedule-status-model'
 import { cn } from '@/lib/utils'
 
-import type { GridCell, GridCellStatus } from './schedule-grid-types'
+import type { GridCell } from './schedule-grid-types'
 
-type AssignmentStatus = 'scheduled' | 'on_call' | 'cancelled' | 'call_in' | 'left_early'
-
-const STATUS_LABELS: Array<{ value: AssignmentStatus; label: string }> = [
+const STATUS_LABELS: Array<{ value: ScheduleGridAssignmentStatus; label: string }> = [
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'on_call', label: 'On call' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'call_in', label: 'Call-in' },
   { value: 'left_early', label: 'Left early' },
 ]
-
-function cellStatusToAssignment(status: GridCellStatus): AssignmentStatus {
-  if (status === 'on_call') return 'on_call'
-  if (status === 'cancelled') return 'cancelled'
-  if (status === 'call_in') return 'call_in'
-  if (status === 'left_early') return 'left_early'
-  return 'scheduled'
-}
 
 type StatusCellPopoverProps = {
   open: boolean
@@ -37,7 +31,7 @@ type StatusCellPopoverProps = {
   canUnassign: boolean
   canDesignateLead: boolean
   isCurrentlyLead: boolean
-  onStatusChange: (status: AssignmentStatus) => Promise<void>
+  onStatusChange: (status: ScheduleGridAssignmentStatus) => Promise<void>
   onUnassign: () => Promise<void>
   onDesignateLead: () => Promise<void>
   isPending: boolean
@@ -62,7 +56,7 @@ export function StatusCellPopover({
   children,
 }: StatusCellPopoverProps) {
   const virtualRef = anchorEl ? ({ current: anchorEl } as RefObject<HTMLElement>) : undefined
-  const currentAssignment = cellStatusToAssignment(cell.status)
+  const currentAssignment = toScheduleGridAssignmentStatus(cell.status)
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>

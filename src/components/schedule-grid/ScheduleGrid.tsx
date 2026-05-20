@@ -5,7 +5,10 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { createCoverageShiftMutator } from '@/lib/coverage/mutations'
 import { shiftTabToQueryValue } from '@/lib/coverage/coverage-shift-tab'
-import type { AssignmentStatus, ShiftStatus } from '@/lib/shift-types'
+import {
+  toScheduleGridMutationPayload,
+  type ScheduleGridAssignmentStatus,
+} from '@/lib/schedule/schedule-status-model'
 import { cn } from '@/lib/utils'
 
 import { AssignCellPopover } from './AssignCellPopover'
@@ -13,8 +16,6 @@ import { ScheduleGridTable } from './ScheduleGridTable'
 import { ScheduleGridToolbar } from './ScheduleGridToolbar'
 import { StatusCellPopover } from './StatusCellPopover'
 import type { GridCell, GridDataset, ScheduleGridPreFlightSummary } from './schedule-grid-types'
-
-type AssignmentStatusValue = 'scheduled' | 'on_call' | 'cancelled' | 'call_in' | 'left_early'
 
 type CellTarget = {
   userId: string
@@ -64,17 +65,6 @@ const SCHEDULE_LEGEND_ITEMS = [
   },
   { label: 'Requested off', code: '*', className: 'text-foreground' },
 ] as const
-
-function toCoveragePayload(status: AssignmentStatusValue): {
-  assignment_status: AssignmentStatus
-  status: ShiftStatus
-} {
-  if (status === 'on_call') return { assignment_status: 'on_call', status: 'on_call' }
-  if (status === 'cancelled') return { assignment_status: 'cancelled', status: 'called_off' }
-  if (status === 'call_in') return { assignment_status: 'call_in', status: 'called_off' }
-  if (status === 'left_early') return { assignment_status: 'left_early', status: 'scheduled' }
-  return { assignment_status: 'scheduled', status: 'scheduled' }
-}
 
 export function ScheduleGrid({
   initialDataset,
@@ -184,13 +174,13 @@ export function ScheduleGrid({
   }, [activeCellTarget, cellsLocked, initialDataset, mutator, refreshAfterMutation])
 
   const handleStatusChange = useCallback(
-    async (status: AssignmentStatusValue) => {
+    async (status: ScheduleGridAssignmentStatus) => {
       if (!activeCellTarget?.cell.shiftId) return
       if (cellsLocked) return
       if (!initialDataset.canManageCoverage && !initialDataset.canUpdateAssignmentStatus) return
       const { error } = await mutator.updateStatus(
         activeCellTarget.cell.shiftId,
-        toCoveragePayload(status)
+        toScheduleGridMutationPayload(status)
       )
       if (error) {
         window.alert('Could not update this shift status. Refresh Schedule and try again.')

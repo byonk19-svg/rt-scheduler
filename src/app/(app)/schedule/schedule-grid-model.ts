@@ -7,7 +7,8 @@ import type {
   ScheduleGridPreFlightSummary,
   TherapistGridRow,
 } from '@/components/schedule-grid/schedule-grid-types'
-import type { ActiveOperationalDetail, OperationalCode } from '@/lib/operational-codes'
+import type { ActiveOperationalDetail } from '@/lib/operational-codes'
+import { toScheduleGridCellStatus } from '@/lib/schedule/schedule-status-model'
 import type { AssignmentStatus, ShiftStatus } from '@/lib/shift-types'
 
 export type CycleRow = {
@@ -93,15 +94,9 @@ export function mapShiftToGridStatus({
   isLead: boolean
   assignmentStatus: AssignmentStatus | null
   shiftStatus: ShiftStatus
-  operationalCode: OperationalCode | null
+  operationalCode: ActiveOperationalDetail['code'] | null
 }): GridCell['status'] {
-  const effectiveAssignmentStatus = operationalCode ?? assignmentStatus
-  if (effectiveAssignmentStatus === 'on_call' || shiftStatus === 'on_call') return 'on_call'
-  if (effectiveAssignmentStatus === 'cancelled') return 'cancelled'
-  if (effectiveAssignmentStatus === 'call_in') return 'call_in'
-  if (effectiveAssignmentStatus === 'left_early') return 'left_early'
-  if (shiftStatus === 'called_off') return 'cancelled'
-  return isLead ? 'lead' : 'staff'
+  return toScheduleGridCellStatus({ isLead, assignmentStatus, shiftStatus, operationalCode })
 }
 
 export function buildTherapistGridRows({
