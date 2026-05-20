@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { createClientMock, notifyUsersMock, redirectMock, revalidatePathMock, writeAuditLogMock } =
   vi.hoisted(() => ({
@@ -223,6 +223,12 @@ function createSupabaseMock(context: TestContext) {
 describe('Schedule Block Planning actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-19T12:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('creates a visible Schedule Block with date-only planning targets and notifies therapists', async () => {
@@ -262,6 +268,24 @@ describe('Schedule Block Planning actions', () => {
 
     await expect(createScheduleBlockPlanningAction(makeCreateForm())).rejects.toThrow(
       'REDIRECT:/schedule/planning?error=schedule_block_overlap'
+    )
+
+    expect(context.inserted).toBeUndefined()
+    expect(notifyUsersMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects creating a current or past Schedule Block through the planning action', async () => {
+    const context: TestContext = { cycles: [] }
+    createClientMock.mockResolvedValue(createSupabaseMock(context))
+    const formData = makeCreateForm()
+    formData.set('start_date', '2026-05-17')
+    formData.set('end_date', '2026-06-27')
+    formData.set('availability_due_date', '2026-05-10')
+    formData.set('preliminary_target_date', '2026-05-12')
+    formData.set('final_publish_target_date', '2026-05-14')
+
+    await expect(createScheduleBlockPlanningAction(formData)).rejects.toThrow(
+      'REDIRECT:/schedule/planning?error=planning_block_not_future'
     )
 
     expect(context.inserted).toBeUndefined()
@@ -313,9 +337,80 @@ describe('Schedule Block Planning actions', () => {
     await expect(
       updateScheduleBlockPlanningAction(makeUpdateForm({ availability_due_date: '2026-05-24' }))
     ).rejects.toThrow(
-      'REDIRECT:/schedule/planning?cycle=cycle-1&error=planning_due_earlier_requires_confirm'
+      'REDIRECT:/schedule/planning?cycle=cycle-1&error=planning_due_earlier_requires_confirm&pending_due_date=2026-05-24'
     )
 
     expect(context.updated).toBeUndefined()
+  })
+
+  it('applies an earlier visible due date when the manager confirms the change', async () => {
+    const context: TestContext = {
+      cycles: [baseCycle({ availability_due_at: '2026-05-31T23:59:59.999Z' })],
+    }
+    createClientMock.mockResolvedValue(createSupabaseMock(context))
+
+    await expect(
+      updateScheduleBlockPlanningAction(
+        makeUpdateForm({
+          availability_due_date: '2026-05-24',
+          confirm_earlier_due_date: 'true',
+        })
+      )
+    ).rejects.toThrow('REDIRECT:/schedule/planning?cycle=cycle-1&success=planning_saved')
+
+    expect(availabilityDueDateKey(String(context.updated?.availability_due_at))).toBe('2026-05-24')
+    expect(notifyUsersMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'availability_due_date_changed',
+        targetId: 'cycle-1',
+      })
+    )
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: 'schedule_block_availability_due_date_changed' })
+    )
+  })
+
+  it('locks planning updates once the Schedule Block lifecycle is no longer future draft', async () => {
+    const context: TestContext = {
+      cycles: [
+        baseCycle({ status: 'preliminary', availability_due_at: '2026-05-31T23:59:59.999Z' }),
+      ],
+    }
+    createClientMock.mockResolvedValue(createSupabaseMock(context))
+
+    await expect(updateScheduleBlockPlanningAction(makeUpdateForm())).rejects.toThrow(
+      'REDIRECT:/schedule/planning?cycle=cycle-1&error=planning_lifecycle_locked'
+    )
+
+    expect(context.updated).toBeUndefined()
+    expect(notifyUsersMock).not.toHaveBeenCalled()
+  })
+
+  it('audits manager-only target edits without notifying therapists', async () => {
+    const context: TestContext = {
+      cycles: [baseCycle({ availability_due_at: '2026-05-31T23:59:59.999Z' })],
+    }
+    createClientMock.mockResolvedValue(createSupabaseMock(context))
+
+    await expect(
+      updateScheduleBlockPlanningAction(
+        makeUpdateForm({
+          preliminary_target_date: '2026-06-08',
+          final_publish_target_date: '2026-06-15',
+        })
+      )
+    ).rejects.toThrow('REDIRECT:/schedule/planning?cycle=cycle-1&success=planning_saved')
+
+    expect(notifyUsersMock).not.toHaveBeenCalled()
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: 'schedule_block_preliminary_target_changed' })
+    )
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: 'schedule_block_final_publish_target_changed' })
+    )
   })
 })

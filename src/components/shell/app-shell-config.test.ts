@@ -154,12 +154,21 @@ describe('app-shell-config', () => {
     expect(
       getWorkflowContext({ pathname: '/schedule/planning', canAccessManagerUi: true })
     ).toEqual({
-      workflow: 'Schedule Block Planning',
-      context: 'Future Schedule Blocks and target dates',
-      state: 'Draft planning',
-      permission: 'Manager editable',
+      workflow: 'Planning',
+      context: 'Future blocks',
+      state: 'Planning',
+      permission: 'Manager edit',
     })
     expect(getWorkflowContext({ pathname: '/settings', canAccessManagerUi: true })).toBeNull()
+  })
+
+  it('returns manager workflow context for availability', () => {
+    expect(getWorkflowContext({ pathname: '/availability', canAccessManagerUi: true })).toEqual({
+      workflow: 'Availability',
+      context: 'Team availability exceptions',
+      state: 'Missing, submitted, manager edited',
+      permission: 'Manager-managed after lock',
+    })
   })
 })
 

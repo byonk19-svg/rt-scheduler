@@ -94,6 +94,13 @@ async function selectPlannerCycle(page: Page, cycleId: string) {
   await expect(cyclePicker).toHaveValue(cycleId, { timeout: 20_000 })
 }
 
+async function openPlanningAssumptions(editor: Locator) {
+  const planningPanel = editor.locator('details').filter({ hasText: 'Planning assumptions' })
+  if ((await planningPanel.getAttribute('open')) === null) {
+    await planningPanel.getByText('Planning assumptions').click()
+  }
+}
+
 function nextSundayAfter(daysAhead: number): Date {
   const target = addDays(new Date(), daysAhead)
   return addDays(target, (7 - target.getDay()) % 7)
@@ -102,6 +109,9 @@ function nextSundayAfter(daysAhead: number): Date {
 async function createCycle(supabase: SupabaseClient, siteId: string, daysAhead: number) {
   const startDate = nextSundayAfter(daysAhead)
   const endDate = addDays(startDate, 41)
+  const availabilityDueAt = addDays(startDate, -21)
+  const preliminaryTargetDate = addDays(startDate, -14)
+  const finalPublishTargetDate = addDays(startDate, -7)
   const label = `Planner E2E ${randomString('cycle')}`
   const { data, error } = await supabase
     .from('schedule_cycles')
@@ -110,6 +120,9 @@ async function createCycle(supabase: SupabaseClient, siteId: string, daysAhead: 
       label,
       start_date: formatDateKey(startDate),
       end_date: formatDateKey(endDate),
+      availability_due_at: `${formatDateKey(availabilityDueAt)}T23:59:00.000Z`,
+      preliminary_target_date: formatDateKey(preliminaryTargetDate),
+      final_publish_target_date: formatDateKey(finalPublishTargetDate),
       published: false,
     })
     .select('id, start_date, end_date')
@@ -289,7 +302,9 @@ test.describe.serial('/availability manager planner', () => {
     )
     await expect(page.locator('[data-availability-editor]')).toBeVisible()
     await expect(
-      page.locator('[data-availability-editor]').getByRole('heading', { name: 'Edit availability' })
+      page
+        .locator('[data-availability-editor]')
+        .getByRole('heading', { name: 'Availability editor' })
     ).toBeVisible()
 
     const afterTherapistNavigationCount = await page.evaluate(
@@ -342,7 +357,10 @@ test.describe.serial('/availability manager planner', () => {
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await gotoAvailability(page, `/therapist/availability?cycle=${ctx!.secondCycle.id}`)
-    await expect(page.getByText('Schedule building has started.')).toBeVisible({
+    const availabilityLockedMessage = page.getByText(
+      /Availability changes are locked|Schedule building has started/
+    )
+    await expect(availabilityLockedMessage).toBeVisible({
       timeout: 20_000,
     })
     await expect(page.getByRole('button', { name: /Submit availability/ })).toBeDisabled()
@@ -372,7 +390,7 @@ test.describe.serial('/availability manager planner', () => {
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await gotoAvailability(page, `/therapist/availability?cycle=${ctx!.secondCycle.id}`)
-    await expect(page.getByText('Schedule building has started.')).toHaveCount(0)
+    await expect(availabilityLockedMessage).toHaveCount(0)
     await selectCalendarDay(page.locator('main'), lateChangeDate)
     await page
       .getByRole('button', { name: /^Need Off$/ })
@@ -410,9 +428,11 @@ test.describe.serial('/availability manager planner', () => {
       timeout: 20_000,
     })
     const editor = page.locator('[data-availability-editor]')
-    await expect(editor.getByRole('heading', { name: 'Edit availability' })).toBeVisible()
+    await expect(editor.getByRole('heading', { name: 'Availability editor' })).toBeVisible()
     await expect(editor.getByRole('button', { name: /^Save for E2E$/ })).toBeDisabled()
 
+    await openPlanningAssumptions(editor)
+    await editor.getByRole('button', { name: /^Available$/ }).click()
     await selectCalendarDay(editor, ctx!.therapistWillWorkDate)
     await selectCalendarDay(editor, ctx!.therapistCannotWorkDate)
     await editor.getByRole('button', { name: /^Save for E2E$/ }).click()
@@ -441,7 +461,8 @@ test.describe.serial('/availability manager planner', () => {
       `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`
     )
     const refreshedEditor = page.locator('[data-availability-editor]')
-    await refreshedEditor.getByRole('button', { name: /^Cannot work$/ }).click()
+    await openPlanningAssumptions(refreshedEditor)
+    await refreshedEditor.getByRole('button', { name: /^Unavailable$/ }).click()
     await expect(refreshedEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeDisabled()
     await selectCalendarDay(refreshedEditor, ctx!.therapistCannotWorkDate)
     await expect(refreshedEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeEnabled()
@@ -469,7 +490,8 @@ test.describe.serial('/availability manager planner', () => {
       `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`
     )
     const clearedEditor = page.locator('[data-availability-editor]')
-    await clearedEditor.getByRole('button', { name: /^Cannot work$/ }).click()
+    await openPlanningAssumptions(clearedEditor)
+    await clearedEditor.getByRole('button', { name: /^Unavailable$/ }).click()
     await expect(clearedEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeDisabled()
     await clearedEditor.getByRole('button', { name: 'Clear selected dates' }).click()
     await expect(clearedEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeEnabled()
@@ -500,7 +522,7 @@ test.describe.serial('/availability manager planner', () => {
     const clearSelectedDates = managerRequestEditor.getByRole('button', {
       name: 'Clear selected dates',
     })
-    if (await clearSelectedDates.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    if (await clearSelectedDates.isEnabled({ timeout: 2_000 }).catch(() => false)) {
       await clearSelectedDates.click()
     }
     await managerRequestEditor.getByRole('button', { name: /^Need Off$/ }).click()
@@ -548,6 +570,7 @@ test.describe.serial('/availability manager planner', () => {
       `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.prnTherapist.id}&roster=all`
     )
     const prnEditor = page.locator('[data-availability-editor]')
+    await prnEditor.getByRole('button', { name: /^Need to Work$/ }).click()
     await selectCalendarDay(prnEditor, ctx!.prnWillWorkDate)
     await prnEditor.getByRole('button', { name: /^Save for E2E$/ }).click()
 

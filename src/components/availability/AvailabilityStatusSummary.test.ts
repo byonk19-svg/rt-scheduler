@@ -64,14 +64,13 @@ describe('AvailabilityStatusSummary', () => {
       })
     )
 
-    expect(html).toContain('Missing submissions')
-    expect(html).toContain('Submitted with exceptions')
-    expect(html).toContain('Submitted no exceptions')
-    expect(html).toContain('All')
+    expect(html).toContain('Availability queue')
+    expect(html).toContain('Needs submission')
+    expect(html).toContain('Submitted with requests')
+    expect(html).toContain('Submitted no requests')
+    expect(html).toContain('All therapists')
     expect(html).toContain('Therapist')
-    expect(html).toContain('Status')
-    expect(html).toContain('Exceptions')
-    expect(html).toContain('Actions')
+    expect(html).toContain('Status / requests / activity')
     expect(html).toContain('Adrienne S.')
     expect(html).toContain('Barbara C.')
     expect(html).toContain('Part-time')
@@ -119,7 +118,8 @@ describe('AvailabilityStatusSummary', () => {
     )
 
     expect(html).toContain('data-testid="send-reminders-trigger"')
-    expect(html).toContain('Send reminders')
+    expect(html).toContain('Remind missing submissions')
+    expect(html).toContain('Requests: 0')
   })
 
   it('does not render the send-reminders button when missingRows is empty', () => {

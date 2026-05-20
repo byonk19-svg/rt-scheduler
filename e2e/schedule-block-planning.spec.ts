@@ -12,6 +12,7 @@ type TestContext = {
   siteId: string
   manager: { id: string; email: string; password: string }
   therapist: { id: string; email: string; password: string }
+  currentPublishedCycle: { id: string; label: string; startDate: string; endDate: string }
   hiddenCycle: { id: string; label: string; startDate: string; endDate: string }
 }
 
@@ -58,6 +59,15 @@ test.describe.serial('/schedule/planning Schedule Block Planning', () => {
       isLeadEligible: false,
     })
 
+    const currentPublishedLabel = `Published Planning ${randomString('cycle')}`
+    const currentPublishedCycle = await createScheduleCycle(supabase, {
+      label: currentPublishedLabel,
+      siteId,
+      startDate: new Date(),
+      align: 'on-or-before',
+      published: true,
+    })
+
     const hiddenLabel = `Hidden Planning ${randomString('cycle')}`
     const hiddenCycle = await createScheduleCycle(supabase, {
       label: hiddenLabel,
@@ -66,12 +76,18 @@ test.describe.serial('/schedule/planning Schedule Block Planning', () => {
     })
 
     createdUserIds.push(manager.id, therapist.id)
-    createdCycleIds.push(hiddenCycle.id)
+    createdCycleIds.push(currentPublishedCycle.id, hiddenCycle.id)
     ctx = {
       supabase,
       siteId,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       therapist: { id: therapist.id, email: therapistEmail, password: therapistPassword },
+      currentPublishedCycle: {
+        id: currentPublishedCycle.id,
+        label: currentPublishedLabel,
+        startDate: currentPublishedCycle.start_date,
+        endDate: currentPublishedCycle.end_date,
+      },
       hiddenCycle: {
         id: hiddenCycle.id,
         label: hiddenLabel,
@@ -109,10 +125,20 @@ test.describe.serial('/schedule/planning Schedule Block Planning', () => {
     await expect(page.getByRole('heading', { name: 'Schedule Block Planning' })).toBeVisible({
       timeout: 20_000,
     })
-    await expect(page.getByRole('link', { name: 'Planning' })).toBeVisible()
-    await expect(page.getByText('Manager draft').first()).toBeVisible()
+    await expect(page.getByText('Future blocks', { exact: true })).toBeVisible()
+    await expect(page.getByText('1 future block needs planning')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Save Schedule Block' }).click()
+    const upcomingSection = page.locator('section[aria-labelledby="upcoming-schedule-blocks"]')
+    const contextSection = page.locator('section[aria-labelledby="current-recent-context"]')
+    await expect(upcomingSection.getByText(ctx!.hiddenCycle.label)).toBeVisible()
+    await expect(upcomingSection.getByText('Needs dates', { exact: true })).toBeVisible()
+    await expect(upcomingSection.getByText('Draft', { exact: true })).toBeVisible()
+    await expect(upcomingSection.getByText(ctx!.currentPublishedCycle.label)).toHaveCount(0)
+    await expect(contextSection.getByText(ctx!.currentPublishedCycle.label)).toBeVisible()
+    await expect(contextSection.getByText('Published', { exact: true })).toBeVisible()
+    await expect(contextSection.getByText('Missing historical targets')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Create schedule block' }).click()
     await expect(page.getByText('Schedule Block Planning saved.')).toBeVisible({
       timeout: 20_000,
     })

@@ -335,19 +335,19 @@ export function getWorkflowContext(args: {
 
     if (pathname === '/schedule/planning') {
       return {
-        workflow: 'Schedule Block Planning',
-        context: 'Future Schedule Blocks and target dates',
-        state: 'Draft planning',
-        permission: 'Manager editable',
+        workflow: 'Planning',
+        context: 'Future blocks',
+        state: 'Planning',
+        permission: 'Manager edit',
       }
     }
 
     if (pathname === '/availability') {
       return {
         workflow: 'Availability',
-        context: 'Team exceptions for the block',
+        context: 'Team availability exceptions',
         state: 'Missing, submitted, manager edited',
-        permission: 'Manager managed after lock',
+        permission: 'Manager-managed after lock',
       }
     }
 

@@ -81,7 +81,10 @@ function formatCycleDate(value: string): string {
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function getNextPlanningSummary(cycle: DashboardCycle | null): {
+function getNextPlanningSummary(
+  cycle: DashboardCycle | null,
+  todayKey: string
+): {
   label: string
   detail: string
   ctaHref: string
@@ -105,9 +108,12 @@ function getNextPlanningSummary(cycle: DashboardCycle | null): {
 
   if (!cycle.preliminary_target_date) {
     return {
-      label: `Availability due ${formatCycleDate(availabilityDueDate)}`,
-      detail: 'Add the Preliminary target date for this Schedule Block.',
-      ctaHref: `/schedule/planning?cycle=${cycle.id}`,
+      label:
+        availabilityDueDate < todayKey
+          ? `Availability past due ${formatCycleDate(availabilityDueDate)}`
+          : `Availability due ${formatCycleDate(availabilityDueDate)}`,
+      detail: 'Review availability responses and add the Preliminary target date.',
+      ctaHref: `/availability?cycle=${cycle.id}`,
     }
   }
 
@@ -115,16 +121,30 @@ function getNextPlanningSummary(cycle: DashboardCycle | null): {
     return {
       label: `Preliminary target ${formatCycleDate(cycle.preliminary_target_date)}`,
       detail: 'Add the Final Publish target date for this Schedule Block.',
-      ctaHref: `/schedule/planning?cycle=${cycle.id}`,
+      ctaHref: `/schedule?cycle=${cycle.id}`,
+    }
+  }
+
+  if (availabilityDueDate >= todayKey) {
+    return {
+      label: `Availability due ${formatCycleDate(availabilityDueDate)}`,
+      detail: 'Collect therapist availability for this Schedule Block.',
+      ctaHref: `/availability?cycle=${cycle.id}`,
+    }
+  }
+
+  if (cycle.preliminary_target_date >= todayKey) {
+    return {
+      label: `Preliminary target ${formatCycleDate(cycle.preliminary_target_date)}`,
+      detail: 'Build the schedule before sending Preliminary.',
+      ctaHref: `/schedule?cycle=${cycle.id}`,
     }
   }
 
   return {
-    label: `Availability due ${formatCycleDate(availabilityDueDate)}`,
-    detail: `Preliminary target ${formatCycleDate(
-      cycle.preliminary_target_date
-    )}. Final Publish target ${formatCycleDate(cycle.final_publish_target_date)}.`,
-    ctaHref: `/schedule/planning?cycle=${cycle.id}`,
+    label: `Final Publish target ${formatCycleDate(cycle.final_publish_target_date)}`,
+    detail: 'Review and publish from the Schedule workspace.',
+    ctaHref: `/schedule?cycle=${cycle.id}`,
   }
 }
 
@@ -370,7 +390,7 @@ export default async function ManagerDashboardPage() {
   }))
 
   const scheduleHref = buildCycleRoute('/schedule', activeCycle?.id ?? null)
-  const nextCyclePlanning = getNextPlanningSummary(nextCycle)
+  const nextCyclePlanning = getNextPlanningSummary(nextCycle, todayKey)
   const activeCycleHasNoShifts =
     Boolean(activeCycle) && dayRows.length === 0 && nightRows.length === 0
 

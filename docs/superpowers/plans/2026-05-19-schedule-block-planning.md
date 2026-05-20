@@ -12,6 +12,8 @@
 
 **Implementation Status (2026-05-19):** Complete. The implementation added the schema migration, pure planning helper, manager Planning route, server actions, manager navigation, manager dashboard links, therapist visibility filtering, manager Availability status cues, focused unit/source coverage, and a Playwright manager-to-therapist flow. Verification passed with format, lint, typecheck, build, focused unit tests, and targeted E2E. The configured Supabase test/dev database has the new migration applied.
 
+**Hardening Status (2026-05-20):** Added a follow-up proof/hardening pass for lifecycle and dashboard edge cases. Planning create now rejects current or past Schedule Blocks, planning update is server-limited to future Draft blocks, the earlier-availability-due confirmation redirect preserves the pending date and opens the target block, manager-only Preliminary/Final target edits are audit-only, and dashboard planning cues now link to Planning, Availability, or Schedule according to where the manager can actually act. Verification passed focused unit/source tests, format check, lint, build, rerun typecheck after regenerated `.next/types`, and the targeted Playwright manager-to-therapist Schedule Block Planning workflow.
+
 ---
 
 ## File Map

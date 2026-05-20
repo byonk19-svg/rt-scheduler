@@ -24,9 +24,25 @@ describe('Schedule Block Planning page source contract', () => {
   })
 
   it('keeps actual preliminary and publish actions out of the planning route', () => {
-    expect(source).toContain('Next suggested Schedule Block')
-    expect(source).toContain('This is a preview. It is not saved until you confirm the dates.')
+    expect(source).toContain('Create next schedule block')
+    expect(source).toContain('Review or edit dates')
+    expect(source).toContain('Missing historical targets')
     expect(source).not.toContain('sendPreliminary')
     expect(source).not.toContain('publishSchedule')
+  })
+
+  it('opens a linked planning block and carries earlier-due-date confirmation explicitly', () => {
+    expect(source).toContain('const selectedCycleId = getSearchParam(params.cycle)')
+    expect(source).toContain('pending_due_date')
+    expect(source).toContain('confirm_earlier_due_date')
+    expect(source).toContain('open={selected}')
+    expect(source).toContain('Saving again confirms the earlier availability due date.')
+  })
+
+  it('shows lifecycle guard feedback for server-side action attempts', () => {
+    expect(source).toContain('planning_block_not_future')
+    expect(source).toContain('planning_lifecycle_locked')
+    expect(source).toContain('Schedule Block Planning is only for future blocks.')
+    expect(source).toContain('Planning dates are locked after the Schedule Block starts')
   })
 })

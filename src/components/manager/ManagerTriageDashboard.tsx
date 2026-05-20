@@ -122,11 +122,15 @@ function getCycleStepState(args: {
   needsReviewCount: number | '--'
   nextCycleLabel: string
 }): Array<{ label: string; value: string; tone: 'success' | 'warning' | 'muted' }> {
-  const availabilityState = args.nextCycleLabel.startsWith('Collect availability')
-    ? 'Pending'
-    : args.nextCycleLabel === 'No next Schedule Block'
+  const availabilityState =
+    args.nextCycleLabel === 'No next Schedule Block' ||
+    args.nextCycleLabel.startsWith('Plan the next') ||
+    args.nextCycleLabel.startsWith('Set availability')
       ? 'Not started'
-      : 'Ready'
+      : args.nextCycleLabel.startsWith('Availability due') ||
+          args.nextCycleLabel.startsWith('Availability past due')
+        ? 'Pending'
+        : 'Ready'
   const buildState =
     args.currentCycleStatus === 'Draft not started' ||
     args.currentCycleStatus === 'No active Schedule Block'
