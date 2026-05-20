@@ -27,6 +27,8 @@ Last verified on branch `codex/schedule-block-planning`:
 - `npm run build` passed
 - `npm run test:e2e -- e2e/auth-redirect.spec.ts e2e/public-pages.spec.ts` passed (`9` tests)
 - `npm run test:e2e -- e2e/schedule-block-planning.spec.ts` passed (`1` seeded schedule smoke)
+- `npx playwright test e2e/requests-workflow.spec.ts --project=chromium --workers=1` passed (`6` tests, `1` seeded Teamwise case skipped)
+- `npx playwright test e2e/pickup-interest-concurrency.spec.ts --project=chromium --workers=1` passed (`3` seeded DB-backed pickup concurrency tests)
 
 Dependency security refresh:
 
@@ -39,6 +41,7 @@ Dependency security refresh:
 
 - `e2e/directory-date-override.spec.ts` remains intentionally removed because `/directory` is now a redirect to the team-management surface.
 - Unified Schedule grid has focused authenticated browser coverage in `e2e/manager-schedule-roster.spec.ts` for manager redirects, draft assign/unassign, lead designation, published status updates, and therapist read-only pinned rows.
+- Pickup interest primary/backup promotion now has DB-backed coverage in `e2e/pickup-interest-concurrency.spec.ts` for simultaneous interest submissions, selected claimant withdrawal, deterministic backup promotion, manager claimant denial, and clearing stale selected/pending state.
 
 ## Risk Notes
 
