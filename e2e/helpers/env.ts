@@ -3,7 +3,7 @@ import path from 'node:path'
 
 const envCache = new Map<string, string>()
 
-export function getEnvFromFile(key: string): string | undefined {
+function getEnvFromFile(key: string): string | undefined {
   if (envCache.has(key)) return envCache.get(key)
   const envPath = path.resolve(process.cwd(), '.env.local')
   try {

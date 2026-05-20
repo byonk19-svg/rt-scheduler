@@ -33,16 +33,16 @@ function parseDateKey(value: string): Date {
   return new Date(`${value}T00:00:00`)
 }
 
-export function sundayOnOrBefore(value: Date): Date {
+function sundayOnOrBefore(value: Date): Date {
   return addDays(cloneDate(value), -cloneDate(value).getDay())
 }
 
-export function sundayOnOrAfter(value: Date): Date {
+function sundayOnOrAfter(value: Date): Date {
   const date = cloneDate(value)
   return addDays(date, (7 - date.getDay()) % 7)
 }
 
-export function scheduleBlockEnd(startDate: Date): Date {
+function scheduleBlockEnd(startDate: Date): Date {
   return addDays(startDate, 41)
 }
 

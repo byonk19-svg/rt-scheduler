@@ -4,11 +4,11 @@ import { getEnv } from './env'
 
 let warnedAboutMissingSeededEnv = false
 
-export type E2ERole = 'manager' | 'therapist' | 'lead'
-export type E2EEmploymentType = 'full_time' | 'part_time' | 'prn'
-export type E2EShiftType = 'day' | 'night'
+type E2ERole = 'manager' | 'therapist' | 'lead'
+type E2EEmploymentType = 'full_time' | 'part_time' | 'prn'
+type E2EShiftType = 'day' | 'night'
 
-export type E2EUserPayload = {
+type E2EUserPayload = {
   email: string
   password: string
   fullName: string
