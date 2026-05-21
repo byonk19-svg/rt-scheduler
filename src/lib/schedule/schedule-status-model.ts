@@ -10,15 +10,15 @@ export type ScheduleGridCellStatus =
   | 'left_early'
   | 'off'
 
-export type ScheduleGridAssignmentStatus = AssignmentStatus
-
 export const SCHEDULE_GRID_ASSIGNMENT_STATUS_VALUES = [
   'scheduled',
   'call_in',
   'cancelled',
   'on_call',
   'left_early',
-] as const satisfies ReadonlyArray<ScheduleGridAssignmentStatus>
+] as const satisfies ReadonlyArray<AssignmentStatus>
+
+export type ScheduleGridAssignmentStatus = (typeof SCHEDULE_GRID_ASSIGNMENT_STATUS_VALUES)[number]
 
 export function isScheduleGridAssignmentStatus(
   value: string

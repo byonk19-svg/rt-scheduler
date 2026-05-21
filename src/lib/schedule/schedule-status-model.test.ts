@@ -133,11 +133,13 @@ describe('schedule status model', () => {
     }
   })
 
-  it('falls back to scheduled payload for unsupported UI status input', () => {
-    expect(toScheduleGridMutationPayload('unknown')).toEqual({
-      assignment_status: 'scheduled',
-      status: 'scheduled',
-    })
+  it('falls back to scheduled payload for unsupported or missing UI status input', () => {
+    for (const value of ['unknown', null, undefined]) {
+      expect(toScheduleGridMutationPayload(value)).toEqual({
+        assignment_status: 'scheduled',
+        status: 'scheduled',
+      })
+    }
   })
 
   it('recognizes supported schedule grid assignment status values', () => {
