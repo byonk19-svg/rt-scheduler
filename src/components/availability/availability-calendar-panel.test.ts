@@ -30,4 +30,23 @@ describe('AvailabilityCalendarPanel', () => {
     expect(html).toContain('data-in-cycle="true"')
     expect(html).not.toContain('overflow-x-auto')
   })
+
+  it('renders overlapping need-off request and draft markers without dropping either chip', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityCalendarPanel, {
+        cycleStart: '2026-03-22',
+        cycleEnd: '2026-05-02',
+        dayStates: {
+          '2026-03-24': {
+            draftSelection: 'need_off',
+            requestTypes: ['need_off'],
+          },
+        },
+        onToggleDate: () => {},
+      })
+    )
+
+    expect(html).toContain('title="Therapist Need Off request"')
+    expect(html).toContain('title="Draft Need Off"')
+  })
 })
