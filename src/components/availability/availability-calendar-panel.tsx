@@ -38,7 +38,7 @@ const CHIP_STYLES = {
 function renderStateChip(type: keyof typeof CHIP_STYLES, label: string, title?: string) {
   return (
     <span
-      key={`${type}-${label}`}
+      key={`${type}-${label}-${title ?? label}`}
       title={title ?? label}
       className={cn(
         'inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none',
