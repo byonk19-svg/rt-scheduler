@@ -214,15 +214,19 @@ export function ScheduleGrid({
   ])
 
   const handleStatusChange = useCallback(
-    async (status: ScheduleGridAssignmentStatus) => {
+    async (
+      status: ScheduleGridAssignmentStatus,
+      change?: { note?: string | null; leftEarlyTime?: string | null }
+    ) => {
       if (!activeCellTarget?.cell.shiftId) return
       if (cellsLocked) return
       if (!initialDataset.canManageCoverage && !initialDataset.canUpdateAssignmentStatus) return
       setFeedback(null)
-      const { error } = await mutator.updateStatus(
-        activeCellTarget.cell.shiftId,
-        toScheduleGridMutationPayload(status)
-      )
+      const { error } = await mutator.updateStatus(activeCellTarget.cell.shiftId, {
+        ...toScheduleGridMutationPayload(status),
+        note: change?.note ?? null,
+        leftEarlyTime: status === 'left_early' ? (change?.leftEarlyTime ?? null) : null,
+      })
       if (error) {
         showMutationError(SCHEDULE_GRID_MUTATION_ERROR_MESSAGES.status)
         return

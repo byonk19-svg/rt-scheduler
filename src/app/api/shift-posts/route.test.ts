@@ -417,6 +417,38 @@ describe('shift-post mutation API', () => {
     expect(body.error).toContain('Lead coverage gap')
   })
 
+  it('blocks denial for stale reviewed requests before the review RPC', async () => {
+    const rpcMock = vi.fn()
+
+    createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
+    createAdminClientMock.mockReturnValue(
+      makeReviewAdminClient({
+        rpc: rpcMock,
+        post: {
+          id: 'post-1',
+          type: 'pickup',
+          status: 'approved',
+          visibility: 'team',
+          recipient_response: null,
+          claimed_by: null,
+        },
+      })
+    )
+
+    const response = await POST(
+      makeRequest({
+        action: 'review_request',
+        requestId: 'post-1',
+        decision: 'deny',
+      })
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain('Only pending shift posts can be reviewed')
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
   it('blocks direct swaps waiting on teammate response before the review RPC', async () => {
     const rpcMock = vi.fn()
 

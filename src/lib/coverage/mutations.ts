@@ -35,8 +35,13 @@ export type CoverageShiftMutator = {
   ) => Promise<{ error: CoverageMutationError }>
   updateStatus: (
     shiftId: string,
-    payload: CoverageAssignmentPayload
+    payload: CoverageAssignmentStatusPayload
   ) => Promise<{ error: CoverageMutationError }>
+}
+
+export type CoverageAssignmentStatusPayload = CoverageAssignmentPayload & {
+  note?: string | null
+  leftEarlyTime?: string | null
 }
 
 type CoverageApiErrorResponse = {
@@ -143,7 +148,7 @@ async function unassignCoverageShiftViaApi(params: {
 
 async function persistCoverageShiftStatus(
   shiftId: string,
-  payload: CoverageAssignmentPayload
+  payload: CoverageAssignmentStatusPayload
 ): Promise<{ error: CoverageMutationError }> {
   const result = await postCoverageMutation({
     url: '/api/schedule/assignment-status',
@@ -151,6 +156,8 @@ async function persistCoverageShiftStatus(
     body: {
       assignmentId: shiftId,
       status: payload.assignment_status,
+      note: payload.note ?? undefined,
+      leftEarlyTime: payload.leftEarlyTime ?? undefined,
     },
   })
 

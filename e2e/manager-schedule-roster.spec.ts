@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
@@ -18,51 +18,12 @@ type ManagerScheduleCtx = {
   dayPrn: TestUser
   nightCore: TestUser
   lead: TestUser
+  liveDay2LeadShiftId: string
+  liveDay2CandidateShiftId: string
 }
 
 function cellTestId(userId: string, isoDate: string) {
   return `cell-${userId}-${isoDate}`
-}
-
-async function openCellAction(page: Page, cell: Locator, actionName: string) {
-  const action = page.getByRole('button', { name: actionName })
-
-  async function clickCell(attempt: number) {
-    await page.keyboard.press('Escape').catch(() => undefined)
-    await cell
-      .evaluate((element) => {
-        if (element instanceof HTMLElement) element.blur()
-      })
-      .catch(() => undefined)
-    await expect(cell).toBeEnabled({ timeout: 10_000 })
-
-    if (attempt % 3 === 0) {
-      await cell.click()
-    } else if (attempt % 3 === 1) {
-      await cell.evaluate((element) => {
-        if (!(element instanceof HTMLElement)) return
-        element.scrollIntoView({ block: 'center', inline: 'center' })
-        element.click()
-      })
-    } else {
-      await cell.focus()
-      await page.keyboard.press('Enter')
-    }
-  }
-
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    await clickCell(attempt)
-    if (await action.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await expect(action).toBeEnabled({ timeout: 10_000 })
-      return action
-    }
-    await page.waitForTimeout(500)
-  }
-
-  await clickCell(0)
-  await expect(action).toBeVisible({ timeout: 10_000 })
-  await expect(action).toBeEnabled({ timeout: 10_000 })
-  return action
 }
 
 async function clickShiftTab(page: Page, tabName: 'Day' | 'Night') {
@@ -348,9 +309,50 @@ test.describe.serial('unified schedule grid route', () => {
         assignment_status: 'scheduled',
         role: 'staff',
       },
+      {
+        cycle_id: liveCycle.id,
+        user_id: lead.id,
+        date: liveDay2,
+        shift_type: 'day',
+        site_id: siteId,
+        status: 'scheduled',
+        assignment_status: 'scheduled',
+        role: 'lead',
+      },
+      {
+        cycle_id: liveCycle.id,
+        user_id: dayCore.id,
+        date: liveDay2,
+        shift_type: 'day',
+        site_id: siteId,
+        status: 'scheduled',
+        assignment_status: 'scheduled',
+        role: 'staff',
+      },
     ])
     if (shiftsInsert.error) {
       throw new Error(`Could not seed shifts: ${shiftsInsert.error.message}`)
+    }
+
+    const liveDay2ShiftResult = await supabase
+      .from('shifts')
+      .select('id, user_id')
+      .eq('cycle_id', liveCycle.id)
+      .eq('date', liveDay2)
+      .eq('shift_type', 'day')
+      .in('user_id', [lead.id, dayCore.id])
+
+    if (liveDay2ShiftResult.error) {
+      throw new Error(`Could not load lead promotion shifts: ${liveDay2ShiftResult.error.message}`)
+    }
+
+    const liveDay2LeadShiftId =
+      liveDay2ShiftResult.data?.find((shift) => shift.user_id === lead.id)?.id ?? null
+    const liveDay2CandidateShiftId =
+      liveDay2ShiftResult.data?.find((shift) => shift.user_id === dayCore.id)?.id ?? null
+
+    if (!liveDay2LeadShiftId || !liveDay2CandidateShiftId) {
+      throw new Error('Could not identify lead promotion shifts.')
     }
 
     ctx = {
@@ -382,6 +384,8 @@ test.describe.serial('unified schedule grid route', () => {
         password: leadPassword,
         name: leadName,
       },
+      liveDay2LeadShiftId,
+      liveDay2CandidateShiftId,
     }
   })
 
@@ -594,6 +598,61 @@ test.describe.serial('unified schedule grid route', () => {
       .single()
     expect(updated.error).toBeNull()
     expect(updated.data?.assignment_status).toBe(nextStatus)
+  })
+
+  test('manager sees lead promotion reflected in active staffing totals after Call In', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+    const smoke = ctx!
+
+    await loginAs(page, smoke.manager.email, smoke.manager.password)
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.liveCycle.id}&shift=day`)
+
+    const leadCell = page.getByTestId(cellTestId(smoke.lead.id, smoke.liveCycle.day2))
+    const candidateCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.liveCycle.day2))
+    await expect(leadCell).toHaveText('1', { timeout: 30_000 })
+    await expect(candidateCell).toHaveText('1', { timeout: 30_000 })
+    await expect(page.getByTestId(`total-${smoke.liveCycle.day2}`)).toHaveText('2')
+
+    const statusResponse = await page.request.post('/api/schedule/assignment-status', {
+      headers: {
+        origin: 'http://127.0.0.1:3000',
+        referer: page.url(),
+      },
+      data: {
+        assignmentId: smoke.liveDay2LeadShiftId,
+        status: 'call_in',
+      },
+    })
+    expect(statusResponse.ok(), await statusResponse.text()).toBe(true)
+
+    await expect
+      .poll(
+        async () => {
+          const { data, error } = await smoke.supabase
+            .from('shifts')
+            .select('id, role')
+            .in('id', [smoke.liveDay2LeadShiftId, smoke.liveDay2CandidateShiftId])
+
+          if (error) throw new Error(error.message)
+
+          const originalLeadRole =
+            data?.find((shift) => shift.id === smoke.liveDay2LeadShiftId)?.role ?? null
+          const promotedRole =
+            data?.find((shift) => shift.id === smoke.liveDay2CandidateShiftId)?.role ?? null
+
+          return `${originalLeadRole}:${promotedRole}`
+        },
+        { timeout: 30_000 }
+      )
+      .toBe('staff:lead')
+
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.liveCycle.id}&shift=day`)
+    await expect(leadCell).toHaveText('CI', { timeout: 30_000 })
+    await expect(candidateCell).toHaveText('1', { timeout: 30_000 })
+    await expect(candidateCell).toHaveClass(/bg-yellow-200/, { timeout: 30_000 })
+    await expect(page.getByTestId(`total-${smoke.liveCycle.day2}`)).toHaveText('1')
   })
 
   test('lead can update status but cannot see assignment controls', async ({ page }) => {
