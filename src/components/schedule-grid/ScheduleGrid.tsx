@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
+import { FeedbackToast } from '@/components/feedback-toast'
 import { createCoverageShiftMutator } from '@/lib/coverage/mutations'
 import { shiftTabToQueryValue } from '@/lib/coverage/coverage-shift-tab'
 import {
@@ -32,6 +33,19 @@ type ScheduleGridProps = {
   publishAction?: (formData: FormData) => void | Promise<void>
   preFlightSummary?: ScheduleGridPreFlightSummary | null
 }
+
+type ScheduleGridFeedback = {
+  id: number
+  message: string
+  variant: 'error'
+}
+
+const SCHEDULE_GRID_MUTATION_ERROR_MESSAGES = {
+  assign: 'Could not assign this shift. Refresh Schedule and try again.',
+  unassign: 'Could not remove this assignment. Refresh Schedule and try again.',
+  status: 'Could not update this shift status. Refresh Schedule and try again.',
+  designateLead: 'Could not set the lead for this shift. Refresh Schedule and try again.',
+} as const
 
 const SCHEDULE_LEGEND_ITEMS = [
   {
@@ -81,6 +95,7 @@ export function ScheduleGrid({
   const [shiftTab, setShiftTab] = useState<'Day' | 'Night'>(initialShiftTab)
   const [activeCellTarget, setActiveCellTarget] = useState<CellTarget | null>(null)
   const [showPreFlight, setShowPreFlight] = useState(false)
+  const [feedback, setFeedback] = useState<ScheduleGridFeedback | null>(null)
   const autoDraftFormRef = useRef<HTMLFormElement | null>(null)
   const publishFormRef = useRef<HTMLFormElement | null>(null)
   const mutator = useMemo(() => createCoverageShiftMutator(), [])
@@ -136,12 +151,22 @@ export function ScheduleGrid({
   )
 
   const refreshAfterMutation = useCallback(() => {
+    setFeedback(null)
     setActiveCellTarget(null)
     startTransition(() => router.refresh())
   }, [router])
 
+  const showMutationError = useCallback((message: string) => {
+    setFeedback((current) => ({
+      id: (current?.id ?? 0) + 1,
+      message,
+      variant: 'error',
+    }))
+  }, [])
+
   const handleAssign = useCallback(async () => {
     if (!activeCellTarget || !initialDataset.canManageCoverage || cellsLocked) return
+    setFeedback(null)
     const { error } = await mutator.assign({
       cycleId: initialDataset.cycleId,
       userId: activeCellTarget.userId,
@@ -154,45 +179,69 @@ export function ScheduleGrid({
         : undefined,
     })
     if (error) {
-      window.alert('Could not assign this shift. Refresh Schedule and try again.')
+      showMutationError(SCHEDULE_GRID_MUTATION_ERROR_MESSAGES.assign)
       return
     }
     refreshAfterMutation()
-  }, [activeCellTarget, cellsLocked, initialDataset, mutator, refreshAfterMutation])
+  }, [
+    activeCellTarget,
+    cellsLocked,
+    initialDataset,
+    mutator,
+    refreshAfterMutation,
+    showMutationError,
+  ])
 
   const handleUnassign = useCallback(async () => {
     if (!activeCellTarget?.cell.shiftId || !initialDataset.canManageCoverage || cellsLocked) return
+    setFeedback(null)
     const { error } = await mutator.unassign({
       cycleId: initialDataset.cycleId,
       shiftId: activeCellTarget.cell.shiftId,
     })
     if (error) {
-      window.alert('Could not remove this assignment. Refresh Schedule and try again.')
+      showMutationError(SCHEDULE_GRID_MUTATION_ERROR_MESSAGES.unassign)
       return
     }
     refreshAfterMutation()
-  }, [activeCellTarget, cellsLocked, initialDataset, mutator, refreshAfterMutation])
+  }, [
+    activeCellTarget,
+    cellsLocked,
+    initialDataset,
+    mutator,
+    refreshAfterMutation,
+    showMutationError,
+  ])
 
   const handleStatusChange = useCallback(
     async (status: ScheduleGridAssignmentStatus) => {
       if (!activeCellTarget?.cell.shiftId) return
       if (cellsLocked) return
       if (!initialDataset.canManageCoverage && !initialDataset.canUpdateAssignmentStatus) return
+      setFeedback(null)
       const { error } = await mutator.updateStatus(
         activeCellTarget.cell.shiftId,
         toScheduleGridMutationPayload(status)
       )
       if (error) {
-        window.alert('Could not update this shift status. Refresh Schedule and try again.')
+        showMutationError(SCHEDULE_GRID_MUTATION_ERROR_MESSAGES.status)
         return
       }
       refreshAfterMutation()
     },
-    [activeCellTarget, cellsLocked, initialDataset, mutator, refreshAfterMutation]
+    [
+      activeCellTarget,
+      cellsLocked,
+      initialDataset,
+      mutator,
+      refreshAfterMutation,
+      showMutationError,
+    ]
   )
 
   const handleDesignateLead = useCallback(async () => {
     if (!activeCellTarget?.cell.shiftId || !initialDataset.canManageCoverage || cellsLocked) return
+    setFeedback(null)
     const { error } = await mutator.setDesignatedLead({
       cycleId: initialDataset.cycleId,
       therapistId: activeCellTarget.userId,
@@ -200,11 +249,18 @@ export function ScheduleGrid({
       shiftType: initialDataset.shiftType,
     })
     if (error) {
-      window.alert('Could not set the lead for this shift. Refresh Schedule and try again.')
+      showMutationError(SCHEDULE_GRID_MUTATION_ERROR_MESSAGES.designateLead)
       return
     }
     refreshAfterMutation()
-  }, [activeCellTarget, cellsLocked, initialDataset, mutator, refreshAfterMutation])
+  }, [
+    activeCellTarget,
+    cellsLocked,
+    initialDataset,
+    mutator,
+    refreshAfterMutation,
+    showMutationError,
+  ])
 
   const isAssignTarget = activeCellTarget?.cell.status === 'off'
   const isStatusTarget = Boolean(activeCellTarget && activeCellTarget.cell.status !== 'off')
@@ -331,6 +387,9 @@ export function ScheduleGrid({
           onDesignateLead={handleDesignateLead}
           isPending={isPending}
         />
+      ) : null}
+      {feedback ? (
+        <FeedbackToast key={feedback.id} message={feedback.message} variant={feedback.variant} />
       ) : null}
     </div>
   )

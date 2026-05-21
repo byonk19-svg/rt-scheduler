@@ -56,4 +56,15 @@ describe('ScheduleGrid source invariants', () => {
     expect(code).toContain('cycleDateRangeLabel')
     expect(code).toContain('{sheetTitle}')
   })
+
+  it('uses non-blocking feedback for schedule mutation failures', () => {
+    const code = source()
+
+    expect(code).toContain('FeedbackToast')
+    expect(code).not.toContain('window.alert')
+    expect(code).toContain('Could not assign this shift. Refresh Schedule and try again.')
+    expect(code).toContain('Could not remove this assignment. Refresh Schedule and try again.')
+    expect(code).toContain('Could not update this shift status. Refresh Schedule and try again.')
+    expect(code).toContain('Could not set the lead for this shift. Refresh Schedule and try again.')
+  })
 })
