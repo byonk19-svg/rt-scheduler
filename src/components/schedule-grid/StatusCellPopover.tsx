@@ -5,18 +5,15 @@ import type { ReactNode, RefObject } from 'react'
 
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { formatDisplayDate } from '@/lib/calendar-utils'
+import {
+  toScheduleGridAssignmentStatus,
+  type ScheduleGridAssignmentStatus,
+} from '@/lib/schedule/schedule-status-model'
 import { cn } from '@/lib/utils'
 
-import type { GridCell, GridCellStatus } from './schedule-grid-types'
+import type { GridCell } from './schedule-grid-types'
 
-type AssignmentStatus = 'scheduled' | 'on_call' | 'cancelled' | 'call_in' | 'left_early'
-
-type AssignmentStatusChange = {
-  note?: string | null
-  leftEarlyTime?: string | null
-}
-
-const STATUS_LABELS: Array<{ value: AssignmentStatus; label: string }> = [
+const STATUS_LABELS: Array<{ value: ScheduleGridAssignmentStatus; label: string }> = [
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'on_call', label: 'On call' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -24,12 +21,9 @@ const STATUS_LABELS: Array<{ value: AssignmentStatus; label: string }> = [
   { value: 'left_early', label: 'Left early' },
 ]
 
-function cellStatusToAssignment(status: GridCellStatus): AssignmentStatus {
-  if (status === 'on_call') return 'on_call'
-  if (status === 'cancelled') return 'cancelled'
-  if (status === 'call_in') return 'call_in'
-  if (status === 'left_early') return 'left_early'
-  return 'scheduled'
+type AssignmentStatusChange = {
+  note?: string | null
+  leftEarlyTime?: string | null
 }
 
 export function normalizeLeftEarlyTime(value: string): string | null {
@@ -39,7 +33,10 @@ export function normalizeLeftEarlyTime(value: string): string | null {
   return null
 }
 
-export function getStatusConfirmationCopy(status: AssignmentStatus, therapistName: string) {
+export function getStatusConfirmationCopy(
+  status: ScheduleGridAssignmentStatus,
+  therapistName: string
+) {
   switch (status) {
     case 'scheduled':
       return {
@@ -90,7 +87,10 @@ type StatusCellPopoverProps = {
   canUnassign: boolean
   canDesignateLead: boolean
   isCurrentlyLead: boolean
-  onStatusChange: (status: AssignmentStatus, change?: AssignmentStatusChange) => Promise<void>
+  onStatusChange: (
+    status: ScheduleGridAssignmentStatus,
+    change?: AssignmentStatusChange
+  ) => Promise<void>
   onUnassign: () => Promise<void>
   onDesignateLead: () => Promise<void>
   isPending: boolean
@@ -115,8 +115,8 @@ export function StatusCellPopover({
   children,
 }: StatusCellPopoverProps) {
   const virtualRef = anchorEl ? ({ current: anchorEl } as RefObject<HTMLElement>) : undefined
-  const currentAssignment = cellStatusToAssignment(cell.status)
-  const [pendingStatus, setPendingStatus] = useState<AssignmentStatus | null>(null)
+  const currentAssignment = toScheduleGridAssignmentStatus(cell.status)
+  const [pendingStatus, setPendingStatus] = useState<ScheduleGridAssignmentStatus | null>(null)
   const [leftEarlyTime, setLeftEarlyTime] = useState('')
   const [note, setNote] = useState('')
   const pendingCopy = pendingStatus ? getStatusConfirmationCopy(pendingStatus, therapistName) : null

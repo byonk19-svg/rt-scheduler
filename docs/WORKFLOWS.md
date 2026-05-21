@@ -76,6 +76,17 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
 - `*` is informational; managers can assign anyway after confirming the warning.
 - The old block-board and roster-layout toggle are removed.
 
+Schedule grid status model:
+
+- Shared status rules live in `src/lib/schedule/schedule-status-model.ts`.
+- Display status precedence is: matching active operational code, then `assignment_status`, then legacy `shifts.status` fallback, then scheduled staff/lead default.
+- Client mutation payload mapping for schedule-grid status choices is centralized in the same model so server display state and client update requests do not drift.
+- Schedule grid mutation failures use the app's non-blocking `FeedbackToast` pattern instead of browser alerts.
+- Focused verification:
+  - `npm run test:unit -- schedule-status schedule-grid-data schedule-grid`
+  - `npx playwright test e2e/manager-schedule-roster.spec.ts --project=chromium --workers=1 --reporter=line`
+  - `npx playwright test e2e/therapist-schedule-trust-smoke.spec.ts --project=chromium --workers=1 --reporter=line`
+
 ## 3) Therapist/Manager: Availability Input
 
 - Recurring scheduling is now split into:

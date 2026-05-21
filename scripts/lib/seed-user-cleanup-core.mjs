@@ -84,7 +84,7 @@ function getEmailDomain(email) {
  * @param {CleanupRuleOptions} [options]
  * @returns {CleanupMatch | null}
  */
-export function matchSeedUser(user, options = {}) {
+function matchSeedUser(user, options = {}) {
   const rules = buildRules(options)
   const email = normalizeEmail(user.email)
   if (!email) return null

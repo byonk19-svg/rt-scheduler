@@ -67,6 +67,8 @@ Notes:
 
 - On this repo, stale `next dev` state can survive across multiple overlapping launches and make old HMR/runtime errors look current.
 - If the server is healthy but a browser tab still shows an old overlay, close the old `localhost:3000` tabs and open a brand-new one before debugging further.
+- Playwright runs now clean generated artifacts first and refuse to reuse an already-running server by default; if you intentionally want to attach to an existing dev server, set `PLAYWRIGHT_REUSE_EXISTING_SERVER=1`.
+- If `npm run test:e2e` fails immediately with a port-in-use message, stop the stale dev server first instead of trying to reuse the old process.
 
 ## Environment Variables
 

@@ -46,6 +46,7 @@ test.describe.serial('therapist recurring pattern flow', () => {
       label: `Pattern Flow ${randomString('cycle')}`,
       startDate: addDays(new Date(), 14),
       published: false,
+      availabilityDueAt: `${formatDateKey(addDays(new Date(), 21))}T17:00:00.000Z`,
     })
     const cycleStart = cycle.start_date
     createdCycleId = cycle.id

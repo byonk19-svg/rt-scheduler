@@ -6,20 +6,16 @@ import { parseRole } from '@/lib/auth/roles'
 import { buildCallInAlertMessage, shouldCreateCallInAlert } from '@/lib/call-in-alerts'
 import { notifyUsers } from '@/lib/notifications'
 import { notifyPublishedShiftStatusChanged } from '@/lib/published-schedule-notifications'
+import {
+  isScheduleGridAssignmentStatus,
+  type ScheduleGridAssignmentStatus,
+} from '@/lib/schedule/schedule-status-model'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { writeAuditLog } from '@/lib/audit-log'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-const ASSIGNMENT_STATUS_VALUES = [
-  'scheduled',
-  'call_in',
-  'cancelled',
-  'on_call',
-  'left_early',
-] as const
-
-type AssignmentStatus = (typeof ASSIGNMENT_STATUS_VALUES)[number]
+type AssignmentStatus = ScheduleGridAssignmentStatus
 
 type UpdateAssignmentStatusRequest = {
   assignmentId?: string
@@ -80,10 +76,6 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null
 }
 
-function isAllowedAssignmentStatus(value: string): value is AssignmentStatus {
-  return ASSIGNMENT_STATUS_VALUES.includes(value as AssignmentStatus)
-}
-
 function isIncidentAssignmentStatus(value: AssignmentStatus) {
   return value === 'call_in' || value === 'cancelled' || value === 'left_early'
 }
@@ -113,7 +105,7 @@ export async function POST(request: Request) {
   const leftEarlyTimeRaw =
     typeof payload?.leftEarlyTime === 'string' ? payload.leftEarlyTime.trim() || null : null
 
-  if (!assignmentId || !status || !isAllowedAssignmentStatus(status)) {
+  if (!assignmentId || !status || !isScheduleGridAssignmentStatus(status)) {
     return NextResponse.json({ error: 'Invalid status update payload.' }, { status: 400 })
   }
 

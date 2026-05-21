@@ -178,13 +178,13 @@ export function toSeedEmail(member, domain = FUNCTIONAL_DEMO_DOMAIN) {
   return `${local}@${domain}`.toLowerCase()
 }
 
-export function buildFunctionalDemoAccounts(domain = FUNCTIONAL_DEMO_DOMAIN) {
+function buildFunctionalDemoAccounts(domain = FUNCTIONAL_DEMO_DOMAIN) {
   return FUNCTIONAL_DEMO_ROSTER.filter((member) => member.login).map((member) =>
     toSeedEmail(member, domain)
   )
 }
 
-export function getFunctionalDemoManager() {
+function getFunctionalDemoManager() {
   return FUNCTIONAL_DEMO_ROSTER.find((member) => member.role === 'manager' && member.login)
 }
 

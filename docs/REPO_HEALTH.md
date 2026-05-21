@@ -1,4 +1,4 @@
-# Repository Health Snapshot (May 13, 2026)
+# Repository Health Snapshot (May 20, 2026)
 
 ## Current Shape
 
@@ -18,31 +18,40 @@
 
 ## Quality Status
 
-Last verified on branch `codex/verify-ui-visibility`:
+Last verified on branch `codex/schedule-block-planning`:
 
+- `npm audit --omit=dev` passed (`0` vulnerabilities)
+- `npm run format:check` passed
 - `npm run lint` passed
 - `npm run typecheck` passed
 - `npm run build` passed
-- `npm run test:unit` passed (`1103` tests across `209` files)
-- `npx playwright test e2e/manager-schedule-roster.spec.ts --project=chromium --workers=1` passed (`4` tests)
-- `npx playwright test e2e/therapist-schedule-trust-smoke.spec.ts --project=chromium --workers=1` passed (`8` tests)
-- `npm run test:e2e` previously passed (`42` passed) with the checked-in Playwright worker count set to `2`
-- `npm audit --omit=dev` previously passed with `0` vulnerabilities after the lockfile bump; current local build reports `next@16.2.4`
+- `npm run test:e2e -- e2e/auth-redirect.spec.ts e2e/public-pages.spec.ts` passed (`9` tests)
+- `npm run test:e2e -- e2e/schedule-block-planning.spec.ts` passed (`1` seeded schedule smoke)
+- `npx playwright test e2e/requests-workflow.spec.ts --project=chromium --workers=1` passed (`6` tests, `1` seeded Teamwise case skipped)
+- `npx playwright test e2e/pickup-interest-concurrency.spec.ts --project=chromium --workers=1` passed (`3` seeded DB-backed pickup concurrency tests)
+
+Dependency security refresh:
+
+- `next`, `@next/env`, and `eslint-config-next` are on `16.2.6`.
+- `@sentry/nextjs` is on `10.53.1`.
+- `@supabase/supabase-js` is on `2.106.1`.
+- A targeted `fast-uri` `3.1.2` override resolves the remaining transitive production advisory.
 
 ## Known Exceptions / Gaps
 
 - `e2e/directory-date-override.spec.ts` remains intentionally removed because `/directory` is now a redirect to the team-management surface.
 - Unified Schedule grid has focused authenticated browser coverage in `e2e/manager-schedule-roster.spec.ts` for manager redirects, draft assign/unassign, lead designation, published status updates, and therapist read-only pinned rows.
+- Pickup interest primary/backup promotion now has DB-backed coverage in `e2e/pickup-interest-concurrency.spec.ts` for simultaneous interest submissions, selected claimant withdrawal, deterministic backup promotion, manager claimant denial, and clearing stale selected/pending state.
 
 ## Risk Notes
 
-- E2E tests depend on a live app server and seeded Supabase state; timing and environment isolation remain the main reliability risk.
-- Local `next dev` is stable at Playwright `workers=2`; higher parallelism has caused false negatives on this machine.
+- E2E tests depend on a live app server; seeded suites also depend on Supabase service-role env.
+- Playwright now starts through `scripts/playwright-web-server.mjs`, which cleans generated artifacts and refuses to reuse an already-running server unless `PLAYWRIGHT_REUSE_EXISTING_SERVER=1` is set.
 - Mutation trust boundaries depend on origin/referer checks; loopback alias handling (`localhost`, `127.0.0.1`, `[::1]`) should stay covered by tests.
 - If `src/app/api/schedule/drag-drop/route.ts` changes again, preserve the regression tests that prove clients cannot force or suppress post-publish audit logging.
 
 ## Suggested Next Maintenance Steps
 
-1. Run an authenticated manager Playwright smoke around Schedule assign/unassign and status-change flows.
-2. Keep route ownership and workflow docs aligned as manager surfaces evolve.
-3. Preserve dependency hygiene on the Next.js patch line; rerun `npm audit --omit=dev` after lockfile updates.
+1. Keep route ownership and workflow docs aligned as manager surfaces evolve.
+2. Preserve dependency hygiene on the Next.js patch line; rerun `npm audit --omit=dev` after lockfile updates.
+3. Run broader seeded E2E coverage before claiming full workflow coverage.

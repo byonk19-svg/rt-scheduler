@@ -8,6 +8,7 @@ type TestContext = {
 
 import { loginAs } from './helpers/auth'
 import { randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 test.describe.serial('/directory redirect behavior', () => {
@@ -55,7 +56,7 @@ test.describe.serial('/directory redirect behavior', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto('/directory', { waitUntil: 'domcontentloaded' })
+    await gotoWithRetry(page, '/directory')
     await expect(page).toHaveURL(/\/team(?:[/?].*)?$/, { timeout: 15_000 })
     await expect(page.getByRole('heading', { name: 'Managers' })).toBeVisible()
   })

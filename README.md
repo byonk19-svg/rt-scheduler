@@ -57,7 +57,7 @@ The page:
 
 ## Tech Stack
 
-- Next.js (App Router; **16.2.3**) + TypeScript + Tailwind + shadcn/ui
+- Next.js (App Router; **16.2.6**) + TypeScript + Tailwind + shadcn/ui
 - Supabase (Postgres + Auth + RLS)
 
 Local tooling noise (Playwright MCP dumps, generated `artifacts/`) is gitignored — see `.gitignore`.
@@ -283,8 +283,15 @@ Focused workflow suites:
 - `e2e/coverage-cycle-controls.spec.ts` - legacy coverage-route compatibility around cycle controls
 - `e2e/manager-specialized-controls.spec.ts` - swap partner approval and draft-cycle archive lifecycle
 - `e2e/publish-history-lifecycle.spec.ts` - publish details, delete history, and start-over lifecycle
+- `e2e/pickup-interest-concurrency.spec.ts` - seeded DB-backed pickup interest primary/backup promotion coverage
 
 These focused specs complement the broader role/workflow coverage already in the repo and are useful when debugging a single manager-facing surface.
+
+Pickup interest concurrency coverage requires a seeded Supabase/test DB environment with service-role access:
+
+```bash
+npx playwright test e2e/pickup-interest-concurrency.spec.ts --project=chromium --workers=1
+```
 
 Optional auth flow test uses:
 
@@ -398,7 +405,10 @@ Workflow: `.github/workflows/ci.yml`
 - `Playwright E2E` runs when the following repository secrets are set:
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
   - optional: `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`
+
+When all seeded Supabase secrets are present, the CI Playwright lane includes DB-backed pickup concurrency coverage. Without those secrets, CI runs reduced public/auth E2E coverage and explicitly excludes DB-backed concurrency coverage.
 
 ## Local CI Fallback (when GitHub Actions is unavailable)
 

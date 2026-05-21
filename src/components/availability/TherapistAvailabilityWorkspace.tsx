@@ -11,13 +11,32 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import type { ConflictItem } from '@/lib/availability-scheduled-conflict'
 import type { GeneratedAvailabilityBaselineDay } from '@/lib/availability-pattern-generator'
-import { addDays, formatDateLabel, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
-import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
+import { formatDateLabel, formatHumanCycleRange } from '@/lib/calendar-utils'
 import {
   buildTherapistSubmissionUiState,
   resolveTherapistDeadlinePresentation,
 } from '@/lib/therapist-availability-submission'
 import { cn } from '@/lib/utils'
+
+import {
+  applyOverrideToDraft,
+  applySelectionToDraft,
+  buildAvailabilityDraftSummary,
+  buildCopiedCycleDraft,
+  buildCycleDays,
+  buildNotesMap,
+  buildRangeDates,
+  buildStatusMap,
+  clearAvailabilityDraft,
+  getDisplayState,
+  getDisplayStateLabel,
+  hasAvailabilityDraftChanges,
+  summarizeBaseline,
+  updateDraftNote,
+  type DayStatus,
+  type NotesByDate,
+  type StatusByDate,
+} from './availability-workspace-model'
 
 type Cycle = {
   id: string
@@ -27,9 +46,6 @@ type Cycle = {
   published: boolean
   availability_due_at?: string | null
 }
-
-type DayStatus = 'force_on' | 'force_off'
-type DayDisplayState = 'normal_work' | 'normal_off' | 'can_work' | 'cannot_work' | 'not_set'
 
 type Props = {
   cycles: Cycle[]
@@ -64,58 +80,6 @@ function monthRibbonLabel(isoDate: string, previousIsoDate: string | null): stri
     return d.toLocaleDateString('en-US', { month: 'short' })
   }
   return null
-}
-
-function buildStatusMap(rows: AvailabilityEntryTableRow[]): Record<string, DayStatus> {
-  const next: Record<string, DayStatus> = {}
-  for (const row of rows) {
-    next[row.date] = row.entryType === 'force_off' ? 'force_off' : 'force_on'
-  }
-  return next
-}
-
-function buildNotesMap(rows: AvailabilityEntryTableRow[]): Record<string, string> {
-  const next: Record<string, string> = {}
-  for (const row of rows) {
-    if (row.reason?.trim()) next[row.date] = row.reason.trim()
-  }
-  return next
-}
-
-function buildCycleDays(cycle: Cycle | null): string[] {
-  if (!cycle) return []
-  const dayCount =
-    Math.floor(
-      (new Date(`${cycle.end_date}T00:00:00`).getTime() -
-        new Date(`${cycle.start_date}T00:00:00`).getTime()) /
-        (24 * 60 * 60 * 1000)
-    ) + 1
-  return Array.from({ length: Math.max(dayCount, 0) }, (_, index) =>
-    toIsoDate(addDays(new Date(`${cycle.start_date}T00:00:00`), index))
-  )
-}
-
-function sortDateKeys(values: string[]): string[] {
-  return [...values].sort((left, right) => left.localeCompare(right))
-}
-
-function getDisplayStateLabel(state: DayDisplayState): string {
-  switch (state) {
-    case 'normal_work':
-    case 'can_work':
-      return 'Need to Work'
-    case 'normal_off':
-    case 'cannot_work':
-      return 'Need Off'
-    default:
-      return 'Unmarked'
-  }
-}
-
-function buildRangeDates(cycleDays: string[], rangeStart: string, rangeEnd: string): string[] {
-  if (!rangeStart || !rangeEnd) return []
-  const ordered = [rangeStart, rangeEnd].sort((left, right) => left.localeCompare(right))
-  return cycleDays.filter((date) => date >= ordered[0] && date <= ordered[1])
 }
 
 function formatMonthDay(isoDate: string, includeYear = false): string {
@@ -219,67 +183,34 @@ export function TherapistAvailabilityWorkspace({
   const initialStatusByDate = useMemo(() => buildStatusMap(cycleRows), [cycleRows])
   const initialNotesByDate = useMemo(() => buildNotesMap(cycleRows), [cycleRows])
 
-  const [draftStatusByDate, setDraftStatusByDate] =
-    useState<Record<string, DayStatus>>(initialStatusByDate)
-  const [draftNotesByDate, setDraftNotesByDate] =
-    useState<Record<string, string>>(initialNotesByDate)
+  const [draftStatusByDate, setDraftStatusByDate] = useState<StatusByDate>(initialStatusByDate)
+  const [draftNotesByDate, setDraftNotesByDate] = useState<NotesByDate>(initialNotesByDate)
 
   const baselineByDate = useMemo(
     () => generatedBaselineByCycleId[selectedCycleId] ?? {},
     [generatedBaselineByCycleId, selectedCycleId]
   )
 
-  const canWorkDates = useMemo(
+  const { canWorkDates, cannotWorkDates, notesPayload } = useMemo(
     () =>
-      sortDateKeys(
-        Object.entries(draftStatusByDate)
-          .filter(([, status]) => status === 'force_on')
-          .map(([date]) => date)
-      ),
-    [draftStatusByDate]
-  )
-  const cannotWorkDates = useMemo(
-    () =>
-      sortDateKeys(
-        Object.entries(draftStatusByDate)
-          .filter(([, status]) => status === 'force_off')
-          .map(([date]) => date)
-      ),
-    [draftStatusByDate]
+      buildAvailabilityDraftSummary({
+        statusByDate: draftStatusByDate,
+        notesByDate: draftNotesByDate,
+      }),
+    [draftNotesByDate, draftStatusByDate]
   )
   const hasCycleSpecificChanges = canWorkDates.length > 0 || cannotWorkDates.length > 0
 
-  const notesPayload = useMemo(
+  const hasUnsavedChanges = useMemo(
     () =>
-      JSON.stringify(
-        Object.fromEntries(
-          Object.entries(draftNotesByDate)
-            .map(([date, note]) => [date, note.trim()])
-            .filter(([date, note]) => note.length > 0 && Boolean(draftStatusByDate[date]))
-        )
+      hasAvailabilityDraftChanges(
+        initialStatusByDate,
+        draftStatusByDate,
+        initialNotesByDate,
+        draftNotesByDate
       ),
-    [draftNotesByDate, draftStatusByDate]
+    [draftNotesByDate, draftStatusByDate, initialNotesByDate, initialStatusByDate]
   )
-
-  const hasUnsavedChanges = useMemo(() => {
-    const allStatusDates = new Set([
-      ...Object.keys(initialStatusByDate),
-      ...Object.keys(draftStatusByDate),
-    ])
-    for (const date of allStatusDates) {
-      if ((initialStatusByDate[date] ?? null) !== (draftStatusByDate[date] ?? null)) return true
-    }
-
-    const allNoteDates = new Set([
-      ...Object.keys(initialNotesByDate),
-      ...Object.keys(draftNotesByDate),
-    ])
-    for (const date of allNoteDates) {
-      if ((initialNotesByDate[date] ?? '').trim() !== (draftNotesByDate[date] ?? '').trim())
-        return true
-    }
-    return false
-  }, [draftNotesByDate, draftStatusByDate, initialNotesByDate, initialStatusByDate])
 
   function handleCycleChange(nextCycleId: string) {
     if (nextCycleId === selectedCycleId) return
@@ -325,63 +256,23 @@ export function TherapistAvailabilityWorkspace({
     )
   }, [selectedCycle, submissionUi])
 
-  function getBaselineStatus(date: string): 'available' | 'off' | 'neutral' {
-    return baselineByDate[date]?.baselineStatus ?? 'neutral'
-  }
-
-  function getDisplayState(date: string): DayDisplayState {
-    const overrideStatus = draftStatusByDate[date] ?? null
-    if (overrideStatus === 'force_on') return 'can_work'
-    if (overrideStatus === 'force_off') return 'cannot_work'
-
-    const baselineStatus = getBaselineStatus(date)
-    if (baselineStatus === 'available') return 'normal_work'
-    if (baselineStatus === 'off') return 'normal_off'
-    return 'not_set'
-  }
-
-  const baselineSummary = cycleDays.reduce(
-    (totals, date) => {
-      const baselineStatus = getBaselineStatus(date)
-      if (baselineStatus === 'available') totals.normalWork += 1
-      else if (baselineStatus === 'off') totals.normalOff += 1
-      else totals.notSet += 1
-      return totals
-    },
-    { normalWork: 0, normalOff: 0, notSet: 0 }
-  )
-
-  function normalizeOverride(date: string, status: DayStatus | null): DayStatus | null {
-    if (!status) return null
-    const baselineStatus = getBaselineStatus(date)
-    if (status === 'force_on' && baselineStatus === 'available') return null
-    if (status === 'force_off' && baselineStatus === 'off') return null
-    return status
-  }
+  const baselineSummary = summarizeBaseline(cycleDays, baselineByDate)
 
   function setOverride(date: string, status: DayStatus | null) {
-    const normalizedStatus = normalizeOverride(date, status)
-    setDraftStatusByDate((current) => {
-      const next = { ...current }
-      if (!normalizedStatus) delete next[date]
-      else next[date] = normalizedStatus
-      return next
+    const nextDraft = applyOverrideToDraft({
+      statusByDate: draftStatusByDate,
+      notesByDate: draftNotesByDate,
+      date,
+      status,
+      baselineByDate,
     })
-    if (!normalizedStatus) {
-      setDraftNotesByDate((current) => {
-        const next = { ...current }
-        delete next[date]
-        return next
-      })
-    }
+    setDraftStatusByDate(nextDraft.statusByDate)
+    setDraftNotesByDate(nextDraft.notesByDate)
   }
 
   function updateSelectedDateNote(note: string) {
     if (!selectedDate) return
-    setDraftNotesByDate((current) => ({
-      ...current,
-      [selectedDate]: note,
-    }))
+    setDraftNotesByDate((current) => updateDraftNote(current, selectedDate, note))
   }
 
   const rangeDates = useMemo(
@@ -395,48 +286,33 @@ export function TherapistAvailabilityWorkspace({
   )
 
   function applySelection(status: DayStatus | null) {
-    for (const date of activeSelectionDates) {
-      setOverride(date, status)
-    }
+    const nextDraft = applySelectionToDraft({
+      statusByDate: draftStatusByDate,
+      notesByDate: draftNotesByDate,
+      dates: activeSelectionDates,
+      status,
+      baselineByDate,
+    })
+    setDraftStatusByDate(nextDraft.statusByDate)
+    setDraftNotesByDate(nextDraft.notesByDate)
   }
 
   function clearOverrides() {
-    setDraftStatusByDate({})
-    setDraftNotesByDate({})
+    const nextDraft = clearAvailabilityDraft()
+    setDraftStatusByDate(nextDraft.statusByDate)
+    setDraftNotesByDate(nextDraft.notesByDate)
   }
 
   function copyPreviousCycleOverrides() {
-    const cycleIndex = cycles.findIndex((cycle) => cycle.id === selectedCycleId)
-    if (cycleIndex <= 0 || !selectedCycle) return
-
-    const previousCycle = cycles[cycleIndex - 1]
-    if (!previousCycle) return
-
-    const previousRows = availabilityRows.filter((row) => row.cycleId === previousCycle.id)
-    const copiedRows = shiftOverridesToCycle({
-      sourceOverrides: previousRows.map((row) => ({
-        date: row.date,
-        override_type: row.entryType === 'force_off' ? 'force_off' : 'force_on',
-        shift_type: row.shiftType,
-        note: row.reason ?? null,
-      })),
-      sourceCycleStart: previousCycle.start_date,
-      sourceCycleEnd: previousCycle.end_date,
-      targetCycleStart: selectedCycle.start_date,
-      targetCycleEnd: selectedCycle.end_date,
-      existingTargetDates: new Set(),
+    const nextDraft = buildCopiedCycleDraft({
+      cycles,
+      availabilityRows,
+      selectedCycleId,
+      baselineByDate,
     })
-    const nextStatus: Record<string, DayStatus> = {}
-    const nextNotes: Record<string, string> = {}
-    for (const row of copiedRows) {
-      const normalizedStatus = normalizeOverride(row.date, row.override_type)
-      if (normalizedStatus) {
-        nextStatus[row.date] = normalizedStatus
-        if (row.note?.trim()) nextNotes[row.date] = row.note.trim()
-      }
-    }
-    setDraftStatusByDate(nextStatus)
-    setDraftNotesByDate(nextNotes)
+    if (!nextDraft) return
+    setDraftStatusByDate(nextDraft.statusByDate)
+    setDraftNotesByDate(nextDraft.notesByDate)
   }
 
   const cyclePageSubtitle = useMemo(() => {
@@ -779,7 +655,7 @@ export function TherapistAvailabilityWorkspace({
 
                   <div className="grid grid-cols-7 gap-1.5 sm:col-span-7 sm:contents">
                     {week.map((date) => {
-                      const displayState = getDisplayState(date)
+                      const displayState = getDisplayState(date, draftStatusByDate, baselineByDate)
                       const showStatusLabel =
                         displayState === 'can_work' || displayState === 'cannot_work'
                       const dayIndex = cycleDays.indexOf(date)

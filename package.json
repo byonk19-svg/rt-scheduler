@@ -33,6 +33,7 @@
     "shots:sitemap": "node scripts/site-shots.mjs --mode sitemap",
     "shots:links": "node scripts/site-shots.mjs --mode links",
     "test:e2e": "playwright test",
+    "test:e2e:pickup-concurrency": "playwright test e2e/pickup-interest-concurrency.spec.ts --project=chromium --workers=1",
     "test:unit": "vitest run"
   },
   "dependencies": {
@@ -42,22 +43,21 @@
     "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-progress": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
-    "@sentry/nextjs": "^10.50.0",
+    "@sentry/nextjs": "^10.53.1",
     "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.97.0",
+    "@supabase/supabase-js": "^2.106.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
-    "next": "^16.2.4",
+    "next": "^16.2.6",
     "pdf-to-img": "^5.0.0",
-    "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
-    "@next/env": "^16.2.4",
+    "@next/env": "^16.2.6",
     "@playwright/test": "^1.56.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -66,7 +66,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "esbuild": "^0.27.3",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.4",
+    "eslint-config-next": "^16.2.6",
     "husky": "^9.1.7",
     "knip": "^6.11.0",
     "lint-staged": "^16.2.7",
@@ -80,6 +80,7 @@
     "vitest": "^4.0.18"
   },
   "overrides": {
+    "fast-uri": "3.1.2",
     "postcss": "8.5.10"
   },
   "lint-staged": {

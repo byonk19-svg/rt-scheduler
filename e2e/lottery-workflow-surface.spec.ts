@@ -48,12 +48,12 @@ test.describe.serial('lottery workflow surface', () => {
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
     await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
 
-    const scheduleNav = page.getByRole('navigation', { name: 'Schedule section navigation' })
-    const scheduleLotteryLink = scheduleNav.getByRole('link', { name: 'Lottery' })
-    await expect(scheduleLotteryLink).toBeVisible()
-    await expect(scheduleLotteryLink).toHaveAttribute('href', '/lottery')
+    const mainNav = page.getByRole('navigation', { name: 'Main navigation' })
+    const lotteryLink = mainNav.getByRole('link', { name: 'Lottery' })
+    await expect(lotteryLink).toBeVisible()
+    await expect(lotteryLink).toHaveAttribute('href', '/lottery')
 
-    const lotteryHref = await scheduleLotteryLink.getAttribute('href')
+    const lotteryHref = await lotteryLink.getAttribute('href')
     expect(lotteryHref).toBe('/lottery')
     await gotoWithRetry(page, lotteryHref!)
     await expect(page).toHaveURL(/\/lottery(?:[/?].*)?$/)
@@ -69,6 +69,6 @@ test.describe.serial('lottery workflow surface', () => {
       .getByRole('link', { name: 'Schedule' })
     await expect(scheduleMainNavLink).toHaveAttribute('aria-current', 'page')
 
-    await expect(scheduleLotteryLink).toHaveAttribute('aria-current', 'page')
+    await expect(lotteryLink).toHaveAttribute('aria-current', 'page')
   })
 })
