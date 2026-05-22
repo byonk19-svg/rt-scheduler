@@ -84,13 +84,16 @@ describe('functional demo real-roster fixture', () => {
     })
   })
 
-  it('leaves the functional demo draft block empty for Auto-draft testing', () => {
+  it('leaves the functional demo draft block empty and routes seeded staff through first-run onboarding', () => {
     const source = readFileSync(resolve(process.cwd(), 'scripts/seed-functional-demo.mjs'), 'utf8')
 
     expect(source).toContain('const draftCount = 0')
     expect(source).toContain('empty for Auto-draft testing')
     expect(source).toContain('requestAnchorEmail')
     expect(source).toContain("access_status: 'approved'")
-    expect(source).toContain('staff_onboarding_required: false')
+    expect(source).toContain(
+      "staff_onboarding_required: member.role === 'therapist' || member.role === 'lead'"
+    )
+    expect(source).toContain('staff_onboarding_completed_at: null')
   })
 })

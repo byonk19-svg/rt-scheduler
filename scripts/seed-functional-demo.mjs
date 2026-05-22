@@ -619,7 +619,7 @@ export async function seedFunctionalDemo(options = {}) {
       on_fmla: member.onFmla === true,
       fmla_return_date: null,
       access_status: 'approved',
-      staff_onboarding_required: false,
+      staff_onboarding_required: member.role === 'therapist' || member.role === 'lead',
       staff_onboarding_completed_at: null,
     }
     await upsertProfile(profileRow)

@@ -117,6 +117,8 @@ async function upsertProfile({ id, fullName, email, role, shiftType }) {
       email,
       role,
       shift_type: shiftType,
+      staff_onboarding_required: role === 'therapist' || role === 'lead',
+      staff_onboarding_completed_at: null,
     },
     { onConflict: 'id' }
   )

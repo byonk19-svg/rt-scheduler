@@ -44,4 +44,11 @@ describe('staff dashboard therapist action-center copy', () => {
     expect(staffDashboardSource).toContain('Check Schedule after the')
     expect(staffDashboardSource).toContain('next Schedule Block is published')
   })
+
+  it('keeps first-run staff out of the dashboard until onboarding is completed', () => {
+    expect(staffDashboardSource).toContain('!profile?.staff_onboarding_completed_at')
+    expect(staffDashboardSource).not.toContain(
+      'profile?.staff_onboarding_required === true && !profile?.staff_onboarding_completed_at'
+    )
+  })
 })
