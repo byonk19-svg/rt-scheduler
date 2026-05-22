@@ -1,10 +1,10 @@
 export const MAX_WORK_DAYS_PER_WEEK = 3
-export const FULL_TIME_MIN_WORK_DAYS_PER_WEEK = 3
 export const MIN_SHIFT_COVERAGE_PER_DAY = 3
 export const MAX_SHIFT_COVERAGE_PER_DAY = 5
 
-export const PART_TIME_MAX_WORK_DAYS_PER_WEEK = 2
-export const PRN_MAX_WORK_DAYS_PER_WEEK = 1
+const FULL_TIME_MIN_WORK_DAYS_PER_WEEK = 3
+const PART_TIME_MAX_WORK_DAYS_PER_WEEK = 2
+const PRN_MAX_WORK_DAYS_PER_WEEK = 1
 
 export type EmploymentType = 'full_time' | 'part_time' | 'prn'
 

@@ -48,7 +48,7 @@ export async function filterUserIdsByNotificationChannel(
   })
 }
 
-export async function createNotifications(
+async function createNotifications(
   supabase: ServerSupabaseClient,
   payloads: NotificationPayload[]
 ): Promise<void> {

@@ -118,7 +118,7 @@ export function isOpenSwapWithoutPartner(req: ShiftBoardRequest): boolean {
   )
 }
 
-export function isPickupWithResponders(req: ShiftBoardRequest): boolean {
+function isPickupWithResponders(req: ShiftBoardRequest): boolean {
   return (
     req.status === 'pending' &&
     req.type === 'pickup' &&

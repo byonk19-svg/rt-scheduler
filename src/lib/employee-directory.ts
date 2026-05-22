@@ -111,7 +111,7 @@ export function intentForTherapistOverride(
   return overrideType === 'force_off' ? 'therapist_need_off' : 'therapist_wants_work'
 }
 
-export function intentForManagerOverride(
+function intentForManagerOverride(
   overrideType: 'force_off' | 'force_on'
 ): AvailabilityOverrideIntent {
   return overrideType === 'force_off' ? 'manager_block' : 'manager_force'
@@ -194,20 +194,6 @@ export function formatEmployeeDate(value: string | null): string {
     day: 'numeric',
     year: 'numeric',
   })
-}
-
-export function normalizeEmploymentType(raw: string): EmployeeEmploymentType {
-  if (raw === 'part_time') return 'part_time'
-  if (raw === 'prn') return 'prn'
-  return 'full_time'
-}
-
-export function normalizeShiftType(raw: string): EmployeeShiftType {
-  return raw === 'night' ? 'night' : 'day'
-}
-
-export function normalizeActiveValue(raw: string): boolean {
-  return raw === 'true'
 }
 
 /** Returns true when `dateValue` falls within the cycle's inclusive date range.

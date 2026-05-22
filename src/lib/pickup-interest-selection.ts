@@ -1,23 +1,31 @@
-import { sortPickupInterestCandidates } from '@/lib/pickup-interest-presentation'
+import {
+  type PickupInterestCandidate,
+  sortPickupInterestCandidates,
+} from '@/lib/pickup-interest-presentation'
 
-export function resolvePickupApprovalCandidate(
-  request: {
-    claimedById: string | null
-    interestCandidates: Array<{
-      id: string
-      therapistId: string
-      therapistName: string
-      createdAt: string
-      status: 'pending' | 'selected'
-    }>
-  },
-  selectedInterestId: string | null
-): {
+type PickupApprovalCandidate = {
   interestId: string
   therapistId: string
   therapistName: string
   status: 'pending' | 'selected'
-} | null {
+}
+
+function toApprovalCandidate(candidate: PickupInterestCandidate): PickupApprovalCandidate {
+  return {
+    interestId: candidate.id,
+    therapistId: candidate.therapistId,
+    therapistName: candidate.therapistName,
+    status: candidate.status,
+  }
+}
+
+export function resolvePickupApprovalCandidate(
+  request: {
+    claimedById: string | null
+    interestCandidates: PickupInterestCandidate[]
+  },
+  selectedInterestId: string | null
+): PickupApprovalCandidate | null {
   if (request.claimedById) return null
 
   const candidates = sortPickupInterestCandidates(request.interestCandidates)
@@ -28,50 +36,24 @@ export function resolvePickupApprovalCandidate(
     candidates.find((item) => item.status === 'selected') ??
     candidates[0]
 
-  return {
-    interestId: candidate.id,
-    therapistId: candidate.therapistId,
-    therapistName: candidate.therapistName,
-    status: candidate.status,
-  }
+  return toApprovalCandidate(candidate)
 }
 
 export function resolveNextPickupQueueCandidate(
-  candidates: Array<{
-    id: string
-    therapistId: string
-    therapistName: string
-    createdAt: string
-    status: 'pending' | 'selected'
-  }>,
+  candidates: PickupInterestCandidate[],
   removedInterestId: string
-): {
-  interestId: string
-  therapistId: string
-  therapistName: string
-  status: 'pending' | 'selected'
-} | null {
+): PickupApprovalCandidate | null {
   const remaining = candidates.filter((candidate) => candidate.id !== removedInterestId)
   if (remaining.length === 0) return null
 
   const alreadySelected = remaining.find((candidate) => candidate.status === 'selected')
   if (alreadySelected) {
-    return {
-      interestId: alreadySelected.id,
-      therapistId: alreadySelected.therapistId,
-      therapistName: alreadySelected.therapistName,
-      status: alreadySelected.status,
-    }
+    return toApprovalCandidate(alreadySelected)
   }
 
   const nextCandidate = sortPickupInterestCandidates(remaining)[0]
 
   if (!nextCandidate) return null
 
-  return {
-    interestId: nextCandidate.id,
-    therapistId: nextCandidate.therapistId,
-    therapistName: nextCandidate.therapistName,
-    status: nextCandidate.status,
-  }
+  return toApprovalCandidate(nextCandidate)
 }

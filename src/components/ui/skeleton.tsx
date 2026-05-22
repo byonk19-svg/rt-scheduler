@@ -25,17 +25,6 @@ export function SkeletonCard({ rows = 3, className }: { rows?: number; className
   )
 }
 
-/** A metric tile skeleton (icon + number + label). */
-export function SkeletonMetricTile({ className }: { className?: string }) {
-  return (
-    <div className={cn('flex flex-col items-center gap-2 rounded-lg bg-muted p-3', className)}>
-      <Skeleton className="h-4 w-4 rounded-full" />
-      <Skeleton className="h-5 w-10" />
-      <Skeleton className="h-2.5 w-16" />
-    </div>
-  )
-}
-
 /** A list-item row skeleton (avatar + two lines of text). */
 export function SkeletonListItem({ className }: { className?: string }) {
   return (

@@ -18,26 +18,7 @@ type ActiveOperationalEntryDetailRow = ActiveOperationalEntryRow & {
   left_early_time: string | null
 }
 
-export const OPERATIONAL_CODE_VALUES = [
-  'on_call',
-  'call_in',
-  'cancelled',
-  'left_early',
-] as const satisfies ReadonlyArray<OperationalCode>
 const OPERATIONAL_CODE_SHIFT_ID_BATCH_SIZE = 100
-
-export function isOperationalCode(value: string): value is OperationalCode {
-  return OPERATIONAL_CODE_VALUES.includes(value as OperationalCode)
-}
-
-export function toLegacyShiftStatusFromOperationalCode(
-  code: OperationalCode | null,
-  fallback: ShiftStatus = 'scheduled'
-): ShiftStatus {
-  if (code === 'on_call') return 'on_call'
-  if (code === 'call_in' || code === 'cancelled') return 'called_off'
-  return fallback
-}
 
 export function isWorkingScheduledShift(params: {
   status: ShiftStatus | string | null | undefined

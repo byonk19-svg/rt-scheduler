@@ -1,4 +1,4 @@
-export const TEAM_SUCCESS_MESSAGES = {
+const TEAM_SUCCESS_MESSAGES = {
   profile_saved: 'Team member updated.',
   profile_archived: 'Team member archived.',
   roster_saved: 'Employee roster entry saved.',
@@ -10,7 +10,7 @@ export const TEAM_SUCCESS_MESSAGES = {
   imported: 'Team import completed.',
 } as const
 
-export const TEAM_ERROR_MESSAGES = {
+const TEAM_ERROR_MESSAGES = {
   missing_profile: 'Could not find that team member.',
   missing_name: 'Name is required.',
   invalid_role: 'Choose a valid role.',

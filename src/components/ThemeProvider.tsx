@@ -17,7 +17,7 @@ function applyTheme(resolvedTheme: 'light' | 'dark') {
   document.documentElement.classList.toggle('dark', resolvedTheme === 'dark')
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => getStoredTheme())
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() =>
     resolveTheme(getStoredTheme())
@@ -69,7 +69,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 export default ThemeProvider
 
-export function useTheme() {
+function useTheme() {
   const context = useContext(ThemeContext)
   if (!context) throw new Error('useTheme must be used within ThemeProvider')
   return context

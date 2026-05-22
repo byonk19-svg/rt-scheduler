@@ -41,6 +41,26 @@ describe('resolvePickupApprovalCandidate', () => {
     expect(candidate?.status).toBe('pending')
   })
 
+  it('does not replace an already accepted direct pickup recipient', () => {
+    const candidate = resolvePickupApprovalCandidate(
+      {
+        ...request,
+        claimedById: 'ther-1',
+      },
+      'interest-2'
+    )
+
+    expect(candidate).toBeNull()
+  })
+
+  it('falls back to the selected claimant when the explicit selected interest is stale', () => {
+    const candidate = resolvePickupApprovalCandidate(request, 'missing-interest')
+
+    expect(candidate?.interestId).toBe('interest-1')
+    expect(candidate?.therapistId).toBe('ther-1')
+    expect(candidate?.status).toBe('selected')
+  })
+
   it('prefers the selected primary claimant before falling back to time order', () => {
     const candidate = resolvePickupApprovalCandidate(request, null)
     expect(candidate?.interestId).toBe('interest-1')

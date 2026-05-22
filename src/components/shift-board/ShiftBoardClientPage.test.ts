@@ -197,7 +197,7 @@ describe('manager Shift Board action model', () => {
     })
 
     expect(html).toContain('Responder queue')
-    expect(html).toContain('Selected pickup responder')
+    expect(html).toContain('First responder')
     expect(html).not.toContain('Selected replacement')
     expect(html).toContain('backup responder')
     expect(html).toContain('Approve pickup')
@@ -207,7 +207,7 @@ describe('manager Shift Board action model', () => {
     expect(html).toContain('The original call-in remains on the schedule.')
     expect(html).toContain('scheduled / target')
     expect(html).toContain('No coverage risk')
-    expect(html).toContain('Selected responder')
+    expect(html).toContain('First responder')
     expect(html).toContain('Request history')
     expect(html).toContain('Decision summary')
     expect(html).toContain('scroll-mt-24')

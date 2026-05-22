@@ -146,5 +146,4 @@ function TeamWorkspaceClient({
   )
 }
 
-export { TeamWorkspaceClient }
 export default TeamWorkspaceClient

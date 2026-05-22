@@ -150,7 +150,7 @@ export function buildTherapistGridRows({
     })
 }
 
-export function markWeeklyMaxWorkDaysIneligibility({
+function markWeeklyMaxWorkDaysIneligibility({
   row,
   cycleDates,
   weeklyMax,

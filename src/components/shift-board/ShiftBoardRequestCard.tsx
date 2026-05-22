@@ -385,19 +385,19 @@ function ResponderQueue({
                 {candidate.therapistName}
               </span>
               <span
-                title={selected ? 'selected pickup responder' : 'backup responder'}
+                title={selected ? 'first responder' : 'backup responder'}
                 className={cn(
                   'mt-0.5 block text-[10px] font-bold uppercase leading-tight',
                   selected ? 'text-[var(--success-text)]' : 'text-muted-foreground'
                 )}
               >
-                {selected ? 'Selected pickup responder' : 'Backup responder'}
+                {selected ? 'First responder' : 'Backup responder'}
               </span>
             </span>
             {selected ? (
               <CheckCircle2
                 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--success)]"
-                aria-label="Selected responder"
+                aria-label="First responder"
               />
             ) : null}
           </div>
@@ -440,7 +440,7 @@ function RequestHistorySummary({
           {hasResponderHistory ? (
             <p className="mt-0.5">
               First response: {firstResponder.therapistName}
-              {selectedResponderName ? `; selected pickup responder: ${selectedResponderName}` : ''}
+              {selectedResponderName ? `; first responder: ${selectedResponderName}` : ''}
             </p>
           ) : null}
           {req.type === 'swap' && req.swapWithName ? (

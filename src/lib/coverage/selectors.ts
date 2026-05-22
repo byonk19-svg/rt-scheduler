@@ -134,27 +134,12 @@ export function countActive(day: DayItem): number {
   return flatten(day).filter((row) => row.status === 'active').length
 }
 
-export function countAssigned(day: DayItem): number {
-  return flatten(day).length
-}
-
 export function shouldShowMonthTag(index: number, isoDate: string): boolean {
   const parsed = new Date(`${isoDate}T00:00:00`)
   return index === 0 || (!Number.isNaN(parsed.getTime()) && parsed.getDate() === 1)
 }
 
 export type HeadcountThreshold = 'red' | 'yellow' | 'green'
-export type CoverageHealthTone = 'critical' | 'warning' | 'healthy'
-export type CoverageHealth = {
-  activeCount: number
-  assignedCount: number
-  tone: CoverageHealthTone
-  statusLabel: string
-  activeStaffingLabel: string
-  assignedRowsLabel: string
-  showAssignedRowsContext: boolean
-}
-export const ACTIVE_STAFFING_TARGET = 4
 export const ASSIGNED_ROWS_TARGET = 5
 
 /**
@@ -165,41 +150,4 @@ export function headcountThreshold(activeCount: number): HeadcountThreshold {
   if (activeCount < 3) return 'red'
   if (activeCount === 3) return 'yellow'
   return 'green'
-}
-
-export function getCoverageHealth(day: DayItem): CoverageHealth {
-  const activeCount = countActive(day)
-  const assignedCount = countAssigned(day)
-
-  let tone: CoverageHealthTone
-  if (day.constraintBlocked) {
-    tone = 'critical'
-  } else if (!day.leadShift) {
-    tone = activeCount > 0 ? 'warning' : 'critical'
-  } else {
-    const threshold = headcountThreshold(activeCount)
-    tone = threshold === 'green' ? 'healthy' : threshold === 'yellow' ? 'warning' : 'critical'
-  }
-
-  let statusLabel: string
-  if (day.constraintBlocked) {
-    statusLabel = 'No eligible therapists'
-  } else if (activeCount === 0) {
-    statusLabel = 'Unstaffed'
-  } else if (!day.leadShift) {
-    statusLabel = 'No lead'
-  } else {
-    const openSlots = Math.max(ACTIVE_STAFFING_TARGET - activeCount, 0)
-    statusLabel = openSlots > 0 ? `${openSlots} ${openSlots === 1 ? 'gap' : 'gaps'}` : 'Set'
-  }
-
-  return {
-    activeCount,
-    assignedCount,
-    tone,
-    statusLabel,
-    activeStaffingLabel: `${activeCount}/${ACTIVE_STAFFING_TARGET} active staffing`,
-    assignedRowsLabel: `${assignedCount}/${ASSIGNED_ROWS_TARGET} assigned rows`,
-    showAssignedRowsContext: assignedCount !== activeCount,
-  }
 }
