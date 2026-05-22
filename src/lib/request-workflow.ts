@@ -8,8 +8,8 @@ export type RequestVisibility = 'team' | 'direct'
 export type RecipientResponse = 'pending' | 'accepted' | 'declined'
 export type RequestKind = 'standard' | 'call_in'
 
-export const REQUEST_EXPIRATION_HOURS = 48
-export const REQUEST_HISTORY_STATUSES = ['approved', 'denied', 'expired', 'withdrawn'] as const
+const REQUEST_EXPIRATION_HOURS = 48
+const REQUEST_HISTORY_STATUSES = ['approved', 'denied', 'expired', 'withdrawn'] as const
 
 export type RequestShiftRow = {
   id: string
@@ -52,7 +52,7 @@ export function requestInitials(name: string): string {
     .join('')
 }
 
-export function formatRequestShortDate(isoDate: string): string {
+function formatRequestShortDate(isoDate: string): string {
   const parsed = new Date(`${isoDate}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return isoDate
   return parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -76,7 +76,7 @@ export function formatRequestRelativeTime(value: string): string {
   return rtf.format(Math.round(seconds / 86400), 'day')
 }
 
-export function isRequestOlderThanHours(value: string, hours: number): boolean {
+function isRequestOlderThanHours(value: string, hours: number): boolean {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return false
   return Date.now() - parsed.getTime() >= hours * 60 * 60 * 1000
