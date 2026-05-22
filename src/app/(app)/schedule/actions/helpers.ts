@@ -1,15 +1,12 @@
 // Private helpers shared across schedule action modules. No 'use server' — not server actions.
 
 import { parseRole } from '@/lib/auth/roles'
-import type { ShiftRole, ShiftStatus } from '@/app/schedule/types'
 import {
   MAX_WORK_DAYS_PER_WEEK,
-  MIN_SHIFT_COVERAGE_PER_DAY,
   getDefaultWeeklyLimitForEmploymentType,
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
-import { buildDateRange, coverageSlotKey, countsTowardWeeklyLimit } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 
 export async function getRoleForUser(userId: string) {
@@ -90,61 +87,4 @@ export function getPanelParam(formData: FormData): 'setup' | 'new-cycle' | 'add-
   if (panel === 'setup') return panel
   if (panel === 'new-cycle' || panel === 'add-shift') return panel
   return undefined
-}
-
-export type PreliminaryShiftLookupRow = {
-  id: string
-  cycle_id: string | null
-  user_id: string | null
-  date: string
-  shift_type: 'day' | 'night'
-  status: ShiftStatus
-  role: ShiftRole
-  profiles: { full_name: string | null } | { full_name: string | null }[] | null
-}
-
-export type PreliminaryShiftInsertRow = {
-  cycle_id: string
-  user_id: null
-  date: string
-  shift_type: 'day' | 'night'
-  status: ShiftStatus
-  role: ShiftRole
-}
-
-export function buildPreliminaryOpenShiftRows(params: {
-  cycleId: string
-  cycleStartDate: string
-  cycleEndDate: string
-  shifts: PreliminaryShiftLookupRow[]
-}): PreliminaryShiftInsertRow[] {
-  const coverageBySlot = new Map<string, number>()
-
-  for (const shift of params.shifts) {
-    if (!countsTowardWeeklyLimit(shift.status)) continue
-    const key = coverageSlotKey(shift.date, shift.shift_type)
-    coverageBySlot.set(key, (coverageBySlot.get(key) ?? 0) + 1)
-  }
-
-  const placeholders: PreliminaryShiftInsertRow[] = []
-  for (const date of buildDateRange(params.cycleStartDate, params.cycleEndDate)) {
-    for (const shiftType of ['day', 'night'] as const) {
-      const slotKey = coverageSlotKey(date, shiftType)
-      const existingCoverage = coverageBySlot.get(slotKey) ?? 0
-      const missingCoverage = Math.max(0, MIN_SHIFT_COVERAGE_PER_DAY - existingCoverage)
-
-      for (let index = 0; index < missingCoverage; index += 1) {
-        placeholders.push({
-          cycle_id: params.cycleId,
-          user_id: null,
-          date,
-          shift_type: shiftType,
-          status: 'scheduled',
-          role: 'staff',
-        })
-      }
-    }
-  }
-
-  return placeholders
 }

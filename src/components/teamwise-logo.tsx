@@ -10,7 +10,7 @@ function logoPixelSize(size: TeamwiseLogoProps['size']): number {
   return 32
 }
 
-export function TeamwiseMark({ size = 'default', className = '' }: TeamwiseLogoProps) {
+function TeamwiseMark({ size = 'default', className = '' }: TeamwiseLogoProps) {
   const pixelSize = logoPixelSize(size)
   return (
     <svg

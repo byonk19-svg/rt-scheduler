@@ -9,13 +9,13 @@ export function dateFromKey(value: string): Date {
   return new Date(year, month - 1, day)
 }
 
-export function startOfWeek(value: Date): Date {
+function startOfWeek(value: Date): Date {
   const next = new Date(value)
   next.setDate(next.getDate() - next.getDay())
   return next
 }
 
-export function endOfWeek(value: Date): Date {
+function endOfWeek(value: Date): Date {
   const next = new Date(value)
   next.setDate(next.getDate() + (6 - next.getDay()))
   return next

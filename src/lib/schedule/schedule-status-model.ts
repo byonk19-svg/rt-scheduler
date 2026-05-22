@@ -10,7 +10,7 @@ export type ScheduleGridCellStatus =
   | 'left_early'
   | 'off'
 
-export const SCHEDULE_GRID_ASSIGNMENT_STATUS_VALUES = [
+const SCHEDULE_GRID_ASSIGNMENT_STATUS_VALUES = [
   'scheduled',
   'call_in',
   'cancelled',

@@ -81,7 +81,7 @@ function summarizeAvailabilityItemRows(rows: AvailabilityEmailItemSummaryRow[]) 
   }
 }
 
-export async function refreshAvailabilityEmailIntakeBatchState(
+async function refreshAvailabilityEmailIntakeBatchState(
   supabase: SupabaseClient,
   intakeId: string
 ) {
@@ -118,7 +118,7 @@ export async function refreshAvailabilityEmailIntakeBatchState(
   }
 }
 
-export async function loadAvailabilityEmailParsingContext(supabase: SupabaseClient) {
+async function loadAvailabilityEmailParsingContext(supabase: SupabaseClient) {
   const todayKey = new Date().toISOString().slice(0, 10)
   const [{ data: profileRows }, { data: cycleRows }] = await Promise.all([
     supabase

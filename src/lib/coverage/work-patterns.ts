@@ -228,7 +228,7 @@ function getRepeatingCyclePosition(pattern: WorkPattern, date: string): WorkPatt
   return pattern.cycle_segments[pattern.cycle_segments.length - 1] ?? null
 }
 
-export function normalizeDowValues(values: number[] | null | undefined): number[] {
+function normalizeDowValues(values: number[] | null | undefined): number[] {
   if (!Array.isArray(values)) return []
   return Array.from(
     new Set(

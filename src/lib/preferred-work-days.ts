@@ -5,7 +5,7 @@ export type PreferredWorkDaysSelection = {
   days: number[]
 }
 
-export function normalizePreferredWorkDays(rawValues: FormDataEntryValue[]): number[] {
+function normalizePreferredWorkDays(rawValues: FormDataEntryValue[]): number[] {
   return Array.from(
     new Set(
       rawValues

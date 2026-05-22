@@ -65,7 +65,7 @@ export function buildCycleDays(
   )
 }
 
-export function sortDateKeys(values: string[]): string[] {
+function sortDateKeys(values: string[]): string[] {
   return [...values].sort((left, right) => left.localeCompare(right))
 }
 
@@ -92,7 +92,7 @@ export function getDisplayStateLabel(state: DayDisplayState): string {
   }
 }
 
-export function getBaselineStatus(
+function getBaselineStatus(
   baselineByDate: AvailabilityBaselineByDate,
   date: string
 ): 'available' | 'off' | 'neutral' {
@@ -131,7 +131,7 @@ export function summarizeBaseline(
   )
 }
 
-export function normalizeOverride(
+function normalizeOverride(
   date: string,
   status: DayStatus | null,
   baselineByDate: AvailabilityBaselineByDate

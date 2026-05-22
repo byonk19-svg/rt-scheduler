@@ -85,7 +85,7 @@ export function splitPlannerDatesByMode(
   }
 }
 
-export function hasDuplicatePlannerDates(dates: string[]): boolean {
+function hasDuplicatePlannerDates(dates: string[]): boolean {
   return new Set(dates).size !== dates.length
 }
 

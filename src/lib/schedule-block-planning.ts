@@ -1,6 +1,6 @@
 import { addDays, dateFromKey, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
 
-export const SCHEDULE_BLOCK_DAY_COUNT = 42
+const SCHEDULE_BLOCK_DAY_COUNT = 42
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 

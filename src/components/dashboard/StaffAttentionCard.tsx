@@ -161,4 +161,4 @@ export function StaffAttentionCard({
   )
 }
 
-export { attentionCardClasses, badgeToneClasses, dueChipToneClasses }
+export { badgeToneClasses, dueChipToneClasses }

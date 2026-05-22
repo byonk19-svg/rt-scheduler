@@ -6,13 +6,7 @@ import {
 } from '@/lib/scheduling-constants'
 import { resolveEligibility } from '@/lib/coverage/resolve-availability'
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
-import {
-  toIsoDate,
-  dateRange,
-  formatDateLabel,
-  formatDisplayDate,
-  parseLocalDate,
-} from '@/lib/calendar-utils'
+import { toIsoDate, dateRange, formatDateLabel, parseLocalDate } from '@/lib/calendar-utils'
 import type {
   AvailabilityOverrideRow,
   ScheduleSearchParams,
@@ -20,22 +14,7 @@ import type {
   ToastVariant,
 } from '@/app/schedule/types'
 
-export function getOne<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null
-  return value ?? null
-}
-
 export { toIsoDate as dateKeyFromDate, dateRange as buildDateRange, formatDateLabel as formatDate }
-
-export function formatDayNumber(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return value
-  return String(parsed.getDate())
-}
-
-export function formatWeekdayShort(value: string): string {
-  return formatDisplayDate(value, { weekday: 'short' }).charAt(0)
-}
 
 export function getWeekBoundsForDate(value: string): { weekStart: string; weekEnd: string } | null {
   const parsed = new Date(`${value}T00:00:00`)
@@ -53,7 +32,7 @@ export function getWeekBoundsForDate(value: string): { weekStart: string; weekEn
   }
 }
 
-export function getWeekdayIndex(value: string): number | null {
+function getWeekdayIndex(value: string): number | null {
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return null
   return parsed.getDay()
@@ -107,13 +86,6 @@ export function wouldExceedMaxConsecutiveDays(
   return streak > maxConsecutiveDays
 }
 
-export function getPrintShiftCode(status: string): string {
-  if (status === 'on_call') return 'OC'
-  if (status === 'sick') return 'S'
-  if (status === 'called_off') return 'OFF'
-  return '1'
-}
-
 export function isDateWithinRange(date: string, startDate: string, endDate: string): boolean {
   return date >= startDate && date <= endDate
 }
@@ -134,7 +106,7 @@ export function buildScheduleUrl(
   return query ? `/schedule?${query}` : '/schedule'
 }
 
-export function getSearchParam(value: string | string[] | undefined): string | undefined {
+function getSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
 }
