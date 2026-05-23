@@ -48,30 +48,45 @@ const SCHEDULE_TYPES: Array<{
   type: RecurringPatternType
   title: string
   detail: string
+  example: string
+  bestFor: string
+  nextStep: string
   Icon: typeof CalendarCheck
 }> = [
   {
     type: 'weekly_fixed',
     title: 'Same days weekly',
-    detail: 'You work the same days every week.',
+    detail: 'You usually work the same weekdays every week.',
+    example: 'Example: Mon, Wed, Fri.',
+    bestFor: 'Staff who usually work the same days every week.',
+    nextStep: 'Choose your normal work days.',
     Icon: CalendarCheck,
   },
   {
     type: 'weekly_with_weekend_rotation',
     title: 'Weekdays + rotating weekends',
-    detail: 'Weekdays stay the same. Weekends rotate.',
+    detail: 'Your weekdays stay mostly the same, but weekends rotate.',
+    example: 'Example: Every other weekend.',
+    bestFor: 'Staff whose weekdays are predictable but weekends alternate.',
+    nextStep: 'Choose your normal weekdays and the first weekend you work.',
     Icon: Users,
   },
   {
     type: 'repeating_cycle',
-    title: 'Repeating cycle',
-    detail: 'Your schedule repeats in a pattern.',
+    title: 'Custom repeating pattern',
+    detail: 'Your schedule follows a repeating sequence.',
+    example: 'Example: 2 on / 2 off.',
+    bestFor: 'Staff with a rotation like 2 on / 2 off, 3 on / 4 off, or Baylor.',
+    nextStep: 'Build the repeating on/off sequence.',
     Icon: RotateCcw,
   },
   {
     type: 'none',
     title: 'No set schedule',
-    detail: 'Your schedule changes often.',
+    detail: 'Your schedule changes often or is different every block.',
+    example: 'Best if your days vary a lot.',
+    bestFor: 'Staff who do not have a reliable normal pattern.',
+    nextStep: 'Start blank and mark any days you never work.',
     Icon: Shuffle,
   },
 ]
@@ -447,10 +462,15 @@ export function OnboardingScheduleSetup({
       ))}
 
       <SetupHeader step={step} />
-      <div className="mx-auto flex max-w-[96rem] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.16fr)_minmax(30rem,0.84fr)]">
-          <Card className="min-h-[45rem] gap-0 py-0 shadow-tw-md-strong">
-            <CardContent className="flex min-h-[45rem] flex-col px-5 py-5 sm:px-8 sm:py-8">
+      <div className="mx-auto flex max-w-[96rem] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(26rem,0.8fr)]">
+          <Card className="gap-0 overflow-hidden py-0 shadow-tw-md-strong">
+            <CardContent
+              className={cn(
+                'flex flex-col px-4 py-3 sm:px-5 sm:py-3.5',
+                step === 1 ? 'min-h-0' : 'min-h-[min(40rem,calc(100vh-8rem))]'
+              )}
+            >
               <div className="min-h-0 flex-1">
                 {step === 1 ? (
                   <ScheduleTypeStep
@@ -510,22 +530,26 @@ export function OnboardingScheduleSetup({
                 {step === 4 ? <ConfirmStep /> : null}
               </div>
 
-              <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/70 pt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep((current) => Math.max(1, current - 1))}
-                  disabled={step === 1}
-                  className="min-w-24"
-                >
-                  Back
-                </Button>
+              <div className="sticky bottom-0 z-10 -mx-4 mt-2.5 flex items-center justify-between gap-3 border-t border-border/70 bg-card/95 px-4 py-1.5 shadow-[0_-10px_28px_-24px_rgba(15,23,42,0.45)] backdrop-blur sm:-mx-5 sm:px-5">
+                {step === 1 ? (
+                  <span aria-hidden="true" />
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep((current) => Math.max(1, current - 1))}
+                    className="min-w-24"
+                  >
+                    Back
+                  </Button>
+                )}
                 {step < STEP_COUNT ? (
                   <Button
                     type="button"
                     onClick={() => setStep((current) => Math.min(STEP_COUNT, current + 1))}
                     disabled={step === 2 && !canContinueFromPattern}
-                    className="min-w-36"
+                    size="sm"
+                    className="min-w-32"
                   >
                     Next
                   </Button>
@@ -546,7 +570,6 @@ export function OnboardingScheduleSetup({
             step={step}
             scheduleType={scheduleType}
             previewDays={previewDays}
-            workDaysInPattern={workDaysInPattern}
             scheduleSummary={scheduleSummary}
             longestRun={longestRun}
             maxConsecutiveDays={maxConsecutiveDays}
@@ -646,10 +669,17 @@ function ScheduleTypeStep({
   selectScheduleType: (type: RecurringPatternType) => void
 }) {
   return (
-    <div className="space-y-10">
-      <h1 className="app-page-title max-w-2xl text-[1.75rem]">Pick how you usually work.</h1>
+    <div className="space-y-2.5">
+      <div className="space-y-0.5">
+        <h1 className="app-page-title max-w-2xl text-[1.38rem]">
+          What kind of schedule do you usually follow?
+        </h1>
+        <p className="max-w-2xl text-sm leading-5 text-muted-foreground">
+          This helps Teamwise build a starting pattern. You can still adjust individual days later.
+        </p>
+      </div>
 
-      <fieldset className="space-y-5">
+      <fieldset className="space-y-1.5">
         <legend className="sr-only">Schedule type</legend>
         {SCHEDULE_TYPES.map((option) => {
           const selected = scheduleType === option.type
@@ -659,37 +689,47 @@ function ScheduleTypeStep({
             <div
               key={option.type}
               className={cn(
-                'rounded-lg border px-4 py-4 transition-colors',
+                'rounded-lg border transition-colors',
                 selected
                   ? 'border-primary bg-[var(--info-subtle)] shadow-tw-sm'
-                  : 'border-border bg-card hover:border-primary/40 hover:bg-secondary/45'
+                  : 'border-border bg-card hover:border-border/90 hover:bg-muted/20'
               )}
             >
               <button
                 type="button"
                 onClick={() => selectScheduleType(option.type)}
                 aria-pressed={selected}
-                className="flex min-h-16 w-full items-center gap-5 text-left"
+                className="flex w-full items-start gap-2.5 px-2.5 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-primary/10 bg-[var(--info-subtle)] text-primary shadow-tw-2xs">
-                  <Icon className="h-7 w-7" aria-hidden="true" />
+                <span
+                  className={cn(
+                    'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-tw-2xs',
+                    selected
+                      ? 'border-primary/20 bg-background text-primary'
+                      : 'border-border/80 bg-muted/20 text-muted-foreground'
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-base font-semibold text-foreground">
-                    {option.title}
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-bold text-foreground">{option.title}</span>
                   </span>
-                  <span className="mt-1 block text-sm text-muted-foreground">{option.detail}</span>
+                  <span className="block text-sm leading-5 text-muted-foreground">
+                    {option.detail}
+                  </span>
+                  <span className="block text-xs font-medium leading-4 text-muted-foreground">
+                    {option.example}
+                  </span>
                 </span>
                 <span
                   className={cn(
-                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border',
+                    'mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
                     selected ? 'border-primary bg-primary' : 'border-border bg-background'
                   )}
                   aria-hidden="true"
                 >
-                  {selected ? (
-                    <span className="h-2.5 w-2.5 rounded-full bg-primary-foreground" />
-                  ) : null}
+                  {selected ? <Check className="h-3 w-3 text-primary-foreground" /> : null}
                 </span>
               </button>
             </div>
@@ -1098,7 +1138,6 @@ function PreviewPanel({
   step,
   scheduleType,
   previewDays,
-  workDaysInPattern,
   scheduleSummary,
   longestRun,
   maxConsecutiveDays,
@@ -1108,82 +1147,88 @@ function PreviewPanel({
   step: number
   scheduleType: RecurringPatternType
   previewDays: Array<{ date: string; status: 'available' | 'off' | 'neutral' }>
-  workDaysInPattern: number
   scheduleSummary: string
   longestRun: number
   maxConsecutiveDays: number
   neverWorkDays: number[]
   previewPulseKey: number
 }) {
-  const waitingForPattern = step === 1 && scheduleType !== 'none'
-  const previewInstruction =
-    step === 1
-      ? scheduleType === 'repeating_cycle'
-        ? 'Build your rotation on the next step.'
-        : scheduleType === 'none'
-          ? 'No fixed days selected.'
-          : 'Pick your work days on the next step.'
-      : 'Read-only preview'
+  const selectedType =
+    SCHEDULE_TYPES.find((option) => option.type === scheduleType) ?? SCHEDULE_TYPES[0]
 
   return (
     <aside
       key={previewPulseKey}
-      className="rounded-xl border border-border-light bg-card p-5 shadow-tw-md-strong motion-safe:animate-in motion-safe:fade-in-50 motion-safe:duration-300 sm:p-6 xl:sticky xl:top-5 xl:self-start"
+      className="rounded-xl border border-border-light bg-card p-3.5 shadow-tw-md-strong motion-safe:animate-in motion-safe:fade-in-50 motion-safe:duration-300 xl:sticky xl:top-2 xl:self-start"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div>
         <div>
-          <p className="app-page-title text-[1.55rem]">Preview</p>
-          <p className="mt-1 text-sm text-muted-foreground">Next 2 weeks</p>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-primary">
-            {previewInstruction}
+          <p className="app-page-title text-[1.35rem]">
+            {step === 1 ? selectedType.title : 'Preview'}
           </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {step === 1 ? selectedType.detail : 'Next 2 weeks'}
+          </p>
+          {step === 1 ? null : (
+            <p className="mt-1 text-sm font-medium leading-5 text-primary">Read-only preview</p>
+          )}
         </div>
-        <span className="rounded-md border border-primary/10 bg-[var(--info-subtle)] px-3 py-1.5 text-xs font-semibold text-primary shadow-tw-pill">
-          {waitingForPattern ? 'Not set yet' : `${workDaysInPattern} work days`}
-        </span>
       </div>
 
-      <div className="mt-7">
-        {waitingForPattern ? (
-          <div className="flex min-h-[16rem] items-center justify-center rounded-xl border border-dashed border-border bg-muted/10 px-6 text-center">
-            <div>
-              <p className="text-lg font-bold text-foreground">Set the pattern next</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                This panel updates after you choose your work days.
-              </p>
-            </div>
+      {step === 1 ? (
+        <div className="mt-3 space-y-2">
+          <div className="rounded-lg border border-border/70 bg-muted/10 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Best for
+            </p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-foreground">
+              {selectedType.bestFor}
+            </p>
           </div>
-        ) : (
-          <CalendarPreview previewDays={previewDays} />
-        )}
-      </div>
-
-      <div className="mt-6 rounded-xl border border-border/70 bg-muted/10 px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          Pattern
-        </p>
-        <p className="mt-1 text-lg font-bold text-foreground">{scheduleSummary}</p>
-        {neverWorkDays.length > 0 ? (
-          <p className="mt-2 text-sm font-medium text-[var(--error-text)]">
-            Never: {formatWeeklyPattern(neverWorkDays)}
-          </p>
-        ) : null}
-      </div>
-
-      {!waitingForPattern ? (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <PreviewMetric
-            icon={<ClipboardList className="h-6 w-6 text-primary" aria-hidden="true" />}
-            label="Longest streak"
-            value={`${longestRun} day${longestRun === 1 ? '' : 's'}`}
-          />
-          <PreviewMetric
-            icon={<ShieldCheck className="h-6 w-6 text-primary" aria-hidden="true" />}
-            label="Your limit"
-            value={`${maxConsecutiveDays} day${maxConsecutiveDays === 1 ? '' : 's'}`}
-          />
+          <div className="rounded-lg border border-border/70 bg-muted/10 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Next
+            </p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-foreground">
+              {selectedType.nextStep}
+            </p>
+          </div>
+          <div className="rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-sm font-semibold leading-5 text-[var(--success-text)]">
+            You can still mark exceptions later.
+          </div>
         </div>
-      ) : null}
+      ) : (
+        <>
+          <div className="mt-5">
+            <CalendarPreview previewDays={previewDays} />
+          </div>
+
+          <div className="mt-5 rounded-xl border border-border/70 bg-muted/10 px-4 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Pattern
+            </p>
+            <p className="mt-1 text-lg font-bold text-foreground">{scheduleSummary}</p>
+            {neverWorkDays.length > 0 ? (
+              <p className="mt-2 text-sm font-medium text-[var(--error-text)]">
+                Never: {formatWeeklyPattern(neverWorkDays)}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <PreviewMetric
+              icon={<ClipboardList className="h-6 w-6 text-primary" aria-hidden="true" />}
+              label="Longest streak"
+              value={`${longestRun} day${longestRun === 1 ? '' : 's'}`}
+            />
+            <PreviewMetric
+              icon={<ShieldCheck className="h-6 w-6 text-primary" aria-hidden="true" />}
+              label="Your limit"
+              value={`${maxConsecutiveDays} day${maxConsecutiveDays === 1 ? '' : 's'}`}
+            />
+          </div>
+        </>
+      )}
     </aside>
   )
 }

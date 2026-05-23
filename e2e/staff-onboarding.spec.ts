@@ -108,8 +108,23 @@ test.describe.serial('staff onboarding gate', () => {
       '/dashboard',
       /\/onboarding(?:[/?].*)?$/
     )
-    await expect(page.getByRole('heading', { name: 'Pick how you usually work.' })).toBeVisible()
-    await expect(page.getByText('Pick your work days on the next step.')).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'What kind of schedule do you usually follow?' })
+    ).toBeVisible()
+    await expect(
+      page.getByText(
+        'This helps Teamwise build a starting pattern. You can still adjust individual days later.'
+      )
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('complementary').getByText('Same days weekly')).toBeVisible()
+    await expect(
+      page.getByRole('complementary').getByText("Next, you'll choose your normal work days.")
+    ).toHaveCount(0)
+    await expect(
+      page.getByRole('complementary').getByText('Choose your normal work days.', { exact: true })
+    ).toBeVisible()
+    await expect(page.getByRole('complementary').getByText('PICK YOUR WORK DAYS')).toHaveCount(0)
     await page.waitForLoadState('networkidle')
 
     const rotatingWeekendsOption = page.getByRole('button', {
