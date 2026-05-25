@@ -33,6 +33,7 @@ import type { PreferredWorkDaysMode } from '@/lib/staff-onboarding'
 import { cn } from '@/lib/utils'
 
 type CycleDayState = 'work' | 'off'
+type CyclePreset = '3-3' | '4-4' | 'custom'
 
 type Props = {
   initialPattern: WorkPattern | null
@@ -77,7 +78,7 @@ const SCHEDULE_TYPES: Array<{
     title: 'Custom repeating pattern',
     detail: 'Your schedule follows a repeating sequence.',
     example: 'Example: 2 on / 2 off.',
-    bestFor: 'Staff with a rotation like 2 on / 2 off, 3 on / 4 off, or Baylor.',
+    bestFor: 'Staff with a rotation like 2 on / 2 off, 3 on / 4 off, or another repeating pattern.',
     nextStep: 'Build the repeating on/off sequence.',
     Icon: RotateCcw,
   },
@@ -154,22 +155,7 @@ function getUpcomingWeekendOptions(todayKey: string) {
 }
 
 function createDefaultCycleDays(): CycleDayState[] {
-  return [
-    'work',
-    'work',
-    'work',
-    'work',
-    'off',
-    'work',
-    'work',
-    'off',
-    'off',
-    'off',
-    'off',
-    'off',
-    'off',
-    'off',
-  ]
+  return ['work', 'work', 'work', 'off', 'off', 'off']
 }
 
 function expandCycleSegments(segments: WorkPatternCycleSegment[]): CycleDayState[] {
@@ -201,6 +187,26 @@ function formatCyclePattern(segments: WorkPatternCycleSegment[]): string {
       return `${segment.length_days} ${label}`
     })
     .join(' → ')
+}
+
+function getCyclePreset(days: CycleDayState[]): CyclePreset {
+  const key = days.join(',')
+  if (key === ['work', 'work', 'work', 'off', 'off', 'off'].join(',')) return '3-3'
+  if (key === ['work', 'work', 'work', 'work', 'off', 'off', 'off', 'off'].join(',')) {
+    return '4-4'
+  }
+
+  return 'custom'
+}
+
+function formatLongDate(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return 'Not selected'
+  return parsed.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 function formatWeeklyPattern(days: number[]): string {
@@ -291,6 +297,7 @@ export function OnboardingScheduleSetup({
   initialPreferredWorkDaysMode,
   saveAction,
 }: Props) {
+  const todayKey = useMemo(() => getTodayKey(), [])
   const [step, setStep] = useState(1)
   const [scheduleType, setScheduleType] = useState<RecurringPatternType>(
     initialPattern?.pattern_type ?? 'weekly_fixed'
@@ -303,6 +310,9 @@ export function OnboardingScheduleSetup({
     initialPattern?.pattern_type === 'repeating_cycle'
       ? expandCycleSegments(initialPattern.cycle_segments)
       : createDefaultCycleDays()
+  )
+  const [cycleAnchorDate, setCycleAnchorDate] = useState(
+    initialPattern?.cycle_anchor_date ?? todayKey
   )
   const [weekendAnchorDate, setWeekendAnchorDate] = useState(
     initialPattern?.weekend_anchor_date ?? ''
@@ -317,7 +327,6 @@ export function OnboardingScheduleSetup({
     )
   )
 
-  const todayKey = useMemo(() => getTodayKey(), [])
   const cycleSegments = useMemo(() => compactCycleDays(cycleDays), [cycleDays])
   const weekendOptions = useMemo(() => getUpcomingWeekendOptions(todayKey), [todayKey])
   const effectivePreferredDays = preferredDays.filter((day) => !neverWorkDays.includes(day))
@@ -361,16 +370,16 @@ export function OnboardingScheduleSetup({
         scheduleType === 'weekly_with_weekend_rotation' && weekendAnchorDate.trim().length > 0
           ? weekendAnchorDate
           : null,
-      cycle_anchor_date: scheduleType === 'repeating_cycle' ? todayKey : null,
+      cycle_anchor_date: scheduleType === 'repeating_cycle' ? cycleAnchorDate : null,
       cycle_segments: scheduleType === 'repeating_cycle' ? cycleSegments : [],
     })
   }, [
     cycleSegments,
+    cycleAnchorDate,
     effectiveWeeklyDays,
     initialPattern?.therapist_id,
     neverWorkDays,
     scheduleType,
-    todayKey,
     weekendAnchorDate,
   ])
 
@@ -378,7 +387,9 @@ export function OnboardingScheduleSetup({
     const cycleStart =
       scheduleType === 'weekly_fixed' || scheduleType === 'weekly_with_weekend_rotation'
         ? getMondayOnOrBeforeKey(todayKey)
-        : todayKey
+        : scheduleType === 'repeating_cycle'
+          ? cycleAnchorDate
+          : todayKey
     const cycleEnd = toIsoDate(addDays(new Date(`${cycleStart}T00:00:00`), 13))
     const baseline = buildCycleAvailabilityBaseline({
       cycleStart,
@@ -390,7 +401,7 @@ export function OnboardingScheduleSetup({
       date,
       status: value.baselineStatus,
     }))
-  }, [previewPattern, scheduleType, todayKey])
+  }, [cycleAnchorDate, previewPattern, scheduleType, todayKey])
 
   const workDaysInPattern =
     scheduleType === 'none'
@@ -426,7 +437,7 @@ export function OnboardingScheduleSetup({
   const canContinueFromPattern =
     scheduleType === 'none' ||
     ((scheduleType === 'repeating_cycle'
-      ? workDaysInPattern > 0 && offDaysInCycle > 0
+      ? workDaysInPattern > 0 && offDaysInCycle > 0 && cycleAnchorDate.trim().length > 0
       : effectiveWeeklyDays.length > 0) &&
       (scheduleType !== 'weekly_with_weekend_rotation' || weekendAnchorDate.trim().length > 0))
 
@@ -499,7 +510,7 @@ export function OnboardingScheduleSetup({
         value={scheduleType === 'weekly_with_weekend_rotation' ? 'every_other_weekend' : 'none'}
       />
       <input type="hidden" name="weekend_anchor_date" value={weekendAnchorDate} />
-      <input type="hidden" name="cycle_anchor_date" value={todayKey} />
+      <input type="hidden" name="cycle_anchor_date" value={cycleAnchorDate} />
       <input type="hidden" name="cycle_segments_json" value={JSON.stringify(cycleSegments)} />
       <input type="hidden" name="max_consecutive_days" value={maxConsecutiveDays} />
       <input type="hidden" name="preferred_work_days_mode" value={preferredWorkDaysMode} />
@@ -556,13 +567,14 @@ export function OnboardingScheduleSetup({
                     workDaysInPattern={workDaysInPattern}
                     offDaysInCycle={offDaysInCycle}
                     longestRun={longestRun}
-                    maxConsecutiveDays={maxConsecutiveDays}
                     hasConsecutiveWarning={hasConsecutiveWarning}
                     problemCycleDayIndexes={problemCycleDayIndexes}
                     toggleCycleDay={toggleCycleDay}
                     addCycleDay={addCycleDay}
                     removeCycleDay={removeCycleDay}
                     applyCyclePreset={applyCyclePreset}
+                    cycleAnchorDate={cycleAnchorDate}
+                    setCycleAnchorDate={setCycleAnchorDate}
                     neverWorkDays={neverWorkDays}
                     toggleNeverWorkDay={toggleNeverWorkDay}
                   />
@@ -999,10 +1011,11 @@ function WeeklyPatternStep({
 function RepeatingCycleStep({
   cycleDays,
   cycleSegments,
+  cycleAnchorDate,
+  setCycleAnchorDate,
   workDaysInPattern,
   offDaysInCycle,
   longestRun,
-  maxConsecutiveDays,
   hasConsecutiveWarning,
   problemCycleDayIndexes,
   toggleCycleDay,
@@ -1014,10 +1027,11 @@ function RepeatingCycleStep({
 }: {
   cycleDays: CycleDayState[]
   cycleSegments: WorkPatternCycleSegment[]
+  cycleAnchorDate: string
+  setCycleAnchorDate: (value: string) => void
   workDaysInPattern: number
   offDaysInCycle: number
   longestRun: number
-  maxConsecutiveDays: number
   hasConsecutiveWarning: boolean
   problemCycleDayIndexes: number[]
   toggleCycleDay: (index: number) => void
@@ -1027,75 +1041,155 @@ function RepeatingCycleStep({
   neverWorkDays: number[]
   toggleNeverWorkDay: (day: number) => void
 }) {
+  const selectedPreset = getCyclePreset(cycleDays)
+
   return (
-    <div className="space-y-7">
+    <div className="space-y-4">
       <div>
-        <h1 className="app-page-title text-[1.75rem]">Build your pattern</h1>
-        <p className="mt-2 text-sm text-muted-foreground">This is your normal schedule.</p>
+        <h1 className="app-page-title text-[1.45rem]">Build your repeating work/off pattern</h1>
+        <p className="mt-1 text-sm leading-5 text-muted-foreground">
+          Use this for rotations like 3 on / 3 off, 4 on / 4 off, or other repeating patterns.
+        </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => applyCyclePreset('3-3')}>
-          3 on / 3 off
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => applyCyclePreset('4-4')}>
-          4 on / 4 off
-        </Button>
-        <span className="inline-flex min-h-9 items-center rounded-md border border-border/80 bg-muted/20 px-3 text-sm font-medium text-muted-foreground">
-          Custom: tap days below
-        </span>
-      </div>
-
-      <div className="overflow-x-auto pb-2">
-        <div className="flex min-w-max gap-2">
-          {cycleDays.map((day, index) => (
-            <button
-              key={`cycle-day-${index}`}
-              type="button"
-              onClick={() => toggleCycleDay(index)}
-              className={cn(
-                'flex h-24 w-20 shrink-0 flex-col items-center justify-center rounded-xl border text-sm transition-colors',
-                day === 'work'
-                  ? 'border-primary bg-primary text-primary-foreground shadow-tw-pill'
-                  : 'border-border bg-muted/40 text-muted-foreground',
-                problemCycleDayIndexes.includes(index) &&
-                  'border-[var(--warning-border)] ring-2 ring-[var(--warning-border)] ring-offset-2 ring-offset-background'
-              )}
-            >
-              <span className="text-xs font-medium">Day {index + 1}</span>
-              <span className="mt-2 text-base font-bold">{day === 'work' ? 'Work' : 'Off'}</span>
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={addCycleDay}
-            className="flex h-24 w-16 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-primary/60 bg-[var(--info-subtle)] text-primary transition-colors hover:border-primary"
-            aria-label="Add pattern day"
-          >
-            <Plus className="h-5 w-5" aria-hidden="true" />
-            <span className="mt-1 text-xs font-semibold">Add</span>
-          </button>
+      <div className="rounded-xl border border-border/80 bg-muted/10 px-4 py-3">
+        <label htmlFor="onboarding-cycle-anchor" className="text-sm font-semibold text-foreground">
+          Pattern starts on
+        </label>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Day 1 starts on this date. The preview uses this as the beginning of your rotation.
+        </p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            id="onboarding-cycle-anchor"
+            type="date"
+            value={cycleAnchorDate}
+            onChange={(event) => setCycleAnchorDate(event.target.value)}
+            className="h-10 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:w-48"
+          />
+          <p className="text-sm font-medium text-primary">
+            Day 1: {formatLongDate(cycleAnchorDate)}
+          </p>
         </div>
       </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={removeCycleDay}
-        disabled={cycleDays.length <= 1}
-      >
-        <Minus className="h-4 w-4" aria-hidden="true" />
-        Remove day
-      </Button>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold text-foreground">Choose a preset</legend>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[
+            {
+              id: '3-3' as const,
+              title: '3 on / 3 off',
+              detail: 'Work 3 days, off 3 days.',
+              onSelect: () => applyCyclePreset('3-3'),
+            },
+            {
+              id: '4-4' as const,
+              title: '4 on / 4 off',
+              detail: 'Work 4 days, off 4 days.',
+              onSelect: () => applyCyclePreset('4-4'),
+            },
+            {
+              id: 'custom' as const,
+              title: 'Custom',
+              detail: 'Tap days below to edit.',
+              onSelect: undefined,
+            },
+          ].map((preset) => {
+            const selected = selectedPreset === preset.id
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={preset.onSelect}
+                aria-pressed={selected}
+                className={cn(
+                  'min-h-20 rounded-lg border px-3 py-2 text-left transition-colors',
+                  selected
+                    ? 'border-primary bg-[var(--info-subtle)] text-primary shadow-tw-sm'
+                    : 'border-border/80 bg-card text-foreground hover:bg-secondary/35'
+                )}
+              >
+                <span className="flex items-center justify-between gap-2 text-sm font-bold">
+                  {preset.title}
+                  {selected ? <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+                </span>
+                <span
+                  className={cn(
+                    'mt-1 block text-xs',
+                    selected ? 'font-semibold text-primary' : 'text-muted-foreground'
+                  )}
+                >
+                  {preset.detail}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </fieldset>
 
-      <NeverWorkDaysPicker selectedDays={neverWorkDays} toggleDay={toggleNeverWorkDay} />
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold text-foreground">Pattern sequence</legend>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 xl:grid-cols-7">
+          {cycleDays.map((day, index) => {
+            const isWork = day === 'work'
+            return (
+              <button
+                key={`cycle-day-${index}`}
+                type="button"
+                onClick={() => toggleCycleDay(index)}
+                aria-pressed={isWork}
+                className={cn(
+                  'flex min-h-16 flex-col items-center justify-center rounded-lg border px-2 text-sm transition-colors',
+                  isWork
+                    ? 'border-primary bg-primary text-primary-foreground shadow-tw-pill'
+                    : 'border-border bg-muted/35 text-muted-foreground hover:bg-muted/50',
+                  problemCycleDayIndexes.includes(index) &&
+                    'border-[var(--warning-border)] ring-2 ring-[var(--warning-border)] ring-offset-2 ring-offset-background'
+                )}
+              >
+                <span className="text-xs font-medium">Day {index + 1}</span>
+                <span className="mt-1 text-base font-bold">{isWork ? 'Work' : 'Off'}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button
+            type="button"
+            onClick={addCycleDay}
+            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-dashed border-primary/60 bg-[var(--info-subtle)] px-3 text-sm font-semibold text-primary transition-colors hover:border-primary"
+            aria-label="Add pattern day"
+          >
+            <Plus className="h-5 w-5" aria-hidden="true" />
+            Add day
+          </button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={removeCycleDay}
+            disabled={cycleDays.length <= 1}
+          >
+            <Minus className="h-4 w-4" aria-hidden="true" />
+            Remove day
+          </Button>
+        </div>
+      </fieldset>
 
       <div className="rounded-xl border border-border/80 bg-muted/15 px-4 py-4">
         {hasConsecutiveWarning ? (
-          <ConsecutiveDaysWarning longestRun={longestRun} maxConsecutiveDays={maxConsecutiveDays} />
+          <div className="mb-3 rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-sm text-[var(--warning-text)]">
+            <p className="font-bold">This pattern needs a {longestRun}-day max streak.</p>
+            <p className="mt-1">
+              You can change the max streak in Preferences next, or tap days above to shorten it.
+            </p>
+          </div>
         ) : null}
-        <div className="grid gap-2 text-sm sm:grid-cols-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Summary
+        </p>
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-4">
           <p>
             <span className="font-bold text-foreground">{cycleDays.length}-day pattern</span>
           </p>
@@ -1105,12 +1199,20 @@ function RepeatingCycleStep({
           <p>
             <span className="font-bold text-foreground">{offDaysInCycle}</span> off
           </p>
-          <p className="sm:col-span-3">
+          <p>
+            Longest streak:{' '}
+            <span className="font-bold text-foreground">
+              {longestRun} day{longestRun === 1 ? '' : 's'}
+            </span>
+          </p>
+          <p className="sm:col-span-4">
             <span className="font-bold text-foreground">Pattern:</span>{' '}
             {formatCyclePattern(cycleSegments)}
           </p>
         </div>
       </div>
+
+      <NeverWorkDaysPicker selectedDays={neverWorkDays} toggleDay={toggleNeverWorkDay} collapsed />
     </div>
   )
 }

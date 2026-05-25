@@ -109,6 +109,59 @@ test.describe.serial('staff onboarding gate', () => {
     }
   })
 
+  test('new therapist can understand the custom repeating pattern builder', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required.')
+
+    await loginAsAndGoTo(
+      page,
+      ctx!.therapist.email,
+      ctx!.therapist.password,
+      '/dashboard',
+      /\/onboarding(?:[/?].*)?$/
+    )
+    await page.waitForLoadState('networkidle')
+
+    const customPatternOption = page.getByRole('button', { name: /Custom repeating pattern/i })
+    await customPatternOption.click()
+    await expect(customPatternOption).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+
+    await expect(
+      page.getByRole('heading', { name: 'Build your repeating work/off pattern' })
+    ).toBeVisible()
+    await expect(page.getByText('Pattern starts on')).toBeVisible()
+    await expect(page.getByLabel('Pattern starts on')).toHaveValue(formatDateKey(new Date()))
+    await expect(page.getByText('Day 1:')).toContainText(
+      new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    )
+
+    await expect(page.getByRole('button', { name: /3 on \/ 3 off/i })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    await expect(page.getByRole('button', { name: /4 on \/ 4 off/i })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
+    await expect(page.getByText('Too many consecutive days')).toHaveCount(0)
+    await expect(page.getByText('6-day pattern')).toBeVisible()
+    await expect(page.getByText('3 work')).toBeVisible()
+    await expect(page.getByText('3 off', { exact: true })).toBeVisible()
+    await expect(page.getByText('Longest streak:')).toBeVisible()
+    await expect(page.getByText('Pattern: 3 on')).toBeVisible()
+    await expect(page.getByText('Advanced: days you are never available')).toBeVisible()
+    await expect(page.locator('details')).not.toHaveAttribute('open')
+
+    await page.getByRole('button', { name: /4 on \/ 4 off/i }).click()
+    await expect(page.getByRole('button', { name: /4 on \/ 4 off/i })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    await expect(page.getByText('This pattern needs a 4-day max streak.')).toBeVisible()
+    await expect(page.getByText('You can change the max streak in Preferences next')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeEnabled()
+  })
+
   test('new therapist sets rotating weekends and hard never-work days during onboarding', async ({
     page,
   }) => {
