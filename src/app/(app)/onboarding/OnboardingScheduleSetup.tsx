@@ -226,6 +226,18 @@ function formatWeeklyPattern(days: number[]): string {
   return sortedDays.join(', ')
 }
 
+function formatOptionalWeeklyPattern(days: number[], emptyLabel: string): string {
+  return days.length > 0 ? formatWeeklyPattern(days) : emptyLabel
+}
+
+function formatConsecutiveDays(value: number): string {
+  return `${value} day${value === 1 ? '' : 's'}`
+}
+
+function getConfirmRowId(label: string): string {
+  return `confirm-row-${label.toLowerCase().replace(/\s+/g, '-')}`
+}
+
 function formatShortWeekday(value: string): string {
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return ''
@@ -619,7 +631,20 @@ export function OnboardingScheduleSetup({
                   />
                 ) : null}
 
-                {step === 4 ? <ConfirmStep /> : null}
+                {step === 4 ? (
+                  <ConfirmStep
+                    scheduleType={scheduleType}
+                    rotatingWeekdayMode={rotatingWeekdayMode}
+                    effectiveWeeklyDays={effectiveWeeklyDays}
+                    cycleSegments={cycleSegments}
+                    cycleAnchorDate={cycleAnchorDate}
+                    weekendAnchorLabel={formatWeekendAnchorRange(weekendAnchorDate)}
+                    maxConsecutiveDays={maxConsecutiveDays}
+                    preferredDays={effectivePreferredDays}
+                    neverWorkDays={neverWorkDays}
+                    setStep={setStep}
+                  />
+                ) : null}
               </div>
 
               <div className="sticky bottom-0 z-10 -mx-4 mt-2.5 flex items-center justify-between gap-3 border-t border-border/70 bg-card/95 px-4 py-1.5 shadow-[0_-10px_28px_-24px_rgba(15,23,42,0.45)] backdrop-blur sm:-mx-5 sm:px-5">
@@ -1484,13 +1509,138 @@ function NeverWorkDaysPicker({
   )
 }
 
-function ConfirmStep() {
+function ConfirmStep({
+  scheduleType,
+  rotatingWeekdayMode,
+  effectiveWeeklyDays,
+  cycleSegments,
+  cycleAnchorDate,
+  weekendAnchorLabel,
+  maxConsecutiveDays,
+  preferredDays,
+  neverWorkDays,
+  setStep,
+}: {
+  scheduleType: RecurringPatternType
+  rotatingWeekdayMode: RotatingWeekdayMode
+  effectiveWeeklyDays: number[]
+  cycleSegments: WorkPatternCycleSegment[]
+  cycleAnchorDate: string
+  weekendAnchorLabel: string
+  maxConsecutiveDays: number
+  preferredDays: number[]
+  neverWorkDays: number[]
+  setStep: (step: number) => void
+}) {
+  const scheduleTypeLabel =
+    SCHEDULE_TYPES.find((option) => option.type === scheduleType)?.title ?? 'Schedule'
+  const patternRows =
+    scheduleType === 'weekly_with_weekend_rotation'
+      ? [
+          {
+            label: 'Weekdays',
+            value:
+              rotatingWeekdayMode === 'flexible'
+                ? 'Flexible'
+                : formatOptionalWeeklyPattern(effectiveWeeklyDays, 'Not selected'),
+            editStep: 2,
+          },
+          { label: 'Weekend rotation', value: 'Every other weekend', editStep: 2 },
+          {
+            label: 'First working weekend',
+            value: weekendAnchorLabel || 'Not selected',
+            editStep: 2,
+          },
+        ]
+      : scheduleType === 'weekly_fixed'
+        ? [
+            {
+              label: 'Fixed weekdays',
+              value: formatOptionalWeeklyPattern(effectiveWeeklyDays, 'Not selected'),
+              editStep: 2,
+            },
+          ]
+        : scheduleType === 'repeating_cycle'
+          ? [
+              { label: 'Pattern', value: formatCyclePattern(cycleSegments), editStep: 2 },
+              { label: 'Pattern starts', value: formatLongDate(cycleAnchorDate), editStep: 2 },
+            ]
+          : [{ label: 'Weekdays', value: 'Flexible', editStep: 2 }]
+
   return (
-    <div className="flex min-h-[30rem] flex-col justify-center space-y-4">
-      <h1 className="app-page-title text-[1.75rem]">{"You're all set"}</h1>
-      <p className="max-w-md text-base text-muted-foreground">
-        Your schedule is ready. You can adjust anything anytime.
-      </p>
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <h1 className="app-page-title text-[1.75rem]">Does this look right?</h1>
+        <p className="max-w-2xl text-base text-muted-foreground">
+          Review your schedule setup before Teamwise saves it.
+        </p>
+      </div>
+
+      <dl className="divide-y divide-border/70 rounded-xl border border-border/80 bg-card">
+        <ConfirmSummaryRow
+          label="Schedule type"
+          value={scheduleTypeLabel}
+          editStep={1}
+          setStep={setStep}
+        />
+        {patternRows.map((row) => (
+          <ConfirmSummaryRow
+            key={row.label}
+            label={row.label}
+            value={row.value}
+            editStep={row.editStep}
+            setStep={setStep}
+          />
+        ))}
+        <ConfirmSummaryRow
+          label="Maximum days in a row"
+          value={formatConsecutiveDays(maxConsecutiveDays)}
+          editStep={3}
+          setStep={setStep}
+        />
+        <ConfirmSummaryRow
+          label="Preferred work days"
+          value={formatOptionalWeeklyPattern(preferredDays, 'Any day')}
+          editStep={3}
+          setStep={setStep}
+        />
+        <ConfirmSummaryRow
+          label="Never available"
+          value={formatOptionalWeeklyPattern(neverWorkDays, 'None')}
+          editStep={2}
+          setStep={setStep}
+        />
+      </dl>
+    </div>
+  )
+}
+
+function ConfirmSummaryRow({
+  label,
+  value,
+  editStep,
+  setStep,
+}: {
+  label: string
+  value: string
+  editStep: number
+  setStep: (step: number) => void
+}) {
+  return (
+    <div
+      className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,13rem)_1fr_auto] sm:items-center"
+      data-testid={getConfirmRowId(label)}
+    >
+      <dt className="text-sm font-semibold text-muted-foreground">{label}</dt>
+      <dd className="text-base font-semibold text-foreground">{value}</dd>
+      <button
+        type="button"
+        onClick={() => setStep(editStep)}
+        className="w-fit rounded-md px-2 py-1 text-sm font-semibold text-primary transition-colors hover:bg-[var(--info-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        aria-label={`Edit ${label.toLowerCase()}`}
+      >
+        Edit
+      </button>
     </div>
   )
 }

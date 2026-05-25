@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { addDays, formatDateKey, randomString } from './helpers/env'
@@ -19,6 +19,18 @@ function nextSaturdayKey() {
   return formatDateKey(addDays(today, offset))
 }
 
+function nextWeekendRangeLabel() {
+  const saturday = new Date(`${nextSaturdayKey()}T00:00:00`)
+  const sunday = addDays(saturday, 1)
+  const saturdayMonth = saturday.toLocaleDateString('en-US', { month: 'short' })
+  const sundayMonth = sunday.toLocaleDateString('en-US', { month: 'short' })
+  const saturdayDay = saturday.getDate()
+  const sundayDay = sunday.getDate()
+
+  if (saturdayMonth === sundayMonth) return `${saturdayMonth} ${saturdayDay}-${sundayDay}`
+  return `${saturdayMonth} ${saturdayDay}-${sundayMonth} ${sundayDay}`
+}
+
 function selectedWeekendPreviewWeek() {
   const today = new Date()
   const dayOfWeek = today.getDay()
@@ -30,6 +42,12 @@ function selectedWeekendPreviewWeek() {
   )
 
   return Math.floor(diffDays / 7) + 1
+}
+
+async function expectConfirmRow(page: Page, label: string, value: string) {
+  const row = page.getByTestId(`confirm-row-${label.toLowerCase().replace(/\s+/g, '-')}`)
+  await expect(row).toContainText(label)
+  await expect(row.getByText(value, { exact: true })).toBeVisible()
 }
 
 test.describe.serial('staff onboarding gate', () => {
@@ -267,7 +285,14 @@ test.describe.serial('staff onboarding gate', () => {
     await page.getByLabel('Maximum days in a row').selectOption('4')
     await page.getByRole('button', { name: 'Next', exact: true }).click()
 
-    await expect(page.getByRole('heading', { name: "You're all set" })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Does this look right?' })).toBeVisible()
+    await expectConfirmRow(page, 'Schedule type', 'Rotating weekends')
+    await expectConfirmRow(page, 'Weekdays', 'Mon, Wed, Fri')
+    await expectConfirmRow(page, 'Weekend rotation', 'Every other weekend')
+    await expectConfirmRow(page, 'First working weekend', nextWeekendRangeLabel())
+    await expectConfirmRow(page, 'Maximum days in a row', '4 days')
+    await expectConfirmRow(page, 'Preferred work days', 'Any day')
+    await expectConfirmRow(page, 'Never available', 'Tue')
     await page.getByRole('button', { name: 'View my schedule' }).click()
     await expect(page).toHaveURL(
       /(?:\/onboarding\?success=setup_complete|\/dashboard(?:\/staff)?\?success=onboarding_complete)/,
@@ -339,14 +364,24 @@ test.describe.serial('staff onboarding gate', () => {
 
     await page.getByRole('button', { name: 'Next', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Preferences' })).toBeVisible()
-    await page.getByRole('checkbox', { name: 'Mon' }).check()
-    await page.getByRole('checkbox', { name: 'Wed' }).check()
-    await page.getByRole('checkbox', { name: 'Fri' }).check()
+    await page.getByRole('checkbox', { name: 'Tue' }).check()
+    await page.getByRole('checkbox', { name: 'Thu' }).check()
     await expect(page.getByRole('complementary').getByText('Preferred work days:')).toBeVisible()
-    await expect(page.getByRole('complementary').getByText('Mon, Wed, Fri')).toBeVisible()
+    await expect(page.getByRole('complementary').getByText('Tue, Thu')).toBeVisible()
     await page.getByRole('button', { name: 'Next', exact: true }).click()
 
-    await expect(page.getByRole('heading', { name: "You're all set" })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Does this look right?' })).toBeVisible()
+    await expectConfirmRow(page, 'Schedule type', 'Rotating weekends')
+    await expectConfirmRow(page, 'Weekdays', 'Flexible')
+    await expectConfirmRow(page, 'Weekend rotation', 'Every other weekend')
+    await expectConfirmRow(page, 'First working weekend', nextWeekendRangeLabel())
+    await expectConfirmRow(page, 'Maximum days in a row', '3 days')
+    await expectConfirmRow(page, 'Preferred work days', 'Tue, Thu')
+    await expectConfirmRow(page, 'Never available', 'None')
+    await page.getByRole('button', { name: 'Edit preferred work days' }).click()
+    await expect(page.getByRole('heading', { name: 'Preferences' })).toBeVisible()
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Does this look right?' })).toBeVisible()
     await page.getByRole('button', { name: 'View my schedule' }).click()
     await expect(page).toHaveURL(
       /(?:\/onboarding\?success=setup_complete|\/dashboard(?:\/staff)?\?success=onboarding_complete)/,
@@ -378,7 +413,7 @@ test.describe.serial('staff onboarding gate', () => {
       .single()
 
     expect(profileResult.error).toBeNull()
-    expect(profileResult.data?.preferred_work_days).toEqual([1, 3, 5])
+    expect(profileResult.data?.preferred_work_days).toEqual([2, 4])
     expect(profileResult.data?.preferred_work_days_mode).toBe('specific_days')
     expect(profileResult.data?.staff_onboarding_completed_at).toBeTruthy()
   })
