@@ -14,8 +14,21 @@ type StaffOnboardingContext = {
 
 function nextSaturdayKey() {
   const today = new Date()
-  const daysUntilSaturday = (6 - today.getDay() + 7) % 7
-  return formatDateKey(addDays(today, daysUntilSaturday))
+  const offset = (6 - today.getDay() + 7) % 7
+  return formatDateKey(addDays(today, offset))
+}
+
+function selectedWeekendPreviewWeek() {
+  const today = new Date()
+  const dayOfWeek = today.getDay()
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const previewStart = addDays(today, mondayOffset)
+  const selectedSaturday = new Date(`${nextSaturdayKey()}T00:00:00`)
+  const diffDays = Math.round(
+    (selectedSaturday.getTime() - previewStart.getTime()) / (1000 * 60 * 60 * 24)
+  )
+
+  return Math.floor(diffDays / 7) + 1
 }
 
 test.describe.serial('staff onboarding gate', () => {
@@ -134,26 +147,46 @@ test.describe.serial('staff onboarding gate', () => {
     await expect(rotatingWeekendsOption).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('button', { name: 'Next', exact: true }).click()
 
-    await expect(page.getByRole('heading', { name: 'Tap your work days' })).toBeVisible()
-    await page.getByRole('button', { name: /^Mon$/ }).click()
-    await page.getByRole('button', { name: /^Tue$/ }).click()
-    await page.getByRole('button', { name: /^Wed$/ }).click()
-    await page.getByRole('button', { name: /^Thu$/ }).click()
-    await page.getByRole('button', { name: /^Fri$/ }).click()
+    await expect(
+      page.getByRole('heading', { name: 'Choose your weekdays and weekend rotation' })
+    ).toBeVisible()
+    await expect(page.getByText('Weekends are set by your rotation below.')).toBeVisible()
+    await page.getByRole('button', { name: /^Mon\s+Off/ }).click()
+    await page.getByRole('button', { name: /^Tue\s+Off/ }).click()
+    await page.getByRole('button', { name: /^Wed\s+Off/ }).click()
+    await page.getByRole('button', { name: /^Thu\s+Off/ }).click()
+    await page.getByRole('button', { name: /^Fri\s+Off/ }).click()
     await expect(page.getByText('Too many consecutive days')).toHaveCount(1)
     await expect(
       page.getByRole('complementary').getByText('Too many consecutive days')
     ).toHaveCount(0)
     await expect(page.getByText('Turn off 2 work days in this streak')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Fix it for me' })).toHaveCount(0)
-    await page.getByRole('button', { name: /^Thu$/ }).click()
+    await page.getByRole('button', { name: /^Thu\s+Work/ }).click()
     await expect(page.getByText('Too many consecutive days')).toHaveCount(0)
-    await page.getByRole('button', { name: /^Tue$/ }).click()
+    await page.getByRole('button', { name: /^Tue\s+Work/ }).click()
 
-    const anchorDate = nextSaturdayKey()
-    await page.getByLabel('First weekend you work').fill(anchorDate)
+    await expect(page.getByText('Choose the first working weekend.', { exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('complementary').getByText('Weekend rotation not set yet.')
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeDisabled()
+    const weekendGroup = page.getByRole('group', { name: 'First working weekend' })
+    await expect(weekendGroup.getByRole('button').first()).toContainText('Starts rotation')
+    await weekendGroup.getByRole('button').first().click()
+    await expect(weekendGroup.getByRole('button').first()).toHaveAttribute('aria-pressed', 'true')
+    const selectedPreviewWeek = selectedWeekendPreviewWeek()
+    const alternatePreviewWeek = selectedPreviewWeek === 1 ? 2 : 1
+    await expect(page.locator(`[aria-label="Week ${selectedPreviewWeek} Sat Work"]`)).toBeVisible()
+    await expect(page.locator(`[aria-label="Week ${selectedPreviewWeek} Sun Work"]`)).toBeVisible()
+    await expect(page.locator(`[aria-label="Week ${alternatePreviewWeek} Sat Off"]`)).toBeVisible()
+    await expect(page.locator(`[aria-label="Week ${alternatePreviewWeek} Sun Off"]`)).toBeVisible()
+    await expect(page.getByRole('complementary').getByText('First working weekend:')).toBeVisible()
 
-    const neverWorkGroup = page.getByRole('group', { name: 'Days you never work' })
+    await page.getByText('Advanced: days you are never available').click()
+    const neverWorkGroup = page.getByRole('group', {
+      name: /Days you are never available/i,
+    })
     await neverWorkGroup.getByLabel('Tue').check()
 
     await expect(page.getByText('Never: Tue')).toBeVisible()
@@ -188,7 +221,7 @@ test.describe.serial('staff onboarding gate', () => {
       weekly_weekdays: [1, 3, 5],
       offs_dow: [2],
       weekend_rule: 'every_other_weekend',
-      weekend_anchor_date: anchorDate,
+      weekend_anchor_date: nextSaturdayKey(),
     })
     expect(patternResult.data?.works_dow).not.toContain(2)
 

@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   CalendarCheck,
   Check,
+  ChevronDown,
   ClipboardList,
   Minus,
   Plus,
@@ -86,7 +87,7 @@ const SCHEDULE_TYPES: Array<{
     detail: 'Your schedule changes often or is different every block.',
     example: 'Best if your days vary a lot.',
     bestFor: 'Staff who do not have a reliable normal pattern.',
-    nextStep: 'Start blank and mark any days you never work.',
+    nextStep: 'Start blank and mark any days you are never available.',
     Icon: Shuffle,
   },
 ]
@@ -103,6 +104,53 @@ const WEEKDAYS = [
 
 function getTodayKey() {
   return toIsoDate(new Date())
+}
+
+function getMondayOnOrBeforeKey(value: string) {
+  const date = new Date(`${value}T00:00:00`)
+  const dayOfWeek = date.getDay()
+  const offset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  return toIsoDate(addDays(date, offset))
+}
+
+function getSaturdayOnOrAfterKey(value: string) {
+  const date = new Date(`${value}T00:00:00`)
+  const offset = (6 - date.getDay() + 7) % 7
+  return toIsoDate(addDays(date, offset))
+}
+
+function formatWeekendRange(saturdayKey: string) {
+  const saturday = new Date(`${saturdayKey}T00:00:00`)
+  const sunday = addDays(saturday, 1)
+  const saturdayMonth = saturday.toLocaleDateString('en-US', { month: 'short' })
+  const sundayMonth = sunday.toLocaleDateString('en-US', { month: 'short' })
+  const saturdayDay = saturday.getDate()
+  const sundayDay = sunday.getDate()
+
+  if (saturdayMonth === sundayMonth) return `${saturdayMonth} ${saturdayDay}-${sundayDay}`
+  return `${saturdayMonth} ${saturdayDay}-${sundayMonth} ${sundayDay}`
+}
+
+function formatWeekendAnchorRange(anchorKey: string) {
+  const anchor = new Date(`${anchorKey}T00:00:00`)
+  if (Number.isNaN(anchor.getTime())) return ''
+
+  const saturday = anchor.getDay() === 0 ? addDays(anchor, -1) : anchor
+  return formatWeekendRange(toIsoDate(saturday))
+}
+
+function getUpcomingWeekendOptions(todayKey: string) {
+  const firstSaturday = new Date(`${getSaturdayOnOrAfterKey(todayKey)}T00:00:00`)
+  return Array.from({ length: 4 }, (_, index) => {
+    const saturday = addDays(firstSaturday, index * 7)
+    const saturdayKey = toIsoDate(saturday)
+    const sundayKey = toIsoDate(addDays(saturday, 1))
+    return {
+      saturdayKey,
+      sundayKey,
+      label: formatWeekendRange(saturdayKey),
+    }
+  })
 }
 
 function createDefaultCycleDays(): CycleDayState[] {
@@ -271,6 +319,7 @@ export function OnboardingScheduleSetup({
 
   const todayKey = useMemo(() => getTodayKey(), [])
   const cycleSegments = useMemo(() => compactCycleDays(cycleDays), [cycleDays])
+  const weekendOptions = useMemo(() => getUpcomingWeekendOptions(todayKey), [todayKey])
   const effectivePreferredDays = preferredDays.filter((day) => !neverWorkDays.includes(day))
   const preferredWorkDaysMode: PreferredWorkDaysMode =
     effectivePreferredDays.length > 0 ? 'specific_days' : 'no_preference'
@@ -326,8 +375,11 @@ export function OnboardingScheduleSetup({
   ])
 
   const previewDays = useMemo(() => {
-    const cycleStart = todayKey
-    const cycleEnd = toIsoDate(addDays(new Date(`${todayKey}T00:00:00`), 13))
+    const cycleStart =
+      scheduleType === 'weekly_fixed' || scheduleType === 'weekly_with_weekend_rotation'
+        ? getMondayOnOrBeforeKey(todayKey)
+        : todayKey
+    const cycleEnd = toIsoDate(addDays(new Date(`${cycleStart}T00:00:00`), 13))
     const baseline = buildCycleAvailabilityBaseline({
       cycleStart,
       cycleEnd,
@@ -338,7 +390,7 @@ export function OnboardingScheduleSetup({
       date,
       status: value.baselineStatus,
     }))
-  }, [previewPattern, todayKey])
+  }, [previewPattern, scheduleType, todayKey])
 
   const workDaysInPattern =
     scheduleType === 'none'
@@ -369,7 +421,7 @@ export function OnboardingScheduleSetup({
           : scheduleType === 'none'
             ? 'No set schedule'
             : scheduleType === 'weekly_with_weekend_rotation'
-              ? `${formatWeeklyPattern(effectiveWeeklyDays)} + rotating weekends`
+              ? `${effectiveWeeklyDays.length === 0 ? 'No weekdays selected' : formatWeeklyPattern(effectiveWeeklyDays)} + rotating weekends`
               : formatWeeklyPattern(effectiveWeeklyDays)
   const canContinueFromPattern =
     scheduleType === 'none' ||
@@ -464,11 +516,11 @@ export function OnboardingScheduleSetup({
       <SetupHeader step={step} />
       <div className="mx-auto flex max-w-[96rem] flex-col gap-3 px-4 py-2 sm:px-6 lg:px-8">
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(26rem,0.8fr)]">
-          <Card className="gap-0 overflow-hidden py-0 shadow-tw-md-strong">
+          <Card className="self-start gap-0 overflow-hidden py-0 shadow-tw-md-strong">
             <CardContent
               className={cn(
                 'flex flex-col px-4 py-3 sm:px-5 sm:py-3.5',
-                step === 1 ? 'min-h-0' : 'min-h-[min(40rem,calc(100vh-8rem))]'
+                step <= 2 ? 'min-h-0' : 'min-h-[min(40rem,calc(100vh-8rem))]'
               )}
             >
               <div className="min-h-0 flex-1">
@@ -493,6 +545,7 @@ export function OnboardingScheduleSetup({
                     toggleNeverWorkDay={toggleNeverWorkDay}
                     weekendAnchorDate={weekendAnchorDate}
                     setWeekendAnchorDate={setWeekendAnchorDate}
+                    weekendOptions={weekendOptions}
                   />
                 ) : null}
 
@@ -574,6 +627,8 @@ export function OnboardingScheduleSetup({
             longestRun={longestRun}
             maxConsecutiveDays={maxConsecutiveDays}
             neverWorkDays={neverWorkDays}
+            weekendAnchorDate={weekendAnchorDate}
+            weekendAnchorLabel={formatWeekendAnchorRange(weekendAnchorDate)}
             previewPulseKey={previewPulseKey}
           />
         </div>
@@ -753,6 +808,7 @@ function WeeklyPatternStep({
   toggleNeverWorkDay,
   weekendAnchorDate,
   setWeekendAnchorDate,
+  weekendOptions,
 }: {
   scheduleType: RecurringPatternType
   effectiveWeeklyDays: number[]
@@ -766,93 +822,144 @@ function WeeklyPatternStep({
   toggleNeverWorkDay: (day: number) => void
   weekendAnchorDate: string
   setWeekendAnchorDate: (value: string) => void
+  weekendOptions: Array<{ saturdayKey: string; sundayKey: string; label: string }>
 }) {
+  const isSameDaysWeekly = scheduleType === 'weekly_fixed'
+  const isRotatingWeekend = scheduleType === 'weekly_with_weekend_rotation'
+  const missingWeekendAnchor = isRotatingWeekend && weekendAnchorDate.trim().length === 0
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
-        <h1 className="app-page-title text-[1.75rem]">
-          {scheduleType === 'none' ? 'No set schedule' : 'Tap your work days'}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h1 className="app-page-title text-[1.45rem]">
           {scheduleType === 'none'
-            ? 'Start blank, then block days you never work.'
-            : 'This is your normal schedule.'}
+            ? 'No set schedule'
+            : isRotatingWeekend
+              ? 'Choose your weekdays and weekend rotation'
+              : 'Choose your normal work days'}
+        </h1>
+        <p className="mt-1 text-sm leading-5 text-muted-foreground">
+          {scheduleType === 'none'
+            ? 'Start blank, then mark days you are never available.'
+            : isRotatingWeekend
+              ? 'Select your normal weekdays, then choose the first weekend you work.'
+              : 'Select the weekdays you usually work. You can still mark exceptions later.'}
         </p>
       </div>
 
       {scheduleType === 'none' ? (
-        <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-5 py-8 text-base text-muted-foreground">
+        <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-5 py-6 text-base text-muted-foreground">
           Future schedules will start blank.
         </div>
       ) : (
-        <div className="grid grid-cols-7 gap-2">
-          {WEEKDAYS.map((day) => {
-            const selected = effectiveWeeklyDays.includes(day.value)
-            const rotatingWeekend =
-              scheduleType === 'weekly_with_weekend_rotation' &&
-              (day.value === 0 || day.value === 6)
-            const neverWork = neverWorkDays.includes(day.value)
-            const problemDay = hasConsecutiveWarning && problemWeeklyDays.includes(day.value)
+        <div className="space-y-2">
+          <div className="grid grid-cols-7 gap-1.5">
+            {WEEKDAYS.map((day) => {
+              const selected = effectiveWeeklyDays.includes(day.value)
+              const rotatingWeekend = isRotatingWeekend && (day.value === 0 || day.value === 6)
+              const neverWork = neverWorkDays.includes(day.value)
+              const problemDay = hasConsecutiveWarning && problemWeeklyDays.includes(day.value)
 
-            return (
-              <button
-                key={day.value}
-                type="button"
-                onClick={() => {
-                  if (!rotatingWeekend && !neverWork) toggleWeeklyDay(day.value)
-                }}
-                disabled={rotatingWeekend || neverWork}
-                className={cn(
-                  'min-h-24 rounded-xl border px-1.5 text-sm font-bold transition-colors',
-                  selected
-                    ? 'border-primary bg-primary text-primary-foreground shadow-tw-pill'
-                    : 'border-border/80 bg-background text-muted-foreground hover:bg-secondary/40',
-                  problemDay &&
-                    'border-[var(--warning-border)] ring-2 ring-[var(--warning-border)] ring-offset-2 ring-offset-background',
-                  rotatingWeekend && 'bg-[var(--warning-subtle)] text-[var(--warning-text)]',
-                  neverWork &&
-                    'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
-                )}
-              >
-                {day.label}
-                {rotatingWeekend ? <span className="mt-1 block text-[10px]">Rotates</span> : null}
-                {neverWork ? <span className="mt-1 block text-[10px]">Never</span> : null}
-              </button>
-            )
-          })}
+              return (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => {
+                    if (!rotatingWeekend && !neverWork) toggleWeeklyDay(day.value)
+                  }}
+                  disabled={rotatingWeekend || neverWork}
+                  className={cn(
+                    'flex min-h-16 flex-col items-center justify-center rounded-lg border px-1.5 text-sm transition-colors',
+                    selected
+                      ? 'border-primary bg-primary text-primary-foreground shadow-tw-pill'
+                      : 'border-border/80 bg-background text-muted-foreground hover:bg-secondary/40',
+                    problemDay &&
+                      'border-[var(--warning-border)] ring-2 ring-[var(--warning-border)] ring-offset-2 ring-offset-background',
+                    rotatingWeekend &&
+                      'cursor-not-allowed border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)] hover:bg-[var(--warning-subtle)]',
+                    neverWork &&
+                      'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
+                  )}
+                >
+                  <span className="font-bold">{day.label}</span>
+                  {selected ? (
+                    <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold">
+                      Work <Check className="h-3 w-3" aria-hidden="true" />
+                    </span>
+                  ) : rotatingWeekend ? (
+                    <span className="mt-1 text-[11px] font-semibold">Rotates</span>
+                  ) : neverWork ? (
+                    <span className="mt-1 text-[11px] font-semibold">Never</span>
+                  ) : (
+                    <span className="mt-1 text-[11px] font-medium">Off</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          {isRotatingWeekend ? (
+            <p className="text-xs font-medium text-primary">
+              Weekends are set by your rotation below.
+            </p>
+          ) : null}
         </div>
       )}
 
-      {scheduleType === 'weekly_with_weekend_rotation' ? (
-        <div className="rounded-xl border border-border/80 bg-muted/10 px-4 py-4">
-          <label
-            htmlFor="onboarding-weekend-anchor"
-            className="text-sm font-semibold text-foreground"
-          >
-            First weekend you work
-          </label>
-          <input
-            id="onboarding-weekend-anchor"
-            type="date"
-            value={weekendAnchorDate}
-            onChange={(event) => setWeekendAnchorDate(event.target.value)}
-            className="mt-2 h-11 w-full max-w-xs rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          />
-          <p className="mt-2 text-xs text-muted-foreground">
-            This anchors the every-other-weekend rotation.
+      {isRotatingWeekend ? (
+        <fieldset className="rounded-xl border border-border/80 bg-muted/10 px-4 py-3">
+          <legend className="px-1 text-sm font-semibold text-foreground">
+            First working weekend
+          </legend>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Choose the first weekend you work. Teamwise will repeat the every-other-weekend rotation
+            from there.
           </p>
-        </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-4">
+            {weekendOptions.map((option) => {
+              const selected =
+                weekendAnchorDate === option.saturdayKey || weekendAnchorDate === option.sundayKey
+              return (
+                <button
+                  key={option.saturdayKey}
+                  type="button"
+                  onClick={() => setWeekendAnchorDate(option.saturdayKey)}
+                  aria-pressed={selected}
+                  className={cn(
+                    'rounded-lg border px-3 py-2 text-left text-sm transition-colors',
+                    selected
+                      ? 'border-primary bg-[var(--info-subtle)] text-primary shadow-tw-sm'
+                      : 'border-border/80 bg-card text-foreground hover:bg-secondary/35'
+                  )}
+                >
+                  <span className="flex items-center justify-between gap-2 font-bold">
+                    {option.label}
+                    {selected ? <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+                  </span>
+                  <span
+                    className={cn(
+                      'mt-0.5 block text-xs',
+                      selected ? 'font-semibold text-primary' : 'text-muted-foreground'
+                    )}
+                  >
+                    Starts rotation
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
       ) : null}
 
-      <NeverWorkDaysPicker selectedDays={neverWorkDays} toggleDay={toggleNeverWorkDay} />
-
-      <div className="rounded-xl border border-border/80 bg-muted/15 px-4 py-4">
+      <div className="rounded-xl border border-border/80 bg-muted/15 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Summary
+        </p>
         {scheduleType === 'none' ? (
-          <p className="text-sm text-muted-foreground">No fixed work days selected.</p>
+          <p className="mt-2 text-sm text-muted-foreground">No fixed work days selected.</p>
         ) : hasConsecutiveWarning ? (
           <ConsecutiveDaysWarning longestRun={longestRun} maxConsecutiveDays={maxConsecutiveDays} />
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Longest streak: {longestRun} day{longestRun === 1 ? '' : 's'}.
           </p>
         )}
@@ -863,14 +970,28 @@ function WeeklyPatternStep({
         ) : (
           <p className="mt-3 text-base font-bold text-foreground">
             {workDaysInPattern} day{workDaysInPattern === 1 ? '' : 's'} per week
+            {isRotatingWeekend ? ' + rotating weekends' : ''}
           </p>
         )}
         {scheduleType !== 'none' && workDaysInPattern === 0 ? (
           <p className="mt-2 text-sm font-medium text-[var(--warning-text)]">
-            Pick at least one day to continue.
+            Pick at least one weekday.
+          </p>
+        ) : null}
+        {missingWeekendAnchor ? (
+          <p className="mt-2 text-sm font-medium text-[var(--warning-text)]">
+            Choose the first working weekend.
           </p>
         ) : null}
       </div>
+
+      {isSameDaysWeekly ? null : (
+        <NeverWorkDaysPicker
+          selectedDays={neverWorkDays}
+          toggleDay={toggleNeverWorkDay}
+          collapsed={isRotatingWeekend}
+        />
+      )}
     </div>
   )
 }
@@ -949,7 +1070,7 @@ function RepeatingCycleStep({
             type="button"
             onClick={addCycleDay}
             className="flex h-24 w-16 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-primary/60 bg-[var(--info-subtle)] text-primary transition-colors hover:border-primary"
-            aria-label="Add cycle day"
+            aria-label="Add pattern day"
           >
             <Plus className="h-5 w-5" aria-hidden="true" />
             <span className="mt-1 text-xs font-semibold">Add</span>
@@ -976,7 +1097,7 @@ function RepeatingCycleStep({
         ) : null}
         <div className="grid gap-2 text-sm sm:grid-cols-3">
           <p>
-            <span className="font-bold text-foreground">{cycleDays.length}-day cycle</span>
+            <span className="font-bold text-foreground">{cycleDays.length}-day pattern</span>
           </p>
           <p>
             <span className="font-bold text-foreground">{workDaysInPattern}</span> work
@@ -1074,7 +1195,7 @@ function PreferencesStep({
         </div>
         <p className="text-xs text-muted-foreground">
           {neverWorkDays.length > 0
-            ? 'Days marked never work are disabled here.'
+            ? 'Days marked never available are disabled here.'
             : 'Leave blank if any day is fine.'}
         </p>
       </fieldset>
@@ -1085,41 +1206,72 @@ function PreferencesStep({
 function NeverWorkDaysPicker({
   selectedDays,
   toggleDay,
+  collapsed = false,
 }: {
   selectedDays: number[]
   toggleDay: (day: number) => void
+  collapsed?: boolean
 }) {
+  const fieldsetTitle = collapsed
+    ? 'Days you are never available'
+    : 'Advanced: days you are never available'
+  const helperCopy =
+    'Use this only if a day should stay off even when another schedule pattern would otherwise mark it as work.'
+  const dayCheckboxes = (
+    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {WEEKDAYS.map((day) => {
+        const selected = selectedDays.includes(day.value)
+        return (
+          <label
+            key={`never-work-${day.value}`}
+            className={cn(
+              'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm transition-colors',
+              selected
+                ? 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
+                : 'border-border/80 bg-card hover:bg-secondary/35'
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => toggleDay(day.value)}
+              className="h-4 w-4 accent-[var(--destructive)]"
+            />
+            {day.label}
+          </label>
+        )
+      })}
+    </div>
+  )
+
+  if (!collapsed) {
+    return (
+      <fieldset className="rounded-xl border border-border/80 bg-muted/10 px-4 py-3">
+        <legend className="px-1 text-sm font-semibold text-foreground">{fieldsetTitle}</legend>
+        <p className="mt-1 text-xs text-muted-foreground">{helperCopy}</p>
+        {dayCheckboxes}
+      </fieldset>
+    )
+  }
+
   return (
-    <fieldset className="rounded-xl border border-border/80 bg-muted/10 px-4 py-4">
-      <legend className="px-1 text-sm font-semibold text-foreground">Days you never work</legend>
-      <p className="mt-1 text-xs text-muted-foreground">
-        These days stay off even if a weekend rotation or cycle would otherwise mark them as work.
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {WEEKDAYS.map((day) => {
-          const selected = selectedDays.includes(day.value)
-          return (
-            <label
-              key={`never-work-${day.value}`}
-              className={cn(
-                'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm transition-colors',
-                selected
-                  ? 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
-                  : 'border-border/80 bg-card hover:bg-secondary/35'
-              )}
-            >
-              <input
-                type="checkbox"
-                checked={selected}
-                onChange={() => toggleDay(day.value)}
-                className="h-4 w-4 accent-[var(--destructive)]"
-              />
-              {day.label}
-            </label>
-          )
-        })}
+    <details className="group rounded-xl border border-border/80 bg-muted/10 px-4 py-3 transition-colors open:bg-card">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-semibold text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <span>Advanced: days you are never available</span>
+        <ChevronDown
+          className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        />
+      </summary>
+      <div
+        role="group"
+        aria-label="Days you are never available"
+        className="mt-3 rounded-lg border border-border/70 bg-background px-3 py-3"
+      >
+        <p className="mt-1 text-xs text-muted-foreground">{helperCopy}</p>
+        {dayCheckboxes}
       </div>
-    </fieldset>
+    </details>
   )
 }
 
@@ -1142,6 +1294,8 @@ function PreviewPanel({
   longestRun,
   maxConsecutiveDays,
   neverWorkDays,
+  weekendAnchorDate,
+  weekendAnchorLabel,
   previewPulseKey,
 }: {
   step: number
@@ -1151,10 +1305,16 @@ function PreviewPanel({
   longestRun: number
   maxConsecutiveDays: number
   neverWorkDays: number[]
+  weekendAnchorDate: string
+  weekendAnchorLabel: string
   previewPulseKey: number
 }) {
   const selectedType =
     SCHEDULE_TYPES.find((option) => option.type === scheduleType) ?? SCHEDULE_TYPES[0]
+  const missingWeekendAnchor =
+    step === 2 &&
+    scheduleType === 'weekly_with_weekend_rotation' &&
+    weekendAnchorDate.trim().length === 0
 
   return (
     <aside
@@ -1170,7 +1330,9 @@ function PreviewPanel({
             {step === 1 ? selectedType.detail : 'Next 2 weeks'}
           </p>
           {step === 1 ? null : (
-            <p className="mt-1 text-sm font-medium leading-5 text-primary">Read-only preview</p>
+            <p className="mt-1 text-sm font-medium leading-5 text-primary">
+              Updates as you choose days
+            </p>
           )}
         </div>
       </div>
@@ -1200,7 +1362,12 @@ function PreviewPanel({
       ) : (
         <>
           <div className="mt-5">
-            <CalendarPreview previewDays={previewDays} />
+            <CalendarPreview
+              previewDays={previewDays}
+              weeklyRows={
+                scheduleType === 'weekly_fixed' || scheduleType === 'weekly_with_weekend_rotation'
+              }
+            />
           </div>
 
           <div className="mt-5 rounded-xl border border-border/70 bg-muted/10 px-4 py-4">
@@ -1208,6 +1375,16 @@ function PreviewPanel({
               Pattern
             </p>
             <p className="mt-1 text-lg font-bold text-foreground">{scheduleSummary}</p>
+            {missingWeekendAnchor ? (
+              <p className="mt-2 text-sm font-medium text-[var(--warning-text)]">
+                Weekend rotation not set yet.
+              </p>
+            ) : null}
+            {step === 2 && scheduleType === 'weekly_with_weekend_rotation' && weekendAnchorLabel ? (
+              <p className="mt-2 text-sm font-medium text-primary">
+                First working weekend: {weekendAnchorLabel}
+              </p>
+            ) : null}
             {neverWorkDays.length > 0 ? (
               <p className="mt-2 text-sm font-medium text-[var(--error-text)]">
                 Never: {formatWeeklyPattern(neverWorkDays)}
@@ -1223,7 +1400,7 @@ function PreviewPanel({
             />
             <PreviewMetric
               icon={<ShieldCheck className="h-6 w-6 text-primary" aria-hidden="true" />}
-              label="Your limit"
+              label="Max allowed streak"
               value={`${maxConsecutiveDays} day${maxConsecutiveDays === 1 ? '' : 's'}`}
             />
           </div>
@@ -1275,9 +1452,50 @@ function PreviewMetric({ icon, label, value }: { icon: ReactNode; label: string;
 
 function CalendarPreview({
   previewDays,
+  weeklyRows = false,
 }: {
   previewDays: Array<{ date: string; status: 'available' | 'off' | 'neutral' }>
+  weeklyRows?: boolean
 }) {
+  if (weeklyRows) {
+    return (
+      <div className="space-y-3">
+        {[0, 1].map((weekIndex) => {
+          const weekDays = previewDays.slice(weekIndex * 7, weekIndex * 7 + 7)
+          return (
+            <div key={`week-preview-${weekIndex}`} className="space-y-1.5">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Week {weekIndex + 1}
+              </p>
+              <div className="grid grid-cols-7 gap-1.5">
+                {weekDays.map((day) => {
+                  const isWork = day.status === 'available'
+                  return (
+                    <div
+                      key={day.date}
+                      aria-label={`Week ${weekIndex + 1} ${formatShortWeekday(day.date)} ${
+                        isWork ? 'Work' : 'Off'
+                      }`}
+                      className={cn(
+                        'flex min-h-14 flex-col items-center justify-center rounded-md border text-center text-xs',
+                        isWork
+                          ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                          : 'border-border/80 bg-muted/20 text-muted-foreground'
+                      )}
+                    >
+                      <span className="font-bold">{formatShortWeekday(day.date)}</span>
+                      <span className="mt-1 font-medium">{isWork ? 'Work' : 'Off'}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-7 gap-2 text-center text-sm font-medium text-muted-foreground">
@@ -1289,7 +1507,7 @@ function CalendarPreview({
         {previewDays.map((day) => {
           const date = new Date(`${day.date}T00:00:00`)
           const isWork = day.status === 'available'
-          const isBlank = day.status === 'neutral'
+          const isNeutral = day.status === 'neutral'
 
           return (
             <div
@@ -1298,14 +1516,14 @@ function CalendarPreview({
                 'flex min-h-24 flex-col items-center justify-center rounded-lg border text-center text-sm',
                 isWork
                   ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)] shadow-tw-pill'
-                  : isBlank
+                  : isNeutral
                     ? 'border-dashed border-border bg-background text-muted-foreground'
                     : 'border-border/80 bg-muted/25 text-muted-foreground'
               )}
             >
               <span className="font-medium">{formatShortMonth(day.date)}</span>
               <span className="text-xl font-bold">{date.getDate()}</span>
-              <span className="mt-1">{isWork ? 'Work' : isBlank ? 'Blank' : 'Off'}</span>
+              <span className="mt-1">{isWork ? 'Work' : 'Off'}</span>
             </div>
           )
         })}
