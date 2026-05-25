@@ -589,6 +589,7 @@ export function OnboardingScheduleSetup({
                     hasConsecutiveWarning={hasConsecutiveWarning}
                     longestRun={longestRun}
                     neverWorkDays={neverWorkDays}
+                    scheduleType={scheduleType}
                   />
                 ) : null}
 
@@ -638,6 +639,7 @@ export function OnboardingScheduleSetup({
             scheduleSummary={scheduleSummary}
             longestRun={longestRun}
             maxConsecutiveDays={maxConsecutiveDays}
+            preferredDays={effectivePreferredDays}
             neverWorkDays={neverWorkDays}
             weekendAnchorDate={weekendAnchorDate}
             weekendAnchorLabel={formatWeekendAnchorRange(weekendAnchorDate)}
@@ -1226,6 +1228,7 @@ function PreferencesStep({
   hasConsecutiveWarning,
   longestRun,
   neverWorkDays,
+  scheduleType,
 }: {
   maxConsecutiveDays: number
   setMaxConsecutiveDays: (value: number) => void
@@ -1234,15 +1237,24 @@ function PreferencesStep({
   hasConsecutiveWarning: boolean
   longestRun: number
   neverWorkDays: number[]
+  scheduleType: RecurringPatternType
 }) {
   return (
     <div className="space-y-7">
-      <h1 className="app-page-title text-[1.75rem]">Preferences</h1>
+      <div className="space-y-1">
+        <h1 className="app-page-title text-[1.75rem]">Preferences</h1>
+        <p className="text-sm leading-5 text-muted-foreground">
+          Set your scheduling limits and optional work preferences.
+        </p>
+      </div>
 
       <div className="max-w-xs space-y-2">
         <label htmlFor="onboarding-max-consecutive" className="text-sm font-semibold">
-          Max consecutive days
+          Maximum days in a row
         </label>
+        <p className="text-xs text-muted-foreground">
+          Teamwise will try not to schedule you beyond this limit.
+        </p>
         <select
           id="onboarding-max-consecutive"
           value={maxConsecutiveDays}
@@ -1261,12 +1273,15 @@ function PreferencesStep({
         <ConsecutiveDaysWarning longestRun={longestRun} maxConsecutiveDays={maxConsecutiveDays} />
       ) : (
         <p className="rounded-xl border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-3 text-sm font-medium text-[var(--success-text)]">
-          Your current pattern fits this limit.
+          {scheduleType === 'none'
+            ? 'This limit will apply when your schedule is built.'
+            : 'Your current pattern fits this limit.'}
         </p>
       )}
 
       <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold text-foreground">Preferred days (optional)</legend>
+        <legend className="text-sm font-semibold text-foreground">Days you prefer to work</legend>
+        <p className="text-xs text-muted-foreground">Optional. Leave blank if any day is fine.</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {WEEKDAYS.map((day) => {
             const selected = preferredDays.includes(day.value)
@@ -1297,10 +1312,13 @@ function PreferencesStep({
           })}
         </div>
         <p className="text-xs text-muted-foreground">
-          {neverWorkDays.length > 0
-            ? 'Days marked never available are disabled here.'
-            : 'Leave blank if any day is fine.'}
+          These are preferences, not guaranteed work days.
         </p>
+        {neverWorkDays.length > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Days marked never available are disabled here.
+          </p>
+        ) : null}
       </fieldset>
     </div>
   )
@@ -1396,6 +1414,7 @@ function PreviewPanel({
   scheduleSummary,
   longestRun,
   maxConsecutiveDays,
+  preferredDays,
   neverWorkDays,
   weekendAnchorDate,
   weekendAnchorLabel,
@@ -1407,6 +1426,7 @@ function PreviewPanel({
   scheduleSummary: string
   longestRun: number
   maxConsecutiveDays: number
+  preferredDays: number[]
   neverWorkDays: number[]
   weekendAnchorDate: string
   weekendAnchorLabel: string
@@ -1418,6 +1438,8 @@ function PreviewPanel({
     step === 2 &&
     scheduleType === 'weekly_with_weekend_rotation' &&
     weekendAnchorDate.trim().length === 0
+  const preferredWorkDaysSummary =
+    preferredDays.length > 0 ? formatWeeklyPattern(preferredDays) : 'Any day'
 
   return (
     <aside
@@ -1493,6 +1515,25 @@ function PreviewPanel({
                 Never: {formatWeeklyPattern(neverWorkDays)}
               </p>
             ) : null}
+            {step >= 3 ? (
+              <div className="mt-4 border-t border-border/70 pt-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Preferences
+                </p>
+                <dl className="mt-2 space-y-1 text-sm leading-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-muted-foreground">Maximum days in a row:</dt>
+                    <dd className="font-semibold text-foreground">
+                      {maxConsecutiveDays} day{maxConsecutiveDays === 1 ? '' : 's'}
+                    </dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-muted-foreground">Preferred work days:</dt>
+                    <dd className="font-semibold text-foreground">{preferredWorkDaysSummary}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -1503,7 +1544,7 @@ function PreviewPanel({
             />
             <PreviewMetric
               icon={<ShieldCheck className="h-6 w-6 text-primary" aria-hidden="true" />}
-              label="Max allowed streak"
+              label="Max days in a row"
               value={`${maxConsecutiveDays} day${maxConsecutiveDays === 1 ? '' : 's'}`}
             />
           </div>

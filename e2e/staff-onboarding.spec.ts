@@ -247,7 +247,7 @@ test.describe.serial('staff onboarding gate', () => {
     await page.getByRole('button', { name: 'Next', exact: true }).click()
 
     await expect(page.getByRole('heading', { name: 'Preferences' })).toBeVisible()
-    await page.getByLabel('Max consecutive days').selectOption('4')
+    await page.getByLabel('Maximum days in a row').selectOption('4')
     await page.getByRole('button', { name: 'Next', exact: true }).click()
 
     await expect(page.getByRole('heading', { name: "You're all set" })).toBeVisible()
