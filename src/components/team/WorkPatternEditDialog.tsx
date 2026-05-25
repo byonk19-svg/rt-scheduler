@@ -53,8 +53,9 @@ export function WorkPatternEditDialog({
   saveWorkPatternAction,
 }: Props) {
   const isAdvancedPattern = initialPattern?.pattern_type === 'repeating_cycle'
+  const initialWeekdays = initialPattern?.weekly_weekdays ?? initialPattern?.works_dow ?? []
   const [open, setOpen] = useState(false)
-  const [worksDow, setWorksDow] = useState<number[]>(initialPattern?.works_dow ?? [])
+  const [worksDow, setWorksDow] = useState<number[]>(initialWeekdays)
   const [offsDow, setOffsDow] = useState<number[]>(initialPattern?.offs_dow ?? [])
   const [worksDowMode, setWorksDowMode] = useState<'hard' | 'soft'>(
     initialPattern?.works_dow_mode ?? 'hard'
@@ -68,7 +69,7 @@ export function WorkPatternEditDialog({
   const [validationError, setValidationError] = useState<string | null>(null)
 
   function openDialog() {
-    setWorksDow(initialPattern?.works_dow ?? [])
+    setWorksDow(initialPattern?.weekly_weekdays ?? initialPattern?.works_dow ?? [])
     setOffsDow(initialPattern?.offs_dow ?? [])
     setWorksDowMode(initialPattern?.works_dow_mode ?? 'hard')
     setWeekendRotation(initialPattern?.weekend_rotation ?? 'none')

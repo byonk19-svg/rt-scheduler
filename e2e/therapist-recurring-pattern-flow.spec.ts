@@ -11,6 +11,12 @@ function formatDateLabelE2E(iso: string): string {
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function nextSaturdayKey() {
+  const today = new Date()
+  const offset = (6 - today.getDay() + 7) % 7
+  return formatDateKey(addDays(today, offset))
+}
+
 type FlowCtx = {
   supabase: SupabaseClient
   therapist: { id: string; email: string; password: string }
@@ -41,6 +47,22 @@ test.describe.serial('therapist recurring pattern flow', () => {
       isLeadEligible: false,
     })
     createdUserIds.push(therapist.id)
+
+    const { error: onboardingUpdateError } = await supabase
+      .from('profiles')
+      .update({
+        staff_onboarding_required: false,
+        staff_onboarding_completed_at: new Date().toISOString(),
+        staff_onboarding_preferences_confirmed_at: new Date().toISOString(),
+        staff_onboarding_theme_confirmed_at: new Date().toISOString(),
+      })
+      .eq('id', therapist.id)
+
+    if (onboardingUpdateError) {
+      throw new Error(
+        `Could not mark pattern-flow therapist onboarded: ${onboardingUpdateError.message}`
+      )
+    }
 
     const cycle = await createScheduleCycle(supabase, {
       label: `Pattern Flow ${randomString('cycle')}`,
@@ -124,5 +146,42 @@ test.describe.serial('therapist recurring pattern flow', () => {
         timeout: 20_000,
       }
     )
+  })
+
+  test('saves rotating weekends with flexible weekdays from the recurring-pattern editor', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required.')
+
+    await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
+    await page.goto('/therapist/recurring-pattern')
+
+    await page.getByRole('button', { name: /Rotating weekends/i }).click()
+    await page.getByText('Weekday flexibility').click()
+    await page.getByRole('button', { name: /My weekdays are flexible/i }).click()
+    await page.getByRole('button', { name: /^Every other weekend$/ }).click()
+    await page.locator('#weekend-anchor-date').fill(nextSaturdayKey())
+
+    await expect(page.getByText('Rotating weekends. Weekdays: Flexible.')).toBeVisible()
+    await page.getByRole('button', { name: /Save recurring pattern/i }).click()
+    await expect(page.getByText('Recurring pattern saved.')).toBeVisible({ timeout: 45_000 })
+
+    const patternResult = await ctx!.supabase
+      .from('work_patterns')
+      .select(
+        'pattern_type, weekly_weekdays, works_dow, works_dow_mode, weekend_rule, weekend_anchor_date'
+      )
+      .eq('therapist_id', ctx!.therapist.id)
+      .single()
+
+    expect(patternResult.error).toBeNull()
+    expect(patternResult.data).toMatchObject({
+      pattern_type: 'weekly_with_weekend_rotation',
+      weekly_weekdays: [],
+      works_dow_mode: 'soft',
+      weekend_rule: 'every_other_weekend',
+      weekend_anchor_date: nextSaturdayKey(),
+    })
+    expect(patternResult.data?.works_dow).toEqual([0, 6])
   })
 })

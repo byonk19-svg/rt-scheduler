@@ -15,6 +15,7 @@ describe('therapist recurring-pattern route', () => {
     expect(source).toContain('Use Future Availability when one cycle is different.')
     expect(source).toContain('RecurringPatternEditor')
     expect(source).toContain('saveRecurringPatternAction')
+    expect(source).toContain('isMissingRequiredWeeklyWeekdays(normalized)')
   })
 
   it('sets route-specific metadata', () => {

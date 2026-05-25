@@ -7,7 +7,11 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
-import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
+import {
+  isMissingRequiredWeeklyWeekdays,
+  normalizeWorkPattern,
+  type WorkPattern,
+} from '@/lib/coverage/work-patterns'
 import { createClient } from '@/lib/supabase/server'
 
 type SearchParams = {
@@ -139,10 +143,7 @@ async function saveManagerRecurringPatternAction(therapistId: string, formData: 
     cycle_segments: patternType === 'repeating_cycle' ? cycleSegments : [],
   })
 
-  const invalidWeeklyPattern =
-    (normalized.pattern_type === 'weekly_fixed' ||
-      normalized.pattern_type === 'weekly_with_weekend_rotation') &&
-    normalized.weekly_weekdays.length === 0
+  const invalidWeeklyPattern = isMissingRequiredWeeklyWeekdays(normalized)
   const invalidWeekendPattern =
     normalized.pattern_type === 'weekly_with_weekend_rotation' &&
     normalized.weekend_rule === 'every_other_weekend' &&

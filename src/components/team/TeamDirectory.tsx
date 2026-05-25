@@ -165,6 +165,19 @@ function filterProfilesForDirectory(
   return profiles.filter((p) => matchesChip(p, chip) && matchesFormFilters(p, form))
 }
 
+function hasQuickEditableWorkPattern(pattern: WorkPatternRecord | null | undefined): boolean {
+  if (!pattern || pattern.pattern_type === 'repeating_cycle') return false
+  return (
+    (pattern.weekly_weekdays ?? pattern.works_dow ?? []).length > 0 ||
+    (pattern.offs_dow ?? []).length > 0 ||
+    pattern.weekend_rotation === 'every_other'
+  )
+}
+
+function getQuickEditWeekdays(pattern: WorkPatternRecord | null | undefined): number[] {
+  return pattern?.weekly_weekdays ?? pattern?.works_dow ?? []
+}
+
 function CollapsibleTeamGroup({
   sectionKey,
   title,
@@ -331,13 +344,11 @@ export function TeamDirectory({
     }
   )
 
-  const [hasPattern, setHasPattern] = useState(
-    initialPattern !== null && initialPattern.works_dow.length > 0
-  )
+  const [hasPattern, setHasPattern] = useState(hasQuickEditableWorkPattern(initialPattern))
   const [hasAdvancedPattern, setHasAdvancedPattern] = useState(
     initialPattern?.pattern_type === 'repeating_cycle'
   )
-  const [selectedDays, setSelectedDays] = useState<number[]>(initialPattern?.works_dow ?? [])
+  const [selectedDays, setSelectedDays] = useState<number[]>(getQuickEditWeekdays(initialPattern))
   const [neverDays, setNeverDays] = useState<number[]>(initialPattern?.offs_dow ?? [])
   const [worksDowMode, setWorksDowMode] = useState<'hard' | 'soft'>(
     initialPattern?.works_dow_mode ?? 'hard'
@@ -389,9 +400,9 @@ export function TeamDirectory({
     setEditProfileId(profileId)
     setDraftRole((profile.role as EditableRole | null) ?? 'therapist')
     setOnFmla(profile.on_fmla === true)
-    setHasPattern(pattern !== null && (pattern.works_dow ?? []).length > 0)
+    setHasPattern(hasQuickEditableWorkPattern(pattern))
     setHasAdvancedPattern(pattern?.pattern_type === 'repeating_cycle')
-    setSelectedDays(pattern?.works_dow ?? [])
+    setSelectedDays(getQuickEditWeekdays(pattern))
     setNeverDays(pattern?.offs_dow ?? [])
     setWorksDowMode(pattern?.works_dow_mode ?? 'hard')
     setWeekendRotation(pattern?.weekend_rotation ?? 'none')
@@ -768,9 +779,9 @@ export function TeamDirectory({
                       onChange={(e) => setHasPattern(e.target.checked)}
                     />
                     <span className="text-xs font-medium text-foreground">
-                      Has a fixed weekly pattern
+                      Has a recurring weekly/weekend pattern
                       <span className="ml-1 font-normal text-muted-foreground">
-                        — works the same days every week
+                        — weekdays may be fixed or flexible
                       </span>
                     </span>
                   </label>
@@ -802,47 +813,45 @@ export function TeamDirectory({
                         ))}
                       </div>
 
-                      {selectedDays.length > 0 && (
-                        <div className="space-y-1">
-                          <p className="text-xs font-medium text-foreground">How strict?</p>
-                          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-sm has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
-                            <input
-                              type="radio"
-                              name="works_dow_mode"
-                              value="hard"
-                              className="mt-0.5 h-4 w-4 shrink-0"
-                              checked={worksDowMode === 'hard'}
-                              disabled={hasAdvancedPattern}
-                              onChange={() => setWorksDowMode('hard')}
-                            />
-                            <span>
-                              <span className="font-medium text-foreground">Only these days</span>
-                              <span className="ml-1 text-muted-foreground">
-                                — will not be scheduled on other days
-                              </span>
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-foreground">How strict?</p>
+                        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-sm has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
+                          <input
+                            type="radio"
+                            name="works_dow_mode"
+                            value="hard"
+                            className="mt-0.5 h-4 w-4 shrink-0"
+                            checked={worksDowMode === 'hard'}
+                            disabled={hasAdvancedPattern}
+                            onChange={() => setWorksDowMode('hard')}
+                          />
+                          <span>
+                            <span className="font-medium text-foreground">Only these days</span>
+                            <span className="ml-1 text-muted-foreground">
+                              - will not be scheduled on other weekdays
                             </span>
-                          </label>
-                          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-sm has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
-                            <input
-                              type="radio"
-                              name="works_dow_mode"
-                              value="soft"
-                              className="mt-0.5 h-4 w-4 shrink-0"
-                              checked={worksDowMode === 'soft'}
-                              disabled={hasAdvancedPattern}
-                              onChange={() => setWorksDowMode('soft')}
-                            />
-                            <span>
-                              <span className="font-medium text-foreground">
-                                Usually these days
-                              </span>
-                              <span className="ml-1 text-muted-foreground">
-                                — preferred but can flex when needed
-                              </span>
+                          </span>
+                        </label>
+                        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-sm has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
+                          <input
+                            type="radio"
+                            name="works_dow_mode"
+                            value="soft"
+                            className="mt-0.5 h-4 w-4 shrink-0"
+                            checked={worksDowMode === 'soft'}
+                            disabled={hasAdvancedPattern}
+                            onChange={() => setWorksDowMode('soft')}
+                          />
+                          <span>
+                            <span className="font-medium text-foreground">
+                              Weekdays are flexible
                             </span>
-                          </label>
-                        </div>
-                      )}
+                            <span className="ml-1 text-muted-foreground">
+                              - manager schedules weekdays block by block
+                            </span>
+                          </span>
+                        </label>
+                      </div>
 
                       <div className="space-y-1.5">
                         <p className="text-xs font-medium text-foreground">Weekend rotation</p>

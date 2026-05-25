@@ -10,6 +10,7 @@ import { normalizeRosterFullName, parseBulkEmployeeRosterText } from '@/lib/empl
 import { parseTeamQuickEditFormData } from '@/lib/team-quick-edit'
 import type { TeamErrorCode, TeamSuccessCode } from '@/lib/team-feedback'
 import { parseTherapistRosterSource } from '@/lib/therapist-roster-source'
+import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import { createClient } from '@/lib/supabase/server'
 
 type ManagedRole = 'manager' | 'therapist' | 'lead'
@@ -205,15 +206,45 @@ export async function saveTeamQuickEditAction(formData: FormData) {
   if (existingWorkPattern?.pattern_type === 'repeating_cycle') {
     // Legacy quick edit cannot faithfully edit advanced repeating cycles.
   } else if (input.workPattern.hasPattern) {
+    if (
+      input.workPattern.weekendRotation === 'every_other' &&
+      input.workPattern.worksDowMode === 'hard' &&
+      input.workPattern.worksDow.length === 0
+    ) {
+      redirect(
+        buildTeamUrl({
+          error: 'invalid_pattern',
+          edit_profile: input.profileId,
+        })
+      )
+    }
+
+    const normalizedPattern = normalizeWorkPattern({
+      therapist_id: input.profileId,
+      pattern_type:
+        input.workPattern.weekendRotation === 'every_other'
+          ? 'weekly_with_weekend_rotation'
+          : 'weekly_fixed',
+      weekly_weekdays: input.workPattern.worksDow,
+      offs_dow: input.workPattern.offsDow,
+      works_dow_mode: input.workPattern.worksDowMode,
+      weekend_rule:
+        input.workPattern.weekendRotation === 'every_other' ? 'every_other_weekend' : 'none',
+      weekend_anchor_date: input.workPattern.weekendAnchorDate,
+    })
+
     const { error: patternError } = await supabase.from('work_patterns').upsert(
       {
         therapist_id: input.profileId,
-        works_dow: input.workPattern.worksDow,
-        offs_dow: input.workPattern.offsDow,
-        works_dow_mode: input.workPattern.worksDowMode,
-        weekend_rotation: input.workPattern.weekendRotation,
-        weekend_anchor_date: input.workPattern.weekendAnchorDate,
+        pattern_type: normalizedPattern.pattern_type,
+        works_dow: normalizedPattern.works_dow,
+        offs_dow: normalizedPattern.offs_dow,
+        works_dow_mode: normalizedPattern.works_dow_mode,
+        weekend_rotation: normalizedPattern.weekend_rotation,
+        weekend_anchor_date: normalizedPattern.weekend_anchor_date,
         shift_preference: 'either',
+        weekly_weekdays: normalizedPattern.weekly_weekdays,
+        weekend_rule: normalizedPattern.weekend_rule,
       },
       { onConflict: 'therapist_id' }
     )
@@ -275,6 +306,15 @@ export async function saveWorkPatternAction(formData: FormData) {
     )
   }
 
+  if (weekendRotation === 'every_other' && worksDowMode === 'hard' && worksDow.length === 0) {
+    redirect(
+      buildWorkPatternsUrl({
+        error: 'invalid_pattern',
+        edit_profile: therapistId,
+      })
+    )
+  }
+
   const { data: existingProfile, error: profileError } = await supabase
     .from('profiles')
     .select('id, role, is_active, archived_at')
@@ -314,15 +354,29 @@ export async function saveWorkPatternAction(formData: FormData) {
       )
     }
   } else {
+    const normalizedPattern = normalizeWorkPattern({
+      therapist_id: therapistId,
+      pattern_type:
+        weekendRotation === 'every_other' ? 'weekly_with_weekend_rotation' : 'weekly_fixed',
+      weekly_weekdays: worksDow,
+      offs_dow: offsDow,
+      works_dow_mode: worksDowMode,
+      weekend_rule: weekendRotation === 'every_other' ? 'every_other_weekend' : 'none',
+      weekend_anchor_date: weekendAnchorDate,
+    })
+
     const { error: patternError } = await supabase.from('work_patterns').upsert(
       {
         therapist_id: therapistId,
-        works_dow: worksDow,
-        offs_dow: offsDow,
-        works_dow_mode: worksDowMode,
-        weekend_rotation: weekendRotation,
-        weekend_anchor_date: weekendAnchorDate,
+        pattern_type: normalizedPattern.pattern_type,
+        works_dow: normalizedPattern.works_dow,
+        offs_dow: normalizedPattern.offs_dow,
+        works_dow_mode: normalizedPattern.works_dow_mode,
+        weekend_rotation: normalizedPattern.weekend_rotation,
+        weekend_anchor_date: normalizedPattern.weekend_anchor_date,
         shift_preference: 'either',
+        weekly_weekdays: normalizedPattern.weekly_weekdays,
+        weekend_rule: normalizedPattern.weekend_rule,
       },
       { onConflict: 'therapist_id' }
     )

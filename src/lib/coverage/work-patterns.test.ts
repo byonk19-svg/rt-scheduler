@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   describeWorkPatternSummary,
+  hasFlexibleWeekdays,
   isAllowedByPattern,
+  isMissingRequiredWeeklyWeekdays,
   isWeekendOn,
   normalizeWorkPattern,
   type WorkPattern,
@@ -94,6 +96,53 @@ describe('work-patterns', () => {
     expect(describeWorkPatternSummary(pattern)).toBe(
       'Works Mon, Thu, Fri. Every other weekend starting May 2, 2026.'
     )
+  })
+
+  it('supports rotating weekends with flexible weekdays', () => {
+    const pattern = normalizeWorkPattern({
+      therapist_id: 'therapist-1',
+      pattern_type: 'weekly_with_weekend_rotation',
+      weekly_weekdays: [],
+      works_dow_mode: 'soft',
+      weekend_rule: 'every_other_weekend',
+      weekend_anchor_date: '2026-05-02',
+    })
+
+    expect(pattern.pattern_type).toBe('weekly_with_weekend_rotation')
+    expect(pattern.weekly_weekdays).toEqual([])
+    expect(pattern.works_dow).toEqual([0, 6])
+    expect(pattern.works_dow_mode).toBe('soft')
+    expect(hasFlexibleWeekdays(pattern)).toBe(true)
+    expect(isMissingRequiredWeeklyWeekdays(pattern)).toBe(false)
+    expect(describeWorkPatternSummary(pattern)).toBe(
+      'Rotating weekends. Weekdays: Flexible. Every other weekend starting May 2, 2026.'
+    )
+    expect(isAllowedByPattern(pattern, '2026-05-05')).toMatchObject({
+      allowed: true,
+      reason: 'soft_outside_works_dow',
+    })
+    expect(isAllowedByPattern(pattern, '2026-05-03')).toMatchObject({
+      allowed: true,
+      reason: 'allowed',
+    })
+    expect(isAllowedByPattern(pattern, '2026-05-10')).toMatchObject({
+      allowed: false,
+      reason: 'blocked_every_other_weekend',
+    })
+  })
+
+  it('still requires weekdays for hard rotating-weekend patterns', () => {
+    const pattern = normalizeWorkPattern({
+      therapist_id: 'therapist-1',
+      pattern_type: 'weekly_with_weekend_rotation',
+      weekly_weekdays: [],
+      works_dow_mode: 'hard',
+      weekend_rule: 'every_other_weekend',
+      weekend_anchor_date: '2026-05-02',
+    })
+
+    expect(hasFlexibleWeekdays(pattern)).toBe(false)
+    expect(isMissingRequiredWeeklyWeekdays(pattern)).toBe(true)
   })
 
   it('supports repeating cycle patterns with anchors and plain-English summaries', () => {
