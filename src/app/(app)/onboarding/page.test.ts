@@ -132,6 +132,16 @@ describe('onboarding route copy', () => {
     expect(setupSource).toContain('aria-pressed={selected}')
     expect(previewPanelSource).toContain('First working weekend:')
     expect(setupSource).toContain('Advanced: days you are never available')
+    expect(setupSource).toContain(
+      'No repeating pattern will be applied. You can still mark days you are never available.'
+    )
+    expect(setupSource).toContain('Your schedule will be built block by block.')
+    expect(setupSource).toContain('Optional: days you are never available')
+    expect(setupSource).toContain('No repeating pattern')
+    expect(setupSource).toContain('Continue without a repeating pattern.')
+    expect(setupSource).not.toContain('Future schedules will start blank.')
+    expect(setupSource).not.toContain('Start blank, then mark days you are never available.')
+    expect(setupSource).not.toContain('We will start with a blank schedule.')
     expect(setupSource).toContain('Days marked never available are disabled here.')
     expect(setupSource).toContain('weeklyRows')
     expect(setupSource).toContain('Week {weekIndex + 1}')

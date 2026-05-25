@@ -88,7 +88,7 @@ const SCHEDULE_TYPES: Array<{
     detail: 'Your schedule changes often or is different every block.',
     example: 'Best if your days vary a lot.',
     bestFor: 'Staff who do not have a reliable normal pattern.',
-    nextStep: 'Start blank and mark any days you are never available.',
+    nextStep: 'Continue without a repeating pattern.',
     Icon: Shuffle,
   },
 ]
@@ -430,7 +430,7 @@ export function OnboardingScheduleSetup({
         : scheduleType === 'repeating_cycle'
           ? formatCyclePattern(cycleSegments)
           : scheduleType === 'none'
-            ? 'No set schedule'
+            ? 'No repeating pattern'
             : scheduleType === 'weekly_with_weekend_rotation'
               ? `${effectiveWeeklyDays.length === 0 ? 'No weekdays selected' : formatWeeklyPattern(effectiveWeeklyDays)} + rotating weekends`
               : formatWeeklyPattern(effectiveWeeklyDays)
@@ -852,7 +852,7 @@ function WeeklyPatternStep({
         </h1>
         <p className="mt-1 text-sm leading-5 text-muted-foreground">
           {scheduleType === 'none'
-            ? 'Start blank, then mark days you are never available.'
+            ? 'No repeating pattern will be applied. You can still mark days you are never available.'
             : isRotatingWeekend
               ? 'Select your normal weekdays, then choose the first weekend you work.'
               : 'Select the weekdays you usually work. You can still mark exceptions later.'}
@@ -861,7 +861,7 @@ function WeeklyPatternStep({
 
       {scheduleType === 'none' ? (
         <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-5 py-6 text-base text-muted-foreground">
-          Future schedules will start blank.
+          Your schedule will be built block by block.
         </div>
       ) : (
         <div className="space-y-2">
@@ -977,7 +977,7 @@ function WeeklyPatternStep({
         )}
         {scheduleType === 'none' ? (
           <p className="mt-3 text-base font-bold text-foreground">
-            We will start with a blank schedule.
+            No repeating pattern will be applied.
           </p>
         ) : (
           <p className="mt-3 text-base font-bold text-foreground">
@@ -1002,6 +1002,7 @@ function WeeklyPatternStep({
           selectedDays={neverWorkDays}
           toggleDay={toggleNeverWorkDay}
           collapsed={isRotatingWeekend}
+          title={scheduleType === 'none' ? 'Optional: days you are never available' : undefined}
         />
       )}
     </div>
@@ -1309,14 +1310,14 @@ function NeverWorkDaysPicker({
   selectedDays,
   toggleDay,
   collapsed = false,
+  title = 'Advanced: days you are never available',
 }: {
   selectedDays: number[]
   toggleDay: (day: number) => void
   collapsed?: boolean
+  title?: string
 }) {
-  const fieldsetTitle = collapsed
-    ? 'Days you are never available'
-    : 'Advanced: days you are never available'
+  const fieldsetTitle = collapsed ? 'Days you are never available' : title
   const helperCopy =
     'Use this only if a day should stay off even when another schedule pattern would otherwise mark it as work.'
   const dayCheckboxes = (
@@ -1359,7 +1360,7 @@ function NeverWorkDaysPicker({
   return (
     <details className="group rounded-xl border border-border/80 bg-muted/10 px-4 py-3 transition-colors open:bg-card">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-semibold text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-        <span>Advanced: days you are never available</span>
+        <span>{title}</span>
         <ChevronDown
           className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180"
           aria-hidden="true"
