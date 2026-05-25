@@ -9,6 +9,7 @@ import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase
 type StaffOnboardingContext = {
   supabase: SupabaseClient
   therapist: { id: string; email: string; password: string; firstName: string }
+  flexibleTherapist: { id: string; email: string; password: string; firstName: string }
   cycleId: string
 }
 
@@ -55,6 +56,18 @@ test.describe.serial('staff onboarding gate', () => {
       isLeadEligible: false,
     })
     createdUserIds.push(therapist.id)
+    const flexibleTherapistEmail = `${randomString('onboard-flex')}@example.com`
+    const flexibleTherapistPassword = `Onb!${Math.random().toString(16).slice(2, 10)}`
+    const flexibleTherapist = await createE2EUser(supabase, {
+      email: flexibleTherapistEmail,
+      password: flexibleTherapistPassword,
+      fullName: 'Flexible Weekday Therapist',
+      role: 'therapist',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      isLeadEligible: false,
+    })
+    createdUserIds.push(flexibleTherapist.id)
 
     const cycle = await createScheduleCycle(supabase, {
       label: `Onboarding Availability ${randomString('cycle')}`,
@@ -73,7 +86,7 @@ test.describe.serial('staff onboarding gate', () => {
         preferred_work_days: [],
         default_landing_page: 'dashboard',
       })
-      .eq('id', therapist.id)
+      .in('id', [therapist.id, flexibleTherapist.id])
 
     if (profileUpdateError) {
       throw new Error(
@@ -88,6 +101,12 @@ test.describe.serial('staff onboarding gate', () => {
         email: therapistEmail,
         password: therapistPassword,
         firstName,
+      },
+      flexibleTherapist: {
+        id: flexibleTherapist.id,
+        email: flexibleTherapistEmail,
+        password: flexibleTherapistPassword,
+        firstName: 'Flexible',
       },
       cycleId: cycle.id,
     }
@@ -193,16 +212,14 @@ test.describe.serial('staff onboarding gate', () => {
     await expect(page.getByRole('complementary').getByText('PICK YOUR WORK DAYS')).toHaveCount(0)
     await page.waitForLoadState('networkidle')
 
-    const rotatingWeekendsOption = page.getByRole('button', {
-      name: /Weekdays \+ rotating weekends/i,
-    })
+    const rotatingWeekendsOption = page.getByRole('button', { name: /Rotating weekends/i })
     await rotatingWeekendsOption.click()
     await expect(rotatingWeekendsOption).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('button', { name: 'Next', exact: true }).click()
 
-    await expect(
-      page.getByRole('heading', { name: 'Choose your weekdays and weekend rotation' })
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose your weekend rotation' })).toBeVisible()
+    await expect(page.getByText('My weekdays are usually the same')).toBeVisible()
+    await expect(page.getByText('My weekdays vary')).toBeVisible()
     await expect(page.getByText('Weekends are set by your rotation below.')).toBeVisible()
     await page.getByRole('button', { name: /^Mon\s+Off/ }).click()
     await page.getByRole('button', { name: /^Tue\s+Off/ }).click()
@@ -263,7 +280,7 @@ test.describe.serial('staff onboarding gate', () => {
     const patternResult = await ctx!.supabase
       .from('work_patterns')
       .select(
-        'pattern_type, weekly_weekdays, works_dow, offs_dow, weekend_rule, weekend_anchor_date'
+        'pattern_type, weekly_weekdays, works_dow, offs_dow, weekend_rule, weekend_anchor_date, works_dow_mode'
       )
       .eq('therapist_id', ctx!.therapist.id)
       .single()
@@ -272,6 +289,7 @@ test.describe.serial('staff onboarding gate', () => {
     expect(patternResult.data).toMatchObject({
       pattern_type: 'weekly_with_weekend_rotation',
       weekly_weekdays: [1, 3, 5],
+      works_dow_mode: 'hard',
       offs_dow: [2],
       weekend_rule: 'every_other_weekend',
       weekend_anchor_date: nextSaturdayKey(),
@@ -287,6 +305,81 @@ test.describe.serial('staff onboarding gate', () => {
     expect(profileResult.error).toBeNull()
     expect(profileResult.data?.max_consecutive_days).toBe(4)
     expect(profileResult.data?.preferred_work_days_mode).toBe('no_preference')
+    expect(profileResult.data?.staff_onboarding_completed_at).toBeTruthy()
+  })
+
+  test('new therapist can keep rotating weekends with flexible weekdays', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required.')
+
+    await loginAsAndGoTo(
+      page,
+      ctx!.flexibleTherapist.email,
+      ctx!.flexibleTherapist.password,
+      '/dashboard',
+      /\/onboarding(?:[/?].*)?$/
+    )
+    await page.waitForLoadState('networkidle')
+
+    const rotatingWeekendsOption = page.getByRole('button', { name: /Rotating weekends/i })
+    await rotatingWeekendsOption.click()
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose your weekend rotation' })).toBeVisible()
+    await page.getByRole('button', { name: /My weekdays vary/i }).click()
+    await expect(
+      page.getByText('No fixed weekdays will be applied. Your weekend rotation will still be used.')
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeDisabled()
+
+    const weekendGroup = page.getByRole('group', { name: 'First working weekend' })
+    await weekendGroup.getByRole('button').first().click()
+    await expect(page.getByText('Flexible weekdays + rotating weekends')).toBeVisible()
+    await expect(page.getByRole('complementary').getByText('Weekdays: Flexible')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeEnabled()
+
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Preferences' })).toBeVisible()
+    await page.getByRole('checkbox', { name: 'Mon' }).check()
+    await page.getByRole('checkbox', { name: 'Wed' }).check()
+    await page.getByRole('checkbox', { name: 'Fri' }).check()
+    await expect(page.getByRole('complementary').getByText('Preferred work days:')).toBeVisible()
+    await expect(page.getByRole('complementary').getByText('Mon, Wed, Fri')).toBeVisible()
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+
+    await expect(page.getByRole('heading', { name: "You're all set" })).toBeVisible()
+    await page.getByRole('button', { name: 'View my schedule' }).click()
+    await expect(page).toHaveURL(
+      /(?:\/onboarding\?success=setup_complete|\/dashboard(?:\/staff)?\?success=onboarding_complete)/,
+      { timeout: 45_000 }
+    )
+
+    const patternResult = await ctx!.supabase
+      .from('work_patterns')
+      .select(
+        'pattern_type, weekly_weekdays, works_dow, works_dow_mode, weekend_rule, weekend_anchor_date'
+      )
+      .eq('therapist_id', ctx!.flexibleTherapist.id)
+      .single()
+
+    expect(patternResult.error).toBeNull()
+    expect(patternResult.data).toMatchObject({
+      pattern_type: 'weekly_with_weekend_rotation',
+      weekly_weekdays: [],
+      works_dow_mode: 'soft',
+      weekend_rule: 'every_other_weekend',
+      weekend_anchor_date: nextSaturdayKey(),
+    })
+    expect(patternResult.data?.works_dow).toEqual([0, 6])
+
+    const profileResult = await ctx!.supabase
+      .from('profiles')
+      .select('preferred_work_days, preferred_work_days_mode, staff_onboarding_completed_at')
+      .eq('id', ctx!.flexibleTherapist.id)
+      .single()
+
+    expect(profileResult.error).toBeNull()
+    expect(profileResult.data?.preferred_work_days).toEqual([1, 3, 5])
+    expect(profileResult.data?.preferred_work_days_mode).toBe('specific_days')
     expect(profileResult.data?.staff_onboarding_completed_at).toBeTruthy()
   })
 })

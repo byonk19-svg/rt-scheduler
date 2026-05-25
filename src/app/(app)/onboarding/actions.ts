@@ -248,6 +248,9 @@ export async function completeScheduleSetupOnboardingAction(formData: FormData) 
   const weekendRule = String(
     formData.get('weekend_rule') ?? 'none'
   ).trim() as WorkPattern['weekend_rule']
+  const worksDowModeRaw = String(formData.get('works_dow_mode') ?? 'hard').trim()
+  const worksDowMode: WorkPattern['works_dow_mode'] =
+    patternType === 'weekly_with_weekend_rotation' && worksDowModeRaw === 'soft' ? 'soft' : 'hard'
   const weekendAnchorDate = String(formData.get('weekend_anchor_date') ?? '').trim() || null
   const cycleAnchorDate = String(formData.get('cycle_anchor_date') ?? '').trim() || null
   const weeklyWeekdays = parseDowValues(formData.getAll('weekly_weekdays'))
@@ -274,7 +277,7 @@ export async function completeScheduleSetupOnboardingAction(formData: FormData) 
   const normalized = normalizeWorkPattern({
     therapist_id: context.user.id,
     pattern_type: patternType,
-    works_dow_mode: 'hard',
+    works_dow_mode: worksDowMode,
     offs_dow: neverWorkDays,
     weekly_weekdays:
       patternType === 'repeating_cycle' || patternType === 'none' ? [] : weeklyWeekdays,
@@ -288,9 +291,11 @@ export async function completeScheduleSetupOnboardingAction(formData: FormData) 
   })
 
   const invalidWeeklyPattern =
-    (normalized.pattern_type === 'weekly_fixed' ||
-      normalized.pattern_type === 'weekly_with_weekend_rotation') &&
-    normalized.weekly_weekdays.length === 0
+    normalized.pattern_type === 'weekly_fixed'
+      ? normalized.weekly_weekdays.length === 0
+      : normalized.pattern_type === 'weekly_with_weekend_rotation' &&
+        normalized.works_dow_mode !== 'soft' &&
+        normalized.weekly_weekdays.length === 0
   const invalidWeekendPattern =
     normalized.pattern_type === 'weekly_with_weekend_rotation' &&
     normalized.weekend_rule === 'every_other_weekend' &&

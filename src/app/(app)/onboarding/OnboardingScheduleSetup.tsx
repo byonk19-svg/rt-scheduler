@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils'
 
 type CycleDayState = 'work' | 'off'
 type CyclePreset = '3-3' | '4-4' | 'custom'
+type RotatingWeekdayMode = 'fixed' | 'flexible'
 
 type Props = {
   initialPattern: WorkPattern | null
@@ -66,11 +67,11 @@ const SCHEDULE_TYPES: Array<{
   },
   {
     type: 'weekly_with_weekend_rotation',
-    title: 'Weekdays + rotating weekends',
-    detail: 'Your weekdays stay mostly the same, but weekends rotate.',
+    title: 'Rotating weekends',
+    detail: 'Your weekends rotate. Your weekdays can be fixed or flexible.',
     example: 'Example: Every other weekend.',
-    bestFor: 'Staff whose weekdays are predictable but weekends alternate.',
-    nextStep: 'Choose your normal weekdays and the first weekend you work.',
+    bestFor: 'Staff who work the same rotating weekends, even if weekdays change.',
+    nextStep: 'Choose your weekday style and the first weekend you work.',
     Icon: Users,
   },
   {
@@ -317,6 +318,13 @@ export function OnboardingScheduleSetup({
   const [weekendAnchorDate, setWeekendAnchorDate] = useState(
     initialPattern?.weekend_anchor_date ?? ''
   )
+  const [rotatingWeekdayMode, setRotatingWeekdayMode] = useState<RotatingWeekdayMode>(
+    initialPattern?.pattern_type === 'weekly_with_weekend_rotation' &&
+      initialPattern.works_dow_mode === 'soft' &&
+      !initialPattern.weekly_weekdays?.length
+      ? 'flexible'
+      : 'fixed'
+  )
   const [maxConsecutiveDays, setMaxConsecutiveDays] = useState(initialMaxConsecutiveDays)
   const [previewPulseKey, setPreviewPulseKey] = useState(0)
   const [preferredDays, setPreferredDays] = useState<number[]>(
@@ -333,15 +341,25 @@ export function OnboardingScheduleSetup({
   const preferredWorkDaysMode: PreferredWorkDaysMode =
     effectivePreferredDays.length > 0 ? 'specific_days' : 'no_preference'
 
-  const effectiveWeeklyDays =
-    scheduleType === 'weekly_with_weekend_rotation'
-      ? weeklyDays.filter((day) => day >= 1 && day <= 5 && !neverWorkDays.includes(day))
-      : weeklyDays.filter((day) => !neverWorkDays.includes(day))
+  const effectiveWeeklyDays = useMemo(() => {
+    if (scheduleType === 'weekly_with_weekend_rotation' && rotatingWeekdayMode === 'flexible') {
+      return []
+    }
+
+    if (scheduleType === 'weekly_with_weekend_rotation') {
+      return weeklyDays.filter((day) => day >= 1 && day <= 5 && !neverWorkDays.includes(day))
+    }
+
+    return weeklyDays.filter((day) => !neverWorkDays.includes(day))
+  }, [neverWorkDays, rotatingWeekdayMode, scheduleType, weeklyDays])
+  const worksDowMode =
+    scheduleType === 'weekly_with_weekend_rotation' && rotatingWeekdayMode === 'flexible'
+      ? 'soft'
+      : 'hard'
 
   const previewPattern = useMemo(() => {
     const emptyWeeklyPreviewPattern =
-      (scheduleType === 'weekly_fixed' || scheduleType === 'weekly_with_weekend_rotation') &&
-      effectiveWeeklyDays.length === 0
+      scheduleType === 'weekly_fixed' && effectiveWeeklyDays.length === 0
 
     if (emptyWeeklyPreviewPattern) {
       return normalizeWorkPattern({
@@ -360,7 +378,7 @@ export function OnboardingScheduleSetup({
     return normalizeWorkPattern({
       therapist_id: initialPattern?.therapist_id ?? 'therapist',
       pattern_type: scheduleType,
-      works_dow_mode: 'hard',
+      works_dow_mode: worksDowMode,
       offs_dow: neverWorkDays,
       weekly_weekdays:
         scheduleType === 'repeating_cycle' || scheduleType === 'none' ? [] : effectiveWeeklyDays,
@@ -381,6 +399,7 @@ export function OnboardingScheduleSetup({
     neverWorkDays,
     scheduleType,
     weekendAnchorDate,
+    worksDowMode,
   ])
 
   const previewDays = useMemo(() => {
@@ -432,14 +451,18 @@ export function OnboardingScheduleSetup({
           : scheduleType === 'none'
             ? 'No repeating pattern'
             : scheduleType === 'weekly_with_weekend_rotation'
-              ? `${effectiveWeeklyDays.length === 0 ? 'No weekdays selected' : formatWeeklyPattern(effectiveWeeklyDays)} + rotating weekends`
+              ? rotatingWeekdayMode === 'flexible'
+                ? 'Rotating weekends; flexible weekdays'
+                : `${effectiveWeeklyDays.length === 0 ? 'No weekdays selected' : formatWeeklyPattern(effectiveWeeklyDays)} + rotating weekends`
               : formatWeeklyPattern(effectiveWeeklyDays)
   const canContinueFromPattern =
     scheduleType === 'none' ||
-    ((scheduleType === 'repeating_cycle'
-      ? workDaysInPattern > 0 && offDaysInCycle > 0 && cycleAnchorDate.trim().length > 0
-      : effectiveWeeklyDays.length > 0) &&
-      (scheduleType !== 'weekly_with_weekend_rotation' || weekendAnchorDate.trim().length > 0))
+    (scheduleType === 'weekly_with_weekend_rotation'
+      ? weekendAnchorDate.trim().length > 0 &&
+        (rotatingWeekdayMode === 'flexible' || effectiveWeeklyDays.length > 0)
+      : scheduleType === 'repeating_cycle'
+        ? workDaysInPattern > 0 && offDaysInCycle > 0 && cycleAnchorDate.trim().length > 0
+        : effectiveWeeklyDays.length > 0)
 
   function selectScheduleType(type: RecurringPatternType) {
     setScheduleType(type)
@@ -512,6 +535,7 @@ export function OnboardingScheduleSetup({
       <input type="hidden" name="weekend_anchor_date" value={weekendAnchorDate} />
       <input type="hidden" name="cycle_anchor_date" value={cycleAnchorDate} />
       <input type="hidden" name="cycle_segments_json" value={JSON.stringify(cycleSegments)} />
+      <input type="hidden" name="works_dow_mode" value={worksDowMode} />
       <input type="hidden" name="max_consecutive_days" value={maxConsecutiveDays} />
       <input type="hidden" name="preferred_work_days_mode" value={preferredWorkDaysMode} />
       {effectiveWeeklyDays.map((day) => (
@@ -554,6 +578,8 @@ export function OnboardingScheduleSetup({
                     workDaysInPattern={workDaysInPattern}
                     neverWorkDays={neverWorkDays}
                     toggleNeverWorkDay={toggleNeverWorkDay}
+                    rotatingWeekdayMode={rotatingWeekdayMode}
+                    setRotatingWeekdayMode={setRotatingWeekdayMode}
                     weekendAnchorDate={weekendAnchorDate}
                     setWeekendAnchorDate={setWeekendAnchorDate}
                     weekendOptions={weekendOptions}
@@ -640,6 +666,7 @@ export function OnboardingScheduleSetup({
             longestRun={longestRun}
             maxConsecutiveDays={maxConsecutiveDays}
             preferredDays={effectivePreferredDays}
+            rotatingWeekdayMode={rotatingWeekdayMode}
             neverWorkDays={neverWorkDays}
             weekendAnchorDate={weekendAnchorDate}
             weekendAnchorLabel={formatWeekendAnchorRange(weekendAnchorDate)}
@@ -820,6 +847,8 @@ function WeeklyPatternStep({
   workDaysInPattern,
   neverWorkDays,
   toggleNeverWorkDay,
+  rotatingWeekdayMode,
+  setRotatingWeekdayMode,
   weekendAnchorDate,
   setWeekendAnchorDate,
   weekendOptions,
@@ -834,6 +863,8 @@ function WeeklyPatternStep({
   workDaysInPattern: number
   neverWorkDays: number[]
   toggleNeverWorkDay: (day: number) => void
+  rotatingWeekdayMode: RotatingWeekdayMode
+  setRotatingWeekdayMode: (value: RotatingWeekdayMode) => void
   weekendAnchorDate: string
   setWeekendAnchorDate: (value: string) => void
   weekendOptions: Array<{ saturdayKey: string; sundayKey: string; label: string }>
@@ -849,21 +880,72 @@ function WeeklyPatternStep({
           {scheduleType === 'none'
             ? 'No set schedule'
             : isRotatingWeekend
-              ? 'Choose your weekdays and weekend rotation'
+              ? 'Choose your weekend rotation'
               : 'Choose your normal work days'}
         </h1>
         <p className="mt-1 text-sm leading-5 text-muted-foreground">
           {scheduleType === 'none'
             ? 'No repeating pattern will be applied. You can still mark days you are never available.'
             : isRotatingWeekend
-              ? 'Select your normal weekdays, then choose the first weekend you work.'
+              ? 'Choose the first weekend you work, then tell us whether your weekdays are fixed or flexible.'
               : 'Select the weekdays you usually work. You can still mark exceptions later.'}
         </p>
       </div>
 
+      {isRotatingWeekend ? (
+        <fieldset className="rounded-xl border border-border/80 bg-muted/10 px-4 py-3">
+          <legend className="px-1 text-sm font-semibold text-foreground">Weekday pattern</legend>
+          <p className="mt-1 text-xs text-muted-foreground">
+            This only controls weekdays. Your weekend rotation stays active either way.
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {[
+              {
+                value: 'fixed' as const,
+                title: 'My weekdays are usually the same',
+                detail: 'Pick the weekdays you normally work.',
+              },
+              {
+                value: 'flexible' as const,
+                title: 'My weekdays vary',
+                detail: 'No fixed weekdays will be applied.',
+              },
+            ].map((option) => {
+              const selected = rotatingWeekdayMode === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setRotatingWeekdayMode(option.value)}
+                  aria-pressed={selected}
+                  className={cn(
+                    'rounded-lg border px-3 py-2 text-left text-sm transition-colors',
+                    selected
+                      ? 'border-primary bg-[var(--info-subtle)] text-primary shadow-tw-sm'
+                      : 'border-border/80 bg-card text-foreground hover:bg-secondary/35'
+                  )}
+                >
+                  <span className="flex items-center justify-between gap-2 font-bold">
+                    {option.title}
+                    {selected ? <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {option.detail}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
+      ) : null}
+
       {scheduleType === 'none' ? (
         <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-5 py-6 text-base text-muted-foreground">
           Your schedule will be built block by block.
+        </div>
+      ) : isRotatingWeekend && rotatingWeekdayMode === 'flexible' ? (
+        <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-5 py-6 text-sm text-muted-foreground">
+          No fixed weekdays will be applied. Your weekend rotation will still be used.
         </div>
       ) : (
         <div className="space-y-2">
@@ -981,13 +1063,19 @@ function WeeklyPatternStep({
           <p className="mt-3 text-base font-bold text-foreground">
             No repeating pattern will be applied.
           </p>
+        ) : isRotatingWeekend && rotatingWeekdayMode === 'flexible' ? (
+          <p className="mt-3 text-base font-bold text-foreground">
+            Flexible weekdays + rotating weekends
+          </p>
         ) : (
           <p className="mt-3 text-base font-bold text-foreground">
             {workDaysInPattern} day{workDaysInPattern === 1 ? '' : 's'} per week
             {isRotatingWeekend ? ' + rotating weekends' : ''}
           </p>
         )}
-        {scheduleType !== 'none' && workDaysInPattern === 0 ? (
+        {scheduleType !== 'none' &&
+        !(isRotatingWeekend && rotatingWeekdayMode === 'flexible') &&
+        workDaysInPattern === 0 ? (
           <p className="mt-2 text-sm font-medium text-[var(--warning-text)]">
             Pick at least one weekday.
           </p>
@@ -1415,6 +1503,7 @@ function PreviewPanel({
   longestRun,
   maxConsecutiveDays,
   preferredDays,
+  rotatingWeekdayMode,
   neverWorkDays,
   weekendAnchorDate,
   weekendAnchorLabel,
@@ -1427,6 +1516,7 @@ function PreviewPanel({
   longestRun: number
   maxConsecutiveDays: number
   preferredDays: number[]
+  rotatingWeekdayMode: RotatingWeekdayMode
   neverWorkDays: number[]
   weekendAnchorDate: string
   weekendAnchorLabel: string
@@ -1509,6 +1599,10 @@ function PreviewPanel({
               <p className="mt-2 text-sm font-medium text-primary">
                 First working weekend: {weekendAnchorLabel}
               </p>
+            ) : null}
+            {scheduleType === 'weekly_with_weekend_rotation' &&
+            rotatingWeekdayMode === 'flexible' ? (
+              <p className="mt-2 text-sm font-medium text-primary">Weekdays: Flexible</p>
             ) : null}
             {neverWorkDays.length > 0 ? (
               <p className="mt-2 text-sm font-medium text-[var(--error-text)]">

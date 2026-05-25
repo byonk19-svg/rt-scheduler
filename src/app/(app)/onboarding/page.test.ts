@@ -105,10 +105,19 @@ describe('onboarding route copy', () => {
     expect(setupSource).toContain('Example: 2 on / 2 off.')
     expect(setupSource).toContain('Best if your days vary a lot.')
     expect(setupSource).toContain('Choose your normal work days.')
-    expect(setupSource).toContain('Choose your weekdays and weekend rotation')
+    expect(setupSource).toContain('Rotating weekends')
+    expect(setupSource).toContain('Your weekends rotate. Your weekdays can be fixed or flexible.')
+    expect(setupSource).toContain('Choose your weekend rotation')
     expect(setupSource).toContain(
-      'Select your normal weekdays, then choose the first weekend you work.'
+      'Choose the first weekend you work, then tell us whether your weekdays are fixed or flexible.'
     )
+    expect(setupSource).toContain('Weekday pattern')
+    expect(setupSource).toContain('My weekdays are usually the same')
+    expect(setupSource).toContain('My weekdays vary')
+    expect(setupSource).toContain(
+      'No fixed weekdays will be applied. Your weekend rotation will still be used.'
+    )
+    expect(previewPanelSource).toContain('Weekdays: Flexible')
     expect(setupSource).toContain('Weekends are set by your rotation below.')
     expect(setupSource).toContain('You can still mark exceptions later.')
     expect(setupSource).not.toContain("Next, you'll choose your normal work days.")
@@ -208,6 +217,8 @@ describe('onboarding route copy', () => {
     expect(previewPanelSource).not.toContain('ConsecutiveDaysWarning')
     expect(setupSource).not.toContain('You can adjust anything later')
     expect(actionSource).toContain("formData.getAll('offs_dow')")
+    expect(actionSource).toContain("formData.get('works_dow_mode')")
+    expect(actionSource).toContain("worksDowModeRaw === 'soft'")
     expect(actionSource).toContain('offs_dow: neverWorkDays')
     expect(actionSource).toContain('safePreferredWorkDays')
     expect(source).toContain('View schedule')
