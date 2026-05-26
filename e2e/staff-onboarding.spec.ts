@@ -313,13 +313,10 @@ test.describe.serial('staff onboarding gate', () => {
     await expectConfirmRow(page, 'Preferred work days', 'Any day')
     await expectConfirmRow(page, 'Never available', 'Tue')
     await page.getByRole('button', { name: 'Save and view my schedule' }).click()
-    await expect(page).toHaveURL(
-      /(?:\/onboarding\?success=setup_complete|\/dashboard(?:\/staff)?\?success=onboarding_complete)/,
-      { timeout: 45_000 }
-    )
-    if (page.url().includes('/onboarding')) {
-      await expect(page.getByRole('link', { name: 'View schedule' })).toBeVisible()
-    }
+    await expect(page).toHaveURL(/\/schedule\?setup=complete/, { timeout: 45_000 })
+    await expect(page.getByText("You're all set")).toBeVisible()
+    await expect(page.getByText('Your work pattern and preferences have been saved.')).toBeVisible()
+    await expect(page.getByText('Your schedule is ready')).toHaveCount(0)
 
     const patternResult = await ctx!.supabase
       .from('work_patterns')
@@ -402,10 +399,10 @@ test.describe.serial('staff onboarding gate', () => {
     await page.getByRole('button', { name: 'Next', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Does this look right?' })).toBeVisible()
     await page.getByRole('button', { name: 'Save and view my schedule' }).click()
-    await expect(page).toHaveURL(
-      /(?:\/onboarding\?success=setup_complete|\/dashboard(?:\/staff)?\?success=onboarding_complete)/,
-      { timeout: 45_000 }
-    )
+    await expect(page).toHaveURL(/\/schedule\?setup=complete/, { timeout: 45_000 })
+    await expect(page.getByText("You're all set")).toBeVisible()
+    await expect(page.getByText('Your work pattern and preferences have been saved.')).toBeVisible()
+    await expect(page.getByText('Your schedule is ready')).toHaveCount(0)
 
     const patternResult = await ctx!.supabase
       .from('work_patterns')

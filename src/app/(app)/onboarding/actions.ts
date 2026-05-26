@@ -239,7 +239,7 @@ export async function completeScheduleSetupOnboardingAction(formData: FormData) 
   }
 
   if (context.status.hasRecordedCompletion) {
-    redirect('/onboarding?success=setup_complete')
+    redirect('/schedule?setup=complete')
   }
 
   const patternType = String(
@@ -372,10 +372,11 @@ export async function completeScheduleSetupOnboardingAction(formData: FormData) 
   }
 
   revalidatePath('/onboarding')
+  revalidatePath('/schedule')
   revalidatePath('/dashboard')
   revalidatePath('/therapist/recurring-pattern')
   revalidatePath('/therapist/settings')
   revalidatePath('/therapist/availability')
 
-  redirect('/onboarding?success=setup_complete')
+  redirect('/schedule?setup=complete')
 }
