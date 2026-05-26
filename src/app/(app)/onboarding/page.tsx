@@ -111,13 +111,11 @@ function CompletionScreen() {
       <Card className="border-primary/25 shadow-tw-md">
         <CardHeader>
           <CardTitle className="text-2xl font-bold tracking-tight">{"You're all set"}</CardTitle>
-          <CardDescription>
-            Your schedule is ready. You can adjust anything anytime.
-          </CardDescription>
+          <CardDescription>Your work pattern and preferences have been saved.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           <Button asChild>
-            <Link href="/schedule">View schedule</Link>
+            <Link href="/schedule">Go to schedule</Link>
           </Button>
         </CardContent>
       </Card>

@@ -8,6 +8,7 @@ import { generateDraftScheduleAction } from '@/app/(app)/schedule/actions/draft-
 import { toggleCyclePublishedAction } from '@/app/(app)/schedule/actions/publish-actions'
 
 import { loadScheduleGridData } from './schedule-grid-data'
+import { SetupCompleteBanner } from './SetupCompleteBanner'
 
 export const metadata: Metadata = {
   title: 'Team Schedule',
@@ -45,8 +46,14 @@ function getScheduleSubtitle(dataset: GridDataset) {
   return 'Review your row and the live team schedule in one 42-day grid.'
 }
 
+function getSetupParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0]
+  return value
+}
+
 export default async function SchedulePage({ searchParams }: SchedulePageProps) {
   const params = (await searchParams) ?? {}
+  const showSetupCompleteBanner = getSetupParam(params.setup) === 'complete'
   const result = await loadScheduleGridData(params)
 
   if (result.status === 'unauthenticated') {
@@ -59,7 +66,8 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
 
   if (result.status === 'no_cycle') {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
+      <div className="mx-auto max-w-7xl space-y-4 px-4 py-12 md:px-6">
+        {showSetupCompleteBanner ? <SetupCompleteBanner /> : null}
         <section className="mx-auto max-w-md rounded-xl border border-border/70 bg-card px-6 py-8 text-center shadow-tw-sm">
           <p className="text-base font-semibold text-foreground">
             No active Schedule Block is available yet.
@@ -74,7 +82,8 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   }
 
   return (
-    <div className="mx-auto max-w-[96rem] scroll-mt-24 px-4 pb-6 pt-2 md:px-6 md:pt-3">
+    <div className="mx-auto max-w-[96rem] scroll-mt-24 space-y-4 px-4 pb-6 pt-2 md:px-6 md:pt-3">
+      {showSetupCompleteBanner ? <SetupCompleteBanner /> : null}
       <ManagerWorkspaceHeader
         title="Team Schedule"
         subtitle={getScheduleSubtitle(result.dataset)}
