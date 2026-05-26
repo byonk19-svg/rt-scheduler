@@ -384,6 +384,7 @@ export function ScheduleGrid({
       ) : null}
       {isStatusTarget && activeCellTarget ? (
         <StatusCellPopover
+          key={`${activeCellTarget.userId}:${activeCellTarget.date}:${activeCellTarget.cell.shiftId ?? 'unassigned'}`}
           open
           onOpenChange={(open) => {
             if (!open) setActiveCellTarget(null)
