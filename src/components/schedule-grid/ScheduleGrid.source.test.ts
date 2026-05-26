@@ -36,10 +36,20 @@ describe('ScheduleGrid source invariants', () => {
       code.indexOf('const handleUnassign = useCallback')
     )
 
-    expect(handleAssignBlock).toContain(
-      'if (!activeCellTarget || !initialDataset.canManageCoverage || cellsLocked) return'
-    )
+    expect(handleAssignBlock).toContain('interactionMode.canAssignShifts')
     expect(handleAssignBlock).not.toContain('!initialDataset.isPublished')
+  })
+
+  it('gates schedule interactions through the explicit interaction mode', () => {
+    const code = source()
+    const toolbarCode = toolbarSource()
+
+    expect(code).toContain('const interactionMode = initialDataset.interactionMode')
+    expect(code).toContain('interactionMode.canAssignShifts')
+    expect(code).toContain('interactionMode.canUnassignShifts')
+    expect(code).toContain('interactionMode.canDesignateLead')
+    expect(code).toContain('interactionMode.canUpdateAssignmentStatus')
+    expect(toolbarCode).toContain('interactionMode.canUseManagerToolbar')
   })
 
   it('uses explicit shift labels in the toolbar', () => {

@@ -56,6 +56,14 @@ function okDataset() {
   return {
     cycleId: 'cycle-2',
     shiftType: 'day' as const,
+    interactionMode: {
+      kind: 'manager_edit' as const,
+      canUseManagerToolbar: true,
+      canAssignShifts: true,
+      canUnassignShifts: true,
+      canDesignateLead: true,
+      canUpdateAssignmentStatus: true,
+    },
     availableCycles: [{ id: 'cycle-2', label: 'May 3 - Jun 13, 2026' }],
     cycleDates: ['2026-05-03', '2026-05-04'],
     cycleDateRangeLabel: 'May 3 - Jun 13, 2026',

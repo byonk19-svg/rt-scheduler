@@ -36,6 +36,7 @@ import {
   buildAvailableCycleOptions,
   buildTherapistGridRows,
   mapShiftToGridStatus,
+  resolveScheduleInteractionMode,
   selectScheduleCycle,
   shapePreFlightSummary,
 } from './schedule-grid-model'
@@ -297,6 +298,88 @@ describe('loadScheduleGridData visibility', () => {
 })
 
 describe('schedule grid model helpers', () => {
+  it('resolves manager mode with structural and status actions enabled', () => {
+    expect(
+      resolveScheduleInteractionMode({
+        canManageCoverage: true,
+        canUpdateAssignmentStatus: true,
+        isPublished: false,
+      })
+    ).toEqual({
+      kind: 'manager_edit',
+      canUseManagerToolbar: true,
+      canAssignShifts: true,
+      canUnassignShifts: true,
+      canDesignateLead: true,
+      canUpdateAssignmentStatus: true,
+    })
+
+    expect(
+      resolveScheduleInteractionMode({
+        canManageCoverage: true,
+        canUpdateAssignmentStatus: true,
+        isPublished: true,
+      }).kind
+    ).toBe('manager_edit')
+  })
+
+  it('resolves lead status mode only for published schedules', () => {
+    expect(
+      resolveScheduleInteractionMode({
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: true,
+        isPublished: true,
+      })
+    ).toMatchObject({
+      kind: 'lead_status',
+      canAssignShifts: false,
+      canUnassignShifts: false,
+      canDesignateLead: false,
+      canUpdateAssignmentStatus: true,
+    })
+
+    expect(
+      resolveScheduleInteractionMode({
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: true,
+        isPublished: false,
+      }).kind
+    ).toBe('staff_view')
+  })
+
+  it('keeps staff and future combined schedule views read-only', () => {
+    expect(
+      resolveScheduleInteractionMode({
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: false,
+        isPublished: true,
+      })
+    ).toEqual({
+      kind: 'staff_view',
+      canUseManagerToolbar: false,
+      canAssignShifts: false,
+      canUnassignShifts: false,
+      canDesignateLead: false,
+      canUpdateAssignmentStatus: false,
+    })
+
+    expect(
+      resolveScheduleInteractionMode({
+        canManageCoverage: true,
+        canUpdateAssignmentStatus: true,
+        isPublished: true,
+        viewMode: 'combined',
+      })
+    ).toEqual({
+      kind: 'combined_readonly',
+      canUseManagerToolbar: false,
+      canAssignShifts: false,
+      canUnassignShifts: false,
+      canDesignateLead: false,
+      canUpdateAssignmentStatus: false,
+    })
+  })
+
   it('keeps manager cycle options broad and honors a requested draft cycle', () => {
     const result = selectScheduleCycle({
       cycles: [publishedCycle, draftCycle],

@@ -3,12 +3,49 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import { ScheduleGridTable } from './ScheduleGridTable'
-import type { GridDataset } from './schedule-grid-types'
+import type { GridDataset, ScheduleInteractionMode } from './schedule-grid-types'
+
+const MANAGER_EDIT_MODE: ScheduleInteractionMode = {
+  kind: 'manager_edit',
+  canUseManagerToolbar: true,
+  canAssignShifts: true,
+  canUnassignShifts: true,
+  canDesignateLead: true,
+  canUpdateAssignmentStatus: true,
+}
+
+const STAFF_VIEW_MODE: ScheduleInteractionMode = {
+  kind: 'staff_view',
+  canUseManagerToolbar: false,
+  canAssignShifts: false,
+  canUnassignShifts: false,
+  canDesignateLead: false,
+  canUpdateAssignmentStatus: false,
+}
+
+const LEAD_STATUS_MODE: ScheduleInteractionMode = {
+  kind: 'lead_status',
+  canUseManagerToolbar: false,
+  canAssignShifts: false,
+  canUnassignShifts: false,
+  canDesignateLead: false,
+  canUpdateAssignmentStatus: true,
+}
+
+const COMBINED_READONLY_MODE: ScheduleInteractionMode = {
+  kind: 'combined_readonly',
+  canUseManagerToolbar: false,
+  canAssignShifts: false,
+  canUnassignShifts: false,
+  canDesignateLead: false,
+  canUpdateAssignmentStatus: false,
+}
 
 function makeDataset(overrides: Partial<GridDataset> = {}): GridDataset {
   return {
     cycleId: 'c1',
     shiftType: 'day',
+    interactionMode: MANAGER_EDIT_MODE,
     availableCycles: [{ id: 'c1', label: 'May 4 - May 5, 2026' }],
     cycleDates: ['2026-05-03', '2026-05-04', '2026-05-05'],
     cycleDateRangeLabel: 'May 3 - May 5, 2026',
@@ -54,7 +91,12 @@ function makeDataset(overrides: Partial<GridDataset> = {}): GridDataset {
 
 function renderTable(dataset: GridDataset, interactionsDisabled = false) {
   return renderToStaticMarkup(
-    createElement(ScheduleGridTable, { dataset, onCellClick: vi.fn(), interactionsDisabled })
+    createElement(ScheduleGridTable, {
+      dataset,
+      interactionMode: dataset.interactionMode,
+      onCellClick: vi.fn(),
+      interactionsDisabled,
+    })
   )
 }
 
@@ -85,6 +127,7 @@ describe('ScheduleGridTable', () => {
       makeDataset({
         viewerUserId: 'u1',
         viewerRole: 'therapist',
+        interactionMode: STAFF_VIEW_MODE,
         canManageCoverage: false,
         canUpdateAssignmentStatus: false,
       })
@@ -226,6 +269,7 @@ describe('ScheduleGridTable', () => {
       makeDataset({
         viewerUserId: 'u1',
         viewerRole: 'therapist',
+        interactionMode: STAFF_VIEW_MODE,
         canManageCoverage: false,
         canUpdateAssignmentStatus: false,
         isPublished: true,
@@ -235,5 +279,37 @@ describe('ScheduleGridTable', () => {
 
     expect(cell).toContain('data-testid="cell-u1-2026-05-04"')
     expect(cell).toContain('disabled=""')
+  })
+
+  it('lets leads update assigned published schedule cells without structural assignment', () => {
+    const html = renderTable(
+      makeDataset({
+        viewerUserId: 'lead-1',
+        viewerRole: 'lead',
+        interactionMode: LEAD_STATUS_MODE,
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: true,
+        isPublished: true,
+      })
+    )
+    const assignedCell = getCellButton(html, 'u1', '2026-05-04')
+    const offCell = getCellButton(html, 'u1', '2026-05-05')
+
+    expect(assignedCell).not.toContain('disabled')
+    expect(offCell).toContain('disabled=""')
+  })
+
+  it('keeps future combined schedule views read-only for live operations', () => {
+    const html = renderTable(
+      makeDataset({
+        interactionMode: COMBINED_READONLY_MODE,
+        isPublished: true,
+      })
+    )
+    const assignedCell = getCellButton(html, 'u1', '2026-05-04')
+    const offCell = getCellButton(html, 'u1', '2026-05-05')
+
+    expect(assignedCell).toContain('disabled=""')
+    expect(offCell).toContain('disabled=""')
   })
 })

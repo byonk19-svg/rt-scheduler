@@ -3,7 +3,12 @@
 import { cn } from '@/lib/utils'
 
 import { getCellDisplay, isWorkingScheduledGridCell } from './schedule-grid-utils'
-import type { GridCell, GridDataset, TherapistGridRow } from './schedule-grid-types'
+import type {
+  GridCell,
+  GridDataset,
+  ScheduleInteractionMode,
+  TherapistGridRow,
+} from './schedule-grid-types'
 
 type CellClickHandler = (
   userId: string,
@@ -14,6 +19,7 @@ type CellClickHandler = (
 
 type ScheduleGridTableProps = {
   dataset: GridDataset
+  interactionMode: ScheduleInteractionMode
   onCellClick?: CellClickHandler
   interactionsDisabled?: boolean
 }
@@ -66,6 +72,7 @@ function orderManagerRows(rows: readonly TherapistGridRow[]) {
 
 export function ScheduleGridTable({
   dataset,
+  interactionMode,
   onCellClick,
   interactionsDisabled = false,
 }: ScheduleGridTableProps) {
@@ -134,9 +141,7 @@ export function ScheduleGridTable({
               row={row}
               cycleDates={cycleDates}
               isViewer={isStaffViewer && row.userId === viewerUserId}
-              canManageCoverage={dataset.canManageCoverage}
-              canUpdateAssignmentStatus={dataset.canUpdateAssignmentStatus}
-              isPublished={dataset.isPublished}
+              interactionMode={interactionMode}
               interactionsDisabled={interactionsDisabled}
               onCellClick={onCellClick}
             />
@@ -155,9 +160,7 @@ export function ScheduleGridTable({
                   row={row}
                   cycleDates={cycleDates}
                   isViewer={false}
-                  canManageCoverage={dataset.canManageCoverage}
-                  canUpdateAssignmentStatus={dataset.canUpdateAssignmentStatus}
-                  isPublished={dataset.isPublished}
+                  interactionMode={interactionMode}
                   interactionsDisabled={interactionsDisabled}
                   onCellClick={onCellClick}
                 />
@@ -228,18 +231,14 @@ function TherapistRow({
   row,
   cycleDates,
   isViewer,
-  canManageCoverage,
-  canUpdateAssignmentStatus,
-  isPublished,
+  interactionMode,
   interactionsDisabled,
   onCellClick,
 }: {
   row: TherapistGridRow
   cycleDates: readonly string[]
   isViewer: boolean
-  canManageCoverage: boolean
-  canUpdateAssignmentStatus: boolean
-  isPublished: boolean
+  interactionMode: ScheduleInteractionMode
   interactionsDisabled: boolean
   onCellClick?: CellClickHandler
 }) {
@@ -270,9 +269,12 @@ function TherapistRow({
           isIneligible: false,
         }
         const display = getCellDisplay(cell)
-        const canAssign = canManageCoverage && cell.status === 'off'
+        const canAssign = interactionMode.canAssignShifts && cell.status === 'off'
         const canEditAssigned =
-          cell.status !== 'off' && (canManageCoverage || (canUpdateAssignmentStatus && isPublished))
+          cell.status !== 'off' &&
+          (interactionMode.canUnassignShifts ||
+            interactionMode.canDesignateLead ||
+            interactionMode.canUpdateAssignmentStatus)
         const clickable = Boolean(
           onCellClick &&
           !interactionsDisabled &&
