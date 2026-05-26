@@ -146,6 +146,37 @@ test.describe.serial('staff onboarding gate', () => {
     }
   })
 
+  test('new therapist can cancel exit setup and then leave onboarding', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required.')
+
+    await loginAsAndGoTo(
+      page,
+      ctx!.therapist.email,
+      ctx!.therapist.password,
+      '/dashboard',
+      /\/onboarding(?:[/?].*)?$/
+    )
+    await page.waitForLoadState('networkidle')
+
+    await page.getByRole('button', { name: 'Exit setup' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Leave setup?' })
+    await expect(dialog).toBeVisible()
+    await expect(
+      dialog.getByText('Your setup is not saved yet. You can come back later to finish.')
+    ).toBeVisible()
+
+    await dialog.getByRole('button', { name: 'Keep setting up' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(page).toHaveURL(/\/onboarding(?:[/?].*)?$/)
+
+    await page.getByRole('button', { name: 'Exit setup' }).click()
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: 'Exit setup' }).click()
+    await expect(page).toHaveURL(/\/login(?:[/?].*)?$/)
+    await page.waitForTimeout(500)
+    await expect(page).not.toHaveURL(/\/onboarding(?:[/?].*)?$/)
+  })
+
   test('new therapist can understand the custom repeating pattern builder', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required.')
 

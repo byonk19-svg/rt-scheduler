@@ -19,6 +19,17 @@ import {
 
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { APP_PAGE_MAX_WIDTH_CLASS } from '@/components/shell/app-shell-config'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { buildCycleAvailabilityBaseline } from '@/lib/availability-pattern-generator'
@@ -770,13 +781,38 @@ function SetupHeader({ step }: { step: number }) {
           })}
         </nav>
 
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 self-start rounded-lg px-3 py-1.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground hover:no-underline md:self-auto"
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-          Exit setup
-        </Link>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="self-start rounded-lg px-3 py-1.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground md:self-auto"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+              Exit setup
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave setup?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your setup is not saved yet. You can come back later to finish.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep setting up</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => {
+                  window.location.assign('/login')
+                }}
+              >
+                Exit setup
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </header>
   )
