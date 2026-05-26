@@ -23,6 +23,7 @@ import {
   buildAvailableCycleOptions,
   buildTherapistGridRows,
   isCyclePublished,
+  resolveScheduleInteractionMode,
   selectScheduleCycle,
   shapePreFlightSummary,
   type CycleRow,
@@ -117,6 +118,11 @@ export async function loadScheduleGridData(
 
   const cycleDates = dateRange(cycle.start_date, cycle.end_date)
   const isPublished = isCyclePublished(cycle)
+  const interactionMode = resolveScheduleInteractionMode({
+    canManageCoverage,
+    canUpdateAssignmentStatus,
+    isPublished,
+  })
 
   const therapistQuery = supabase
     .from('profiles')
@@ -173,6 +179,7 @@ export async function loadScheduleGridData(
     dataset: {
       cycleId: cycle.id,
       shiftType,
+      interactionMode,
       availableCycles: buildAvailableCycleOptions(visibleCycles),
       cycleDates,
       cycleDateRangeLabel: formatHumanCycleRange(cycle.start_date, cycle.end_date),

@@ -5,6 +5,8 @@ import { CalendarDays, CheckCircle, Moon, Printer, Send, Sun, Zap } from 'lucide
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+import type { ScheduleInteractionMode } from './schedule-grid-types'
+
 type ScheduleGridToolbarProps = {
   cycleId: string
   cycleDateRangeLabel: string
@@ -12,7 +14,7 @@ type ScheduleGridToolbarProps = {
   isPublished: boolean
   shiftTab: 'Day' | 'Night'
   isPending: boolean
-  canManageCoverage: boolean
+  interactionMode: ScheduleInteractionMode
   onCycleChange: (cycleId: string) => void
   onShiftTabChange: (tab: 'Day' | 'Night') => void
   onAutoDraft?: () => void
@@ -28,7 +30,7 @@ export function ScheduleGridToolbar({
   isPublished,
   shiftTab,
   isPending,
-  canManageCoverage,
+  interactionMode,
   onCycleChange,
   onShiftTabChange,
   onAutoDraft,
@@ -100,7 +102,7 @@ export function ScheduleGridToolbar({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {canManageCoverage && !isPublished ? (
+        {interactionMode.canUseManagerToolbar && !isPublished ? (
           <>
             {onAutoDraft ? (
               <Button
@@ -130,7 +132,7 @@ export function ScheduleGridToolbar({
           <Printer className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
           Print
         </Button>
-        {canManageCoverage && !isPublished && onPublish ? (
+        {interactionMode.canUseManagerToolbar && !isPublished && onPublish ? (
           <Button size="sm" className="h-8 px-3 font-bold shadow-tw-sm" onClick={onPublish}>
             <Send className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             Publish -&gt;

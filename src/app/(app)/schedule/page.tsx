@@ -31,16 +31,22 @@ function ScheduleHeaderChip({ label, value }: { label: string; value: string }) 
 }
 
 function getScheduleAccessLabel(dataset: GridDataset) {
-  if (dataset.canManageCoverage) return 'Manager edit'
-  if (dataset.canUpdateAssignmentStatus) return 'Lead status updates'
-  return 'Read-only'
+  switch (dataset.interactionMode.kind) {
+    case 'manager_edit':
+      return 'Manager edit'
+    case 'lead_status':
+      return 'Lead status updates'
+    case 'staff_view':
+    case 'combined_readonly':
+      return 'Read-only'
+  }
 }
 
 function getScheduleSubtitle(dataset: GridDataset) {
-  if (dataset.canManageCoverage) {
+  if (dataset.interactionMode.kind === 'manager_edit') {
     return 'Draft staffing, coverage review, and live schedule visibility.'
   }
-  if (dataset.canUpdateAssignmentStatus) {
+  if (dataset.interactionMode.kind === 'lead_status') {
     return 'Review the team schedule and update published shift status in one 42-day grid.'
   }
   return 'Review your row and the live team schedule in one 42-day grid.'
@@ -103,8 +109,16 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         key={`${result.dataset.cycleId}:${result.dataset.shiftType}`}
         initialDataset={result.dataset}
         initialShiftTab={result.initialShiftTab}
-        autoDraftAction={result.dataset.canManageCoverage ? generateDraftScheduleAction : undefined}
-        publishAction={result.dataset.canManageCoverage ? toggleCyclePublishedAction : undefined}
+        autoDraftAction={
+          result.dataset.interactionMode.canUseManagerToolbar
+            ? generateDraftScheduleAction
+            : undefined
+        }
+        publishAction={
+          result.dataset.interactionMode.canUseManagerToolbar
+            ? toggleCyclePublishedAction
+            : undefined
+        }
         preFlightSummary={result.preFlightSummary}
       />
     </div>

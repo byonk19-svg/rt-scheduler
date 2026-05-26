@@ -99,6 +99,7 @@ export function ScheduleGrid({
   const autoDraftFormRef = useRef<HTMLFormElement | null>(null)
   const publishFormRef = useRef<HTMLFormElement | null>(null)
   const mutator = useMemo(() => createCoverageShiftMutator(), [])
+  const interactionMode = initialDataset.interactionMode
   const cellsLocked = isPending
 
   const handleShiftTabChange = useCallback(
@@ -135,19 +136,20 @@ export function ScheduleGrid({
       if (cellsLocked) return
       const row = initialDataset.therapistRows.find((candidate) => candidate.userId === userId)
       if (!row) return
-      if (cell.status === 'off' && !initialDataset.canManageCoverage) {
+      if (cell.status === 'off' && !interactionMode.canAssignShifts) {
         return
       }
       if (
         cell.status !== 'off' &&
-        !initialDataset.canManageCoverage &&
-        (!initialDataset.canUpdateAssignmentStatus || !initialDataset.isPublished)
+        !interactionMode.canUnassignShifts &&
+        !interactionMode.canDesignateLead &&
+        !interactionMode.canUpdateAssignmentStatus
       ) {
         return
       }
       setActiveCellTarget({ userId, date, cell, therapistName: row.name, anchorEl })
     },
-    [cellsLocked, initialDataset]
+    [cellsLocked, initialDataset, interactionMode]
   )
 
   const refreshAfterMutation = useCallback(() => {
@@ -165,7 +167,7 @@ export function ScheduleGrid({
   }, [])
 
   const handleAssign = useCallback(async () => {
-    if (!activeCellTarget || !initialDataset.canManageCoverage || cellsLocked) return
+    if (!activeCellTarget || !interactionMode.canAssignShifts || cellsLocked) return
     setFeedback(null)
     const { error } = await mutator.assign({
       cycleId: initialDataset.cycleId,
@@ -187,13 +189,16 @@ export function ScheduleGrid({
     activeCellTarget,
     cellsLocked,
     initialDataset,
+    interactionMode,
     mutator,
     refreshAfterMutation,
     showMutationError,
   ])
 
   const handleUnassign = useCallback(async () => {
-    if (!activeCellTarget?.cell.shiftId || !initialDataset.canManageCoverage || cellsLocked) return
+    if (!activeCellTarget?.cell.shiftId || !interactionMode.canUnassignShifts || cellsLocked) {
+      return
+    }
     setFeedback(null)
     const { error } = await mutator.unassign({
       cycleId: initialDataset.cycleId,
@@ -208,6 +213,7 @@ export function ScheduleGrid({
     activeCellTarget,
     cellsLocked,
     initialDataset,
+    interactionMode,
     mutator,
     refreshAfterMutation,
     showMutationError,
@@ -220,7 +226,7 @@ export function ScheduleGrid({
     ) => {
       if (!activeCellTarget?.cell.shiftId) return
       if (cellsLocked) return
-      if (!initialDataset.canManageCoverage && !initialDataset.canUpdateAssignmentStatus) return
+      if (!interactionMode.canUpdateAssignmentStatus) return
       setFeedback(null)
       const { error } = await mutator.updateStatus(activeCellTarget.cell.shiftId, {
         ...toScheduleGridMutationPayload(status),
@@ -236,7 +242,7 @@ export function ScheduleGrid({
     [
       activeCellTarget,
       cellsLocked,
-      initialDataset,
+      interactionMode,
       mutator,
       refreshAfterMutation,
       showMutationError,
@@ -244,7 +250,9 @@ export function ScheduleGrid({
   )
 
   const handleDesignateLead = useCallback(async () => {
-    if (!activeCellTarget?.cell.shiftId || !initialDataset.canManageCoverage || cellsLocked) return
+    if (!activeCellTarget?.cell.shiftId || !interactionMode.canDesignateLead || cellsLocked) {
+      return
+    }
     setFeedback(null)
     const { error } = await mutator.setDesignatedLead({
       cycleId: initialDataset.cycleId,
@@ -261,6 +269,7 @@ export function ScheduleGrid({
     activeCellTarget,
     cellsLocked,
     initialDataset,
+    interactionMode,
     mutator,
     refreshAfterMutation,
     showMutationError,
@@ -301,7 +310,7 @@ export function ScheduleGrid({
           isPublished={initialDataset.isPublished}
           shiftTab={shiftTab}
           isPending={isPending}
-          canManageCoverage={initialDataset.canManageCoverage}
+          interactionMode={interactionMode}
           onCycleChange={handleCycleChange}
           onShiftTabChange={handleShiftTabChange}
           onAutoDraft={
@@ -353,6 +362,7 @@ export function ScheduleGrid({
           </div>
           <ScheduleGridTable
             dataset={initialDataset}
+            interactionMode={interactionMode}
             onCellClick={handleCellClick}
             interactionsDisabled={cellsLocked}
           />
@@ -382,9 +392,9 @@ export function ScheduleGrid({
           therapistName={activeCellTarget.therapistName}
           date={activeCellTarget.date}
           cell={activeCellTarget.cell}
-          allowStatusChange={initialDataset.canUpdateAssignmentStatus}
-          canUnassign={initialDataset.canManageCoverage}
-          canDesignateLead={initialDataset.canManageCoverage}
+          allowStatusChange={interactionMode.canUpdateAssignmentStatus}
+          canUnassign={interactionMode.canUnassignShifts}
+          canDesignateLead={interactionMode.canDesignateLead}
           isCurrentlyLead={activeCellTarget.cell.status === 'lead'}
           onStatusChange={handleStatusChange}
           onUnassign={handleUnassign}

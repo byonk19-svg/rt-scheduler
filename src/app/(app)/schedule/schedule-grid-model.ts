@@ -4,6 +4,7 @@ import { getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { isWorkingScheduledGridCell } from '@/components/schedule-grid/schedule-grid-utils'
 import type {
   GridCell,
+  ScheduleInteractionMode,
   ScheduleGridPreFlightSummary,
   TherapistGridRow,
 } from '@/components/schedule-grid/schedule-grid-types'
@@ -47,6 +48,60 @@ export type ForceOffOverrideRow = {
   therapist_id: string
   date: string
   shift_type: 'day' | 'night' | 'both'
+}
+
+export function resolveScheduleInteractionMode({
+  canManageCoverage,
+  canUpdateAssignmentStatus,
+  isPublished,
+  viewMode = 'single_shift',
+}: {
+  canManageCoverage: boolean
+  canUpdateAssignmentStatus: boolean
+  isPublished: boolean
+  viewMode?: 'single_shift' | 'combined'
+}): ScheduleInteractionMode {
+  if (viewMode === 'combined') {
+    return {
+      kind: 'combined_readonly',
+      canUseManagerToolbar: false,
+      canAssignShifts: false,
+      canUnassignShifts: false,
+      canDesignateLead: false,
+      canUpdateAssignmentStatus: false,
+    }
+  }
+
+  if (canManageCoverage) {
+    return {
+      kind: 'manager_edit',
+      canUseManagerToolbar: true,
+      canAssignShifts: true,
+      canUnassignShifts: true,
+      canDesignateLead: true,
+      canUpdateAssignmentStatus: true,
+    }
+  }
+
+  if (canUpdateAssignmentStatus && isPublished) {
+    return {
+      kind: 'lead_status',
+      canUseManagerToolbar: false,
+      canAssignShifts: false,
+      canUnassignShifts: false,
+      canDesignateLead: false,
+      canUpdateAssignmentStatus: true,
+    }
+  }
+
+  return {
+    kind: 'staff_view',
+    canUseManagerToolbar: false,
+    canAssignShifts: false,
+    canUnassignShifts: false,
+    canDesignateLead: false,
+    canUpdateAssignmentStatus: false,
+  }
 }
 
 export function isCyclePublished(cycle: CycleRow): boolean {

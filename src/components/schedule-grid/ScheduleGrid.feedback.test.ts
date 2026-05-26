@@ -67,6 +67,14 @@ const scheduleGridFeedbackEntry = String.raw`
   const dataset = {
     cycleId: 'cycle-1',
     shiftType: 'day',
+    interactionMode: {
+      kind: 'manager_edit',
+      canUseManagerToolbar: true,
+      canAssignShifts: true,
+      canUnassignShifts: true,
+      canDesignateLead: true,
+      canUpdateAssignmentStatus: true,
+    },
     availableCycles: [{ id: 'cycle-1', label: 'May 4 - May 5, 2026' }],
     cycleDates: ['2026-05-04'],
     cycleDateRangeLabel: 'May 4 - May 5, 2026',
