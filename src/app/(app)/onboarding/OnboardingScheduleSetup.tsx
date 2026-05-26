@@ -119,11 +119,9 @@ function getTodayKey() {
   return toIsoDate(new Date())
 }
 
-function getMondayOnOrBeforeKey(value: string) {
+function getSundayOnOrBeforeKey(value: string) {
   const date = new Date(`${value}T00:00:00`)
-  const dayOfWeek = date.getDay()
-  const offset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-  return toIsoDate(addDays(date, offset))
+  return toIsoDate(addDays(date, -date.getDay()))
 }
 
 function getSaturdayOnOrAfterKey(value: string) {
@@ -253,12 +251,6 @@ function formatShortWeekday(value: string): string {
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return ''
   return parsed.toLocaleDateString('en-US', { weekday: 'short' })
-}
-
-function formatShortMonth(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return ''
-  return parsed.toLocaleDateString('en-US', { month: 'short' })
 }
 
 function countLongestWorkingRun(days: Array<'available' | 'off' | 'neutral'>): number {
@@ -426,12 +418,7 @@ export function OnboardingScheduleSetup({
   ])
 
   const previewDays = useMemo(() => {
-    const cycleStart =
-      scheduleType === 'weekly_fixed' || scheduleType === 'weekly_with_weekend_rotation'
-        ? getMondayOnOrBeforeKey(todayKey)
-        : scheduleType === 'repeating_cycle'
-          ? cycleAnchorDate
-          : todayKey
+    const cycleStart = getSundayOnOrBeforeKey(todayKey)
     const cycleEnd = toIsoDate(addDays(new Date(`${cycleStart}T00:00:00`), 13))
     const baseline = buildCycleAvailabilityBaseline({
       cycleStart,
@@ -443,7 +430,7 @@ export function OnboardingScheduleSetup({
       date,
       status: value.baselineStatus,
     }))
-  }, [cycleAnchorDate, previewPattern, scheduleType, todayKey])
+  }, [previewPattern, todayKey])
 
   const workDaysInPattern =
     scheduleType === 'none'
@@ -452,7 +439,10 @@ export function OnboardingScheduleSetup({
         ? cycleDays.filter((day) => day === 'work').length
         : effectiveWeeklyDays.length
   const offDaysInCycle = cycleDays.length - workDaysInPattern
-  const longestRun = countLongestWorkingRun(previewDays.map((day) => day.status))
+  const longestRun =
+    scheduleType === 'repeating_cycle'
+      ? countLongestWorkingRun(cycleDays.map((day) => (day === 'work' ? 'available' : 'off')))
+      : countLongestWorkingRun(previewDays.map((day) => day.status))
   const hasConsecutiveWarning = longestRun > maxConsecutiveDays
   const problemWeeklyDays =
     hasConsecutiveWarning && scheduleType !== 'repeating_cycle'
@@ -1763,12 +1753,7 @@ function PreviewPanel({
       ) : (
         <>
           <div className="mt-5">
-            <CalendarPreview
-              previewDays={previewDays}
-              weeklyRows={
-                scheduleType === 'weekly_fixed' || scheduleType === 'weekly_with_weekend_rotation'
-              }
-            />
+            <CalendarPreview previewDays={previewDays} />
           </div>
 
           <div className="mt-5 rounded-xl border border-border/70 bg-muted/10 px-4 py-4">
@@ -1876,82 +1861,53 @@ function PreviewMetric({ icon, label, value }: { icon: ReactNode; label: string;
 
 function CalendarPreview({
   previewDays,
-  weeklyRows = false,
 }: {
   previewDays: Array<{ date: string; status: 'available' | 'off' | 'neutral' }>
-  weeklyRows?: boolean
 }) {
-  if (weeklyRows) {
-    return (
-      <div className="space-y-3">
-        {[0, 1].map((weekIndex) => {
-          const weekDays = previewDays.slice(weekIndex * 7, weekIndex * 7 + 7)
-          return (
-            <div key={`week-preview-${weekIndex}`} className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Week {weekIndex + 1}
-              </p>
-              <div className="grid grid-cols-7 gap-1.5">
-                {weekDays.map((day) => {
-                  const isWork = day.status === 'available'
-                  return (
-                    <div
-                      key={day.date}
-                      aria-label={`Week ${weekIndex + 1} ${formatShortWeekday(day.date)} ${
-                        isWork ? 'Work' : 'Off'
-                      }`}
-                      className={cn(
-                        'flex min-h-14 flex-col items-center justify-center rounded-md border text-center text-xs',
-                        isWork
-                          ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
-                          : 'border-border/80 bg-muted/20 text-muted-foreground'
-                      )}
-                    >
-                      <span className="font-bold">{formatShortWeekday(day.date)}</span>
-                      <span className="mt-1 font-medium">{isWork ? 'Work' : 'Off'}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-7 gap-2 text-center text-sm font-medium text-muted-foreground">
-        {previewDays.slice(0, 7).map((day) => (
-          <span key={`weekday-${day.date}`}>{formatShortWeekday(day.date)}</span>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-2">
-        {previewDays.map((day) => {
-          const date = new Date(`${day.date}T00:00:00`)
-          const isWork = day.status === 'available'
-          const isNeutral = day.status === 'neutral'
+      <p className="text-xs font-medium text-muted-foreground">Weeks are shown Sunday-Saturday.</p>
+      {[0, 1].map((weekIndex) => {
+        const weekDays = previewDays.slice(weekIndex * 7, weekIndex * 7 + 7)
+        return (
+          <div key={`week-preview-${weekIndex}`} className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Week {weekIndex + 1}
+            </p>
+            <div className="grid grid-cols-7 gap-1.5">
+              {weekDays.map((day) => {
+                const isWork = day.status === 'available'
+                const isNeutral = day.status === 'neutral'
+                const statusLabel = getPreviewStatusLabel(day.status)
 
-          return (
-            <div
-              key={day.date}
-              className={cn(
-                'flex min-h-24 flex-col items-center justify-center rounded-lg border text-center text-sm',
-                isWork
-                  ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)] shadow-tw-pill'
-                  : isNeutral
-                    ? 'border-dashed border-border bg-background text-muted-foreground'
-                    : 'border-border/80 bg-muted/25 text-muted-foreground'
-              )}
-            >
-              <span className="font-medium">{formatShortMonth(day.date)}</span>
-              <span className="text-xl font-bold">{date.getDate()}</span>
-              <span className="mt-1">{isWork ? 'Work' : 'Off'}</span>
+                return (
+                  <div
+                    key={day.date}
+                    aria-label={`Week ${weekIndex + 1} ${formatShortWeekday(day.date)} ${statusLabel}`}
+                    className={cn(
+                      'flex min-h-14 flex-col items-center justify-center rounded-md border text-center text-xs',
+                      isWork
+                        ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                        : isNeutral
+                          ? 'border-dashed border-border bg-background text-muted-foreground'
+                          : 'border-border/80 bg-muted/20 text-muted-foreground'
+                    )}
+                  >
+                    <span className="font-bold">{formatShortWeekday(day.date)}</span>
+                    <span className="mt-1 font-medium">{statusLabel}</span>
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
-      </div>
+          </div>
+        )
+      })}
     </div>
   )
+}
+
+function getPreviewStatusLabel(status: 'available' | 'off' | 'neutral') {
+  if (status === 'available') return 'Work'
+  if (status === 'neutral') return 'Not set'
+  return 'Off'
 }
