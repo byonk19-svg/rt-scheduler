@@ -31,19 +31,6 @@ function nextWeekendRangeLabel() {
   return `${saturdayMonth} ${saturdayDay}-${sundayMonth} ${sundayDay}`
 }
 
-function selectedWeekendPreviewWeek() {
-  const today = new Date()
-  const dayOfWeek = today.getDay()
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-  const previewStart = addDays(today, mondayOffset)
-  const selectedSaturday = new Date(`${nextSaturdayKey()}T00:00:00`)
-  const diffDays = Math.round(
-    (selectedSaturday.getTime() - previewStart.getTime()) / (1000 * 60 * 60 * 24)
-  )
-
-  return Math.floor(diffDays / 7) + 1
-}
-
 async function expectConfirmRow(page: Page, label: string, value: string) {
   const row = page.getByTestId(`confirm-row-${label.toLowerCase().replace(/\s+/g, '-')}`)
   await expect(row).toContainText(label)
@@ -294,12 +281,13 @@ test.describe.serial('staff onboarding gate', () => {
     await expect(weekendGroup.getByRole('button').first()).toContainText('Starts rotation')
     await weekendGroup.getByRole('button').first().click()
     await expect(weekendGroup.getByRole('button').first()).toHaveAttribute('aria-pressed', 'true')
-    const selectedPreviewWeek = selectedWeekendPreviewWeek()
-    const alternatePreviewWeek = selectedPreviewWeek === 1 ? 2 : 1
-    await expect(page.locator(`[aria-label="Week ${selectedPreviewWeek} Sat Work"]`)).toBeVisible()
-    await expect(page.locator(`[aria-label="Week ${selectedPreviewWeek} Sun Work"]`)).toBeVisible()
-    await expect(page.locator(`[aria-label="Week ${alternatePreviewWeek} Sat Off"]`)).toBeVisible()
-    await expect(page.locator(`[aria-label="Week ${alternatePreviewWeek} Sun Off"]`)).toBeVisible()
+    await expect(page.getByText('Weeks are shown Sunday-Saturday.')).toBeVisible()
+    await expect(
+      page.getByRole('complementary').locator('[aria-label^="Week 1"]').first()
+    ).toHaveAttribute('aria-label', 'Week 1 Sun Off')
+    await expect(page.locator('[aria-label="Week 1 Sat Work"]')).toBeVisible()
+    await expect(page.locator('[aria-label="Week 2 Sun Work"]')).toBeVisible()
+    await expect(page.locator('[aria-label="Week 2 Sat Off"]')).toBeVisible()
     await expect(page.getByRole('complementary').getByText('First working weekend:')).toBeVisible()
 
     await page.getByText('Advanced: days you are never available').click()
