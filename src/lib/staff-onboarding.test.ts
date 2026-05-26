@@ -39,6 +39,23 @@ describe('getStaffOnboardingStatus', () => {
     ).toBe(true)
   })
 
+  it('requires onboarding for first-run staff even when a legacy profile did not set the flag', async () => {
+    const { getStaffOnboardingStatus } = await loadHelper()
+    const status = getStaffOnboardingStatus({
+      role: 'therapist',
+      onboardingRequired: false,
+      preferredWorkDaysMode: 'unset',
+      preferencesConfirmedAt: null,
+      themeConfirmedAt: null,
+      completedAt: null,
+      workPattern: { pattern_type: 'weekly_fixed' },
+      hasActionableAvailabilityCycle: false,
+    })
+
+    expect(status.isRequired).toBe(true)
+    expect(status.hasRecordedCompletion).toBe(false)
+  })
+
   it('keeps lead onboarding incomplete until schedule and preferences are explicit', async () => {
     const { getStaffOnboardingStatus } = await loadHelper()
     const status = getStaffOnboardingStatus({

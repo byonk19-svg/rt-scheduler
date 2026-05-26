@@ -157,6 +157,30 @@ describe('proxy onboarding and pending gates', () => {
     )
   })
 
+  it('redirects first-run staff to onboarding even when the legacy required flag is false', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        profile: {
+          role: 'therapist',
+          access_status: 'approved',
+          is_active: true,
+          archived_at: null,
+          staff_onboarding_required: false,
+          preferred_work_days_mode: 'unset',
+          staff_onboarding_preferences_confirmed_at: null,
+          staff_onboarding_theme_confirmed_at: null,
+          staff_onboarding_completed_at: null,
+          work_patterns: [{ pattern_type: 'weekly_fixed' }],
+        },
+      })
+    )
+
+    const response = await proxy(makeRequest('/dashboard/staff'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe('https://teamwise.test/onboarding')
+  })
+
   it('keeps onboarding step routes reachable while required setup is still incomplete', async () => {
     createServerClientMock.mockReturnValue(
       makeSupabaseMock({

@@ -59,11 +59,7 @@ export default async function DashboardPage({
   const preferredLanding = profile?.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
   const suffix = toSearchSuffix(params)
 
-  if (
-    !isManager &&
-    profile?.staff_onboarding_required === true &&
-    !profile?.staff_onboarding_completed_at
-  ) {
+  if (!isManager && !profile?.staff_onboarding_completed_at) {
     redirect(`/onboarding${suffix}`)
   }
 

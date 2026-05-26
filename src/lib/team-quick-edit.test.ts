@@ -107,6 +107,31 @@ describe('parseTeamQuickEditFormData', () => {
     })
   })
 
+  it('parses flexible rotating weekends without fixed weekdays', () => {
+    const formData = buildFormData({
+      has_recurring_schedule: true,
+      works_dow_mode: 'soft',
+      weekend_rotation: 'every_other',
+      weekend_anchor_date: '2026-05-02',
+    })
+
+    const result = parseTeamQuickEditFormData(formData)
+
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        workPattern: {
+          hasPattern: true,
+          worksDow: [],
+          offsDow: [],
+          worksDowMode: 'soft',
+          weekendRotation: 'every_other',
+          weekendAnchorDate: '2026-05-02',
+        },
+      }),
+    })
+  })
+
   it('rejects invalid or incomplete input', () => {
     expect(parseTeamQuickEditFormData(buildFormData({ full_name: '   ' }))).toEqual({
       ok: false,

@@ -203,7 +203,7 @@ export default async function StaffDashboardPage({
     redirect('/dashboard/manager')
   }
 
-  if (profile?.staff_onboarding_required === true && !profile?.staff_onboarding_completed_at) {
+  if (!profile?.staff_onboarding_completed_at) {
     redirect(`/onboarding${redirectSuffix}`)
   }
 

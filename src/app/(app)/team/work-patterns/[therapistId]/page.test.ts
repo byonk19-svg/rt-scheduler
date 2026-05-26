@@ -13,6 +13,7 @@ describe('manager advanced work-pattern route', () => {
     expect(source).toContain('Edit Work Pattern')
     expect(source).toContain('RecurringPatternEditor')
     expect(source).toContain('saveManagerRecurringPatternAction')
+    expect(source).toContain('isMissingRequiredWeeklyWeekdays(normalized)')
     expect(source).toContain('/team/work-patterns')
   })
 })

@@ -202,6 +202,23 @@ function weekdaySummary(weekdays: number[]): string {
   return weekdays.map((day) => WEEKDAY_LABELS[day] ?? String(day)).join(', ')
 }
 
+export function hasFlexibleWeekdays(pattern: Pick<WorkPattern, 'pattern_type' | 'works_dow_mode' | 'weekly_weekdays'>): boolean {
+  return (
+    pattern.pattern_type === 'weekly_with_weekend_rotation' &&
+    pattern.works_dow_mode === 'soft' &&
+    pattern.weekly_weekdays.length === 0
+  )
+}
+
+export function isMissingRequiredWeeklyWeekdays(
+  pattern: Pick<WorkPattern, 'pattern_type' | 'works_dow_mode' | 'weekly_weekdays'>
+): boolean {
+  if (pattern.pattern_type === 'weekly_fixed') return pattern.weekly_weekdays.length === 0
+  if (pattern.pattern_type !== 'weekly_with_weekend_rotation') return false
+  if (hasFlexibleWeekdays(pattern)) return false
+  return pattern.weekly_weekdays.length === 0
+}
+
 function getRepeatingCyclePosition(pattern: WorkPattern, date: string): WorkPatternCycleSegment | null {
   if (pattern.pattern_type !== 'repeating_cycle' || !pattern.cycle_anchor_date) return null
   if (pattern.cycle_segments.length === 0) return null
@@ -290,11 +307,11 @@ export function describeWorkPatternSummary(pattern: WorkPattern | null): string 
     return `Repeats every ${cycleLength} days starting ${formatLongDate(pattern.cycle_anchor_date)}.`
   }
 
-  const weekdayText =
-    pattern.weekly_weekdays.length > 0 ? weekdaySummary(pattern.weekly_weekdays) : 'no weekdays'
-  let summary = `Works ${weekdayText}.`
-
   if (pattern.pattern_type === 'weekly_with_weekend_rotation') {
+    let summary = hasFlexibleWeekdays(pattern)
+      ? 'Rotating weekends. Weekdays: Flexible.'
+      : `Works ${pattern.weekly_weekdays.length > 0 ? weekdaySummary(pattern.weekly_weekdays) : 'no weekdays'}.`
+
     if (pattern.weekend_rule === 'every_weekend') {
       summary += ' Every weekend.'
     } else if (pattern.weekend_rule === 'every_other_weekend' && pattern.weekend_anchor_date) {
@@ -302,9 +319,12 @@ export function describeWorkPatternSummary(pattern: WorkPattern | null): string 
     } else {
       summary += ' No weekends.'
     }
+    return summary
   }
 
-  return summary
+  const weekdayText =
+    pattern.weekly_weekdays.length > 0 ? weekdaySummary(pattern.weekly_weekdays) : 'no weekdays'
+  return `Works ${weekdayText}.`
 }
 
 export function isWeekendOn(pattern: WorkPattern, date: string): boolean {

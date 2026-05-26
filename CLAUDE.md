@@ -225,7 +225,7 @@ Role source: `profiles.role`.
 - `lead`: therapist experience plus assignment-status updates
 - `therapist`: standard staff experience
 - `null` role: pending-access user; can sign in but is gated to `/pending-setup` until manager approval
-- `therapist` / `lead` with `staff_onboarding_required = true` and no `staff_onboarding_completed_at`: authenticated staff user gated to `/onboarding` until required first-run setup is finished
+- `therapist` / `lead` with no `staff_onboarding_completed_at`: authenticated staff user gated to `/onboarding` until first-run setup is finished. `staff_onboarding_required` is still set for new staff seeds/approvals, but a missing completion timestamp is the durable first-run gate.
 
 Coverage lead eligibility remains separate at `profiles.is_lead_eligible`.
 On the `/team` surface, lead eligibility is derived from the selected role when saving quick edit.

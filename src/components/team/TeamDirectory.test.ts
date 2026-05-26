@@ -75,5 +75,9 @@ describe('TeamDirectory empty state copy', () => {
 
     expect(source).toContain('No people match these filters.')
     expect(source).toContain('Clear filters or search by another name')
+    expect(source).toContain('hasQuickEditableWorkPattern')
+    expect(source).toContain('getQuickEditWeekdays')
+    expect(source).toContain('Has a recurring weekly/weekend pattern')
+    expect(source).toContain('Weekdays are flexible')
   })
 })

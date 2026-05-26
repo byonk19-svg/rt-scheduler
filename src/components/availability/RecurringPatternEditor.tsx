@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import {
   describeWorkPatternSummary,
+  isMissingRequiredWeeklyWeekdays,
   normalizeWorkPattern,
   type RecurringPatternType,
   type WeekendRule,
@@ -35,9 +36,8 @@ const PATTERN_OPTIONS: Array<{
   },
   {
     type: 'weekly_with_weekend_rotation',
-    title: 'Same weekdays + weekend rotation',
-    description:
-      'Keep a stable weekday template and choose no weekends, every weekend, or every other weekend.',
+    title: 'Rotating weekends',
+    description: 'Use this when weekends repeat, even if weekdays are fixed or flexible.',
   },
   {
     type: 'repeating_cycle',
@@ -167,13 +167,9 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
   }, [previewPattern])
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    if (
-      patternType !== 'none' &&
-      patternType !== 'repeating_cycle' &&
-      weeklyWeekdays.length === 0
-    ) {
+    if (isMissingRequiredWeeklyWeekdays(previewPattern)) {
       event.preventDefault()
-      setValidationError('Select at least one weekday for the recurring pattern.')
+      setValidationError('Select at least one fixed weekday, or mark weekdays as flexible.')
       return
     }
 
@@ -254,7 +250,9 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
             <CardHeader>
               <CardTitle>Which days do you usually work?</CardTitle>
               <CardDescription>
-                Pick the days that are normally part of your schedule.
+                {patternType === 'weekly_with_weekend_rotation'
+                  ? 'Pick fixed weekdays, or leave blank when weekdays vary block by block.'
+                  : 'Pick the days that are normally part of your schedule.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -281,7 +279,7 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
 
               <details className="rounded-xl border border-border/70 bg-muted/10 px-3 py-3">
                 <summary className="cursor-pointer text-sm font-semibold text-foreground">
-                  This can vary sometimes
+                  Weekday flexibility
                 </summary>
                 <div className="mt-3 grid gap-2 md:grid-cols-2">
                   <button
@@ -294,9 +292,7 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
                         : 'border-border/70 bg-card'
                     )}
                   >
-                    <p className="text-sm font-semibold text-foreground">
-                      These are my regular work days
-                    </p>
+                    <p className="text-sm font-semibold text-foreground">My weekdays are fixed</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Use this when other days should usually stay off your normal schedule.
                     </p>
@@ -312,10 +308,11 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
                     )}
                   >
                     <p className="text-sm font-semibold text-foreground">
-                      These are my usual days, but other days can still happen
+                      My weekdays are flexible
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Use this when the pattern is helpful as a starting point, but not rigid.
+                      Use this when weekdays are scheduled block by block. Selected days are only a
+                      soft starting point.
                     </p>
                   </button>
                 </div>

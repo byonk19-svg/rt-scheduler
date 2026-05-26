@@ -49,7 +49,8 @@ function toStepStatus(complete: boolean, href: string): StaffOnboardingStepStatu
 
 export function getStaffOnboardingStatus(input: StaffOnboardingStatusInput): StaffOnboardingStatus {
   const isManager = input.role === 'manager'
-  const isRequired = !isManager && input.onboardingRequired
+  const isFirstRunStaff = !input.completedAt
+  const isRequired = !isManager && (input.onboardingRequired || isFirstRunStaff)
   const scheduleComplete = Boolean(input.workPattern)
   const preferencesComplete =
     input.preferredWorkDaysMode !== 'unset' && Boolean(input.preferencesConfirmedAt)

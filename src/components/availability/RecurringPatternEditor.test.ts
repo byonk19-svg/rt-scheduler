@@ -11,8 +11,11 @@ const source = readFileSync(
 describe('RecurringPatternEditor', () => {
   it('uses simpler therapist-facing labels and a shorter preview rail', () => {
     expect(source).toContain("title: 'No repeating schedule'")
+    expect(source).toContain("title: 'Rotating weekends'")
     expect(source).toContain('Which days do you usually work?')
-    expect(source).toContain('This can vary sometimes')
+    expect(source).toContain('Weekday flexibility')
+    expect(source).toContain('My weekdays are flexible')
+    expect(source).toContain('Select at least one fixed weekday, or mark weekdays as flexible.')
     expect(source).toContain('<CardTitle>What this saves</CardTitle>')
     expect(source).toContain('<CardTitle>Quick preview</CardTitle>')
     expect(source).toContain('Next 2 weeks')
@@ -24,5 +27,6 @@ describe('RecurringPatternEditor', () => {
   it('starts first-time therapists in a blank no-pattern state instead of a prefilled weekly template', () => {
     expect(source).toContain("initialPattern?.pattern_type ?? 'none'")
     expect(source).toContain('initialPattern?.weekly_weekdays ?? initialPattern?.works_dow ?? []')
+    expect(source).toContain('isMissingRequiredWeeklyWeekdays(previewPattern)')
   })
 })
