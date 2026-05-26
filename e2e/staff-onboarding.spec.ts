@@ -287,13 +287,13 @@ test.describe.serial('staff onboarding gate', () => {
 
     await expect(page.getByRole('heading', { name: 'Does this look right?' })).toBeVisible()
     await expectConfirmRow(page, 'Schedule type', 'Rotating weekends')
-    await expectConfirmRow(page, 'Weekdays', 'Mon, Wed, Fri')
+    await expectConfirmRow(page, 'Fixed weekdays', 'Mon, Wed, Fri')
     await expectConfirmRow(page, 'Weekend rotation', 'Every other weekend')
     await expectConfirmRow(page, 'First working weekend', nextWeekendRangeLabel())
     await expectConfirmRow(page, 'Maximum days in a row', '4 days')
     await expectConfirmRow(page, 'Preferred work days', 'Any day')
     await expectConfirmRow(page, 'Never available', 'Tue')
-    await page.getByRole('button', { name: 'View my schedule' }).click()
+    await page.getByRole('button', { name: 'Save and view my schedule' }).click()
     await expect(page).toHaveURL(
       /(?:\/onboarding\?success=setup_complete|\/dashboard(?:\/staff)?\?success=onboarding_complete)/,
       { timeout: 45_000 }
@@ -382,7 +382,7 @@ test.describe.serial('staff onboarding gate', () => {
     await expect(page.getByRole('heading', { name: 'Preferences' })).toBeVisible()
     await page.getByRole('button', { name: 'Next', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Does this look right?' })).toBeVisible()
-    await page.getByRole('button', { name: 'View my schedule' }).click()
+    await page.getByRole('button', { name: 'Save and view my schedule' }).click()
     await expect(page).toHaveURL(
       /(?:\/onboarding\?success=setup_complete|\/dashboard(?:\/staff)?\?success=onboarding_complete)/,
       { timeout: 45_000 }

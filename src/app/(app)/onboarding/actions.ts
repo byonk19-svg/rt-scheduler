@@ -255,6 +255,10 @@ export async function completeScheduleSetupOnboardingAction(formData: FormData) 
   const cycleAnchorDate = String(formData.get('cycle_anchor_date') ?? '').trim() || null
   const weeklyWeekdays = parseDowValues(formData.getAll('weekly_weekdays'))
   const neverWorkDays = parseDowValues(formData.getAll('offs_dow'))
+  const hasFixedNeverAvailableConflict =
+    (patternType === 'weekly_fixed' ||
+      (patternType === 'weekly_with_weekend_rotation' && worksDowMode !== 'soft')) &&
+    weeklyWeekdays.some((day) => neverWorkDays.includes(day))
   const cycleSegmentsJson = String(formData.get('cycle_segments_json') ?? '[]').trim()
   const preferredWorkDays = parsePreferredWorkDaysSelection(formData)
   const safePreferredWorkDays = {
@@ -280,7 +284,11 @@ export async function completeScheduleSetupOnboardingAction(formData: FormData) 
     works_dow_mode: worksDowMode,
     offs_dow: neverWorkDays,
     weekly_weekdays:
-      patternType === 'repeating_cycle' || patternType === 'none' ? [] : weeklyWeekdays,
+      patternType === 'repeating_cycle' ||
+      patternType === 'none' ||
+      (patternType === 'weekly_with_weekend_rotation' && worksDowMode === 'soft')
+        ? []
+        : weeklyWeekdays,
     weekend_rule: patternType === 'weekly_with_weekend_rotation' ? weekendRule : 'none',
     weekend_anchor_date:
       patternType === 'weekly_with_weekend_rotation' && weekendRule === 'every_other_weekend'
@@ -310,7 +318,13 @@ export async function completeScheduleSetupOnboardingAction(formData: FormData) 
     safePreferredWorkDays.mode === 'unset' ||
     (safePreferredWorkDays.mode === 'specific_days' && safePreferredWorkDays.days.length === 0)
 
-  if (invalidWeeklyPattern || invalidWeekendPattern || invalidCyclePattern || invalidPreferences) {
+  if (
+    hasFixedNeverAvailableConflict ||
+    invalidWeeklyPattern ||
+    invalidWeekendPattern ||
+    invalidCyclePattern ||
+    invalidPreferences
+  ) {
     redirect('/onboarding?error=incomplete')
   }
 

@@ -676,7 +676,7 @@ export function OnboardingScheduleSetup({
                     pendingText="Saving setup..."
                     className="min-w-40"
                   >
-                    View my schedule
+                    Save and view my schedule
                   </FormSubmitButton>
                 )}
               </div>
@@ -1538,7 +1538,7 @@ function ConfirmStep({
     scheduleType === 'weekly_with_weekend_rotation'
       ? [
           {
-            label: 'Weekdays',
+            label: rotatingWeekdayMode === 'flexible' ? 'Weekdays' : 'Fixed weekdays',
             value:
               rotatingWeekdayMode === 'flexible'
                 ? 'Flexible'
@@ -1696,7 +1696,7 @@ function PreviewPanel({
           </p>
           {step === 1 ? null : (
             <p className="mt-1 text-sm font-medium leading-5 text-primary">
-              Updates as you choose days
+              {step === 4 ? 'Preview based on this setup' : 'Updates as you choose days'}
             </p>
           )}
         </div>
