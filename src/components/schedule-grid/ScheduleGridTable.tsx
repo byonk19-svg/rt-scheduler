@@ -247,17 +247,22 @@ function TherapistRow({
     <tr
       className={cn(
         'border-b border-border/45',
-        isViewer && 'border-b-2 border-teal-600 bg-teal-50/55'
+        isViewer && 'border-b-2 border-teal-700 bg-teal-50/60'
       )}
     >
       <th
         scope="row"
         className={cn(
           'sticky left-0 z-10 bg-[var(--print-paper)] px-2 py-1 text-left text-[9px] font-black text-[var(--print-ink)] shadow-[1px_0_0_var(--border)]',
-          isViewer && 'bg-teal-50'
+          isViewer && 'bg-teal-50 shadow-[inset_3px_0_0_rgb(15_118_110),1px_0_0_var(--border)]'
         )}
       >
         <span className="block truncate">{isViewer ? `You (${row.name})` : row.name}</span>
+        {isViewer ? (
+          <span className="mt-0.5 inline-flex rounded-[2px] border border-teal-700/35 bg-teal-100 px-1 text-[6px] font-black uppercase leading-3 tracking-[0.08em] text-teal-900">
+            Your row
+          </span>
+        ) : null}
         {row.isOnFmla ? (
           <span className="text-[7px] font-black uppercase text-muted-foreground">FMLA</span>
         ) : null}
@@ -286,7 +291,8 @@ function TherapistRow({
             className={cn(
               'px-0 py-0.5 text-center',
               weekBoundaryClass(date),
-              isWeekend(date) && 'bg-[color-mix(in_srgb,var(--print-paper)_90%,var(--muted))]'
+              isWeekend(date) && 'bg-[color-mix(in_srgb,var(--print-paper)_90%,var(--muted))]',
+              isViewer && 'bg-teal-50/45'
             )}
           >
             <button
@@ -294,6 +300,7 @@ function TherapistRow({
               data-testid={`cell-${row.userId}-${date}`}
               className={cn(
                 'inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] px-0 text-[8px] font-black leading-none tabular-nums',
+                isViewer && !display.isEmpty && 'ring-1 ring-teal-700/30',
                 display.isEmpty
                   ? 'text-[var(--print-ink-muted)] hover:bg-muted/35'
                   : display.colorClass,

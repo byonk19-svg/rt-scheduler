@@ -91,6 +91,67 @@ describe('ScheduleGridTable', () => {
     )
 
     expect(html).toContain('You (Alice Johnson)')
+    expect(html).toContain('Your row')
+  })
+
+  it('keeps the viewer row first when staff view the team schedule', () => {
+    const html = renderTable(
+      makeDataset({
+        viewerUserId: 'u2',
+        viewerRole: 'therapist',
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: false,
+        therapistRows: [
+          {
+            userId: 'u1',
+            name: 'Alice Johnson',
+            isOnFmla: false,
+            isActive: true,
+            employmentType: 'full_time',
+            shiftType: 'day',
+            cells: {},
+          },
+          {
+            userId: 'u2',
+            name: 'Bailey Smith',
+            isOnFmla: false,
+            isActive: true,
+            employmentType: 'full_time',
+            shiftType: 'day',
+            cells: {
+              '2026-05-04': {
+                shiftId: 's2',
+                status: 'staff',
+                hasNeedsOff: false,
+                isIneligible: false,
+              },
+            },
+          },
+        ],
+      })
+    )
+
+    expect(html.indexOf('You (Bailey Smith)')).toBeGreaterThanOrEqual(0)
+    expect(html.indexOf('You (Bailey Smith)')).toBeLessThan(html.indexOf('Alice Johnson'))
+    expect(html).toContain('Your row')
+  })
+
+  it('adds a subtle scan treatment to the viewer row without changing status colors', () => {
+    const html = renderTable(
+      makeDataset({
+        viewerUserId: 'u1',
+        viewerRole: 'therapist',
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: false,
+      })
+    )
+    const assignedCell = getCellButton(html, 'u1', '2026-05-04')
+    const offCell = getCellButton(html, 'u1', '2026-05-03')
+
+    expect(html).toContain('border-teal-700')
+    expect(assignedCell).toContain('ring-teal-700/30')
+    expect(assignedCell).toContain('bg-yellow-200')
+    expect(offCell).not.toContain('ring-teal-700/30')
   })
 
   it('shows daily totals', () => {
@@ -235,5 +296,6 @@ describe('ScheduleGridTable', () => {
 
     expect(cell).toContain('data-testid="cell-u1-2026-05-04"')
     expect(cell).toContain('disabled=""')
+    expect(html).toContain('Your row')
   })
 })
