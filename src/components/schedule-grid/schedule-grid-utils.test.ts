@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildDailyTotals, getCellDisplay, isWorkingScheduledGridCell } from './schedule-grid-utils'
+import {
+  buildDailyTotals,
+  buildScheduleCellAccessibleLabel,
+  getCellDisplay,
+  isWorkingScheduledGridCell,
+} from './schedule-grid-utils'
 import type { GridCell, TherapistGridRow } from './schedule-grid-types'
 
 describe('getCellDisplay', () => {
@@ -139,5 +144,86 @@ describe('buildDailyTotals', () => {
         })
       ).toBe(false)
     }
+  })
+})
+
+describe('buildScheduleCellAccessibleLabel', () => {
+  it('builds a readable label for a clickable scheduled staff cell', () => {
+    expect(
+      buildScheduleCellAccessibleLabel({
+        therapistName: 'Alice Johnson',
+        date: '2026-05-04',
+        shiftType: 'day',
+        cell: {
+          shiftId: 's1',
+          status: 'staff',
+          hasNeedsOff: false,
+          isIneligible: false,
+        },
+        canOpenActions: true,
+      })
+    ).toBe('Alice Johnson, Mon, May 4, 2026, day shift, scheduled staff, opens schedule actions')
+  })
+
+  it('distinguishes lead cells and read-only cells', () => {
+    expect(
+      buildScheduleCellAccessibleLabel({
+        therapistName: 'Alice Johnson',
+        date: '2026-05-04',
+        shiftType: 'night',
+        cell: {
+          shiftId: 's1',
+          status: 'lead',
+          hasNeedsOff: false,
+          isIneligible: false,
+        },
+        canOpenActions: false,
+      })
+    ).toBe('Alice Johnson, Mon, May 4, 2026, night shift, lead, read-only')
+  })
+
+  it('expands compact operational status codes', () => {
+    const cases: Array<[GridCell['status'], string]> = [
+      ['on_call', 'on call'],
+      ['cancelled', 'cancelled'],
+      ['call_in', 'call in'],
+      ['left_early', 'left early'],
+    ]
+
+    for (const [status, statusLabel] of cases) {
+      expect(
+        buildScheduleCellAccessibleLabel({
+          therapistName: 'Alice Johnson',
+          date: '2026-05-04',
+          shiftType: 'day',
+          cell: {
+            shiftId: 's1',
+            status,
+            hasNeedsOff: false,
+            isIneligible: false,
+          },
+          canOpenActions: true,
+        })
+      ).toContain(`day shift, ${statusLabel}, opens schedule actions`)
+    }
+  })
+
+  it('includes requested-off and ineligible context without changing the visual code', () => {
+    expect(
+      buildScheduleCellAccessibleLabel({
+        therapistName: 'Alice Johnson',
+        date: '2026-05-05',
+        shiftType: 'day',
+        cell: {
+          shiftId: null,
+          status: 'off',
+          hasNeedsOff: true,
+          isIneligible: true,
+        },
+        canOpenActions: false,
+      })
+    ).toBe(
+      'Alice Johnson, Tue, May 5, 2026, day shift, not scheduled, requested off, not eligible, read-only'
+    )
   })
 })

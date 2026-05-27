@@ -2,7 +2,11 @@
 
 import { cn } from '@/lib/utils'
 
-import { getCellDisplay, isWorkingScheduledGridCell } from './schedule-grid-utils'
+import {
+  buildScheduleCellAccessibleLabel,
+  getCellDisplay,
+  isWorkingScheduledGridCell,
+} from './schedule-grid-utils'
 import type {
   GridCell,
   GridDataset,
@@ -139,6 +143,7 @@ export function ScheduleGridTable({
             <TherapistRow
               key={row.userId}
               row={row}
+              shiftType={dataset.shiftType}
               cycleDates={cycleDates}
               isViewer={isStaffViewer && row.userId === viewerUserId}
               interactionMode={interactionMode}
@@ -158,6 +163,7 @@ export function ScheduleGridTable({
                 <TherapistRow
                   key={row.userId}
                   row={row}
+                  shiftType={dataset.shiftType}
                   cycleDates={cycleDates}
                   isViewer={false}
                   interactionMode={interactionMode}
@@ -229,6 +235,7 @@ function DailyTotalRow({
 
 function TherapistRow({
   row,
+  shiftType,
   cycleDates,
   isViewer,
   interactionMode,
@@ -236,6 +243,7 @@ function TherapistRow({
   onCellClick,
 }: {
   row: TherapistGridRow
+  shiftType: GridDataset['shiftType']
   cycleDates: readonly string[]
   isViewer: boolean
   interactionMode: ScheduleInteractionMode
@@ -286,6 +294,13 @@ function TherapistRow({
           !cell.isIneligible &&
           (canAssign || canEditAssigned)
         )
+        const accessibleLabel = buildScheduleCellAccessibleLabel({
+          therapistName: row.name,
+          date,
+          shiftType,
+          cell,
+          canOpenActions: clickable,
+        })
 
         return (
           <td
@@ -300,6 +315,8 @@ function TherapistRow({
             <button
               type="button"
               data-testid={`cell-${row.userId}-${date}`}
+              aria-label={accessibleLabel}
+              title={accessibleLabel}
               className={cn(
                 'inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] px-0 text-[8px] font-black leading-none tabular-nums',
                 isViewer && !display.isEmpty && 'ring-1 ring-teal-700/30',

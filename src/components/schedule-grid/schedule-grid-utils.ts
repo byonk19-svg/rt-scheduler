@@ -27,6 +27,28 @@ const STATUS_COLOR: Record<GridCellStatus, string> = {
   off: '',
 }
 
+const STATUS_ACCESSIBLE_LABEL: Record<GridCellStatus, string> = {
+  lead: 'lead',
+  staff: 'scheduled staff',
+  on_call: 'on call',
+  cancelled: 'cancelled',
+  call_in: 'call in',
+  left_early: 'left early',
+  off: 'not scheduled',
+}
+
+function formatCellDateLabel(date: string): string {
+  const parsed = new Date(`${date}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return date
+
+  return parsed.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 export function getCellDisplay(cell: GridCell): CellDisplay {
   return {
     code: STATUS_CODE[cell.status],
@@ -34,6 +56,39 @@ export function getCellDisplay(cell: GridCell): CellDisplay {
     asterisk: cell.hasNeedsOff,
     isEmpty: cell.status === 'off',
   }
+}
+
+export function buildScheduleCellAccessibleLabel({
+  therapistName,
+  date,
+  shiftType,
+  cell,
+  canOpenActions,
+}: {
+  therapistName: string
+  date: string
+  shiftType: TherapistGridRow['shiftType']
+  cell: GridCell
+  canOpenActions: boolean
+}): string {
+  const parts = [
+    therapistName,
+    formatCellDateLabel(date),
+    `${shiftType} shift`,
+    STATUS_ACCESSIBLE_LABEL[cell.status],
+  ]
+
+  if (cell.hasNeedsOff) {
+    parts.push('requested off')
+  }
+
+  if (cell.isIneligible) {
+    parts.push('not eligible')
+  }
+
+  parts.push(canOpenActions ? 'opens schedule actions' : 'read-only')
+
+  return parts.join(', ')
 }
 
 export function isWorkingScheduledGridCell(cell: GridCell | null | undefined): boolean {
