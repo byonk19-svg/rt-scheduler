@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { FeedbackToast } from '@/components/feedback-toast'
-import { createCoverageShiftMutator } from '@/lib/coverage/mutations'
+import { createCoverageShiftMutator, type CoverageMutationError } from '@/lib/coverage/mutations'
 import { shiftTabToQueryValue } from '@/lib/coverage/coverage-shift-tab'
 import {
   toScheduleGridMutationPayload,
@@ -46,6 +46,72 @@ const SCHEDULE_GRID_MUTATION_ERROR_MESSAGES = {
   status: 'Could not update this shift status. Refresh Schedule and try again.',
   designateLead: 'Could not set the lead for this shift. Refresh Schedule and try again.',
 } as const
+
+type ScheduleGridMutationAction = keyof typeof SCHEDULE_GRID_MUTATION_ERROR_MESSAGES
+
+const SAFE_MUTATION_ERROR_MESSAGES = [
+  'A designated lead already exists for that shift.',
+  'Date is outside this Schedule Block',
+  'Incident statuses can only be applied after the Schedule Block is published.',
+  'Incident statuses require an assigned therapist.',
+  'Left early status requires the time the shift ended.',
+  'Left early time can only be set with left early status.',
+  'Left early time must be HH:MM or HH:MM:SS.',
+  'Only lead-eligible therapists can be designated as lead.',
+  'That therapist already has a shift on this date.',
+  'Therapist shift type does not match the selected schedule shift.',
+] as const
+
+function resolveScheduleGridMutationErrorMessage(
+  action: ScheduleGridMutationAction,
+  error: CoverageMutationError
+) {
+  const fallback = SCHEDULE_GRID_MUTATION_ERROR_MESSAGES[action]
+  const message = error?.message?.trim()
+  if (!message) return fallback
+
+  const normalized = message.toLowerCase()
+
+  if (error?.code === 'availability_conflict') {
+    return 'This therapist has a scheduling conflict. Review their availability before assigning.'
+  }
+  if (normalized === 'unauthorized') {
+    return 'Your session expired. Sign in again, then retry this schedule change.'
+  }
+  if (
+    normalized.includes('not authorized') ||
+    normalized.includes('manager access required') ||
+    normalized.includes('site scope') ||
+    normalized.includes('only leads or managers') ||
+    normalized.includes('forbidden') ||
+    normalized.includes('actor site is missing') ||
+    normalized.includes('manager site scope required')
+  ) {
+    return 'You do not have permission to make this schedule change.'
+  }
+  if (normalized.includes('read-only')) {
+    return 'This Schedule Block is read-only until it is republished.'
+  }
+  if (normalized.includes('not found')) {
+    return 'This schedule changed since you opened it. Refresh Schedule and try again.'
+  }
+  if (
+    SAFE_MUTATION_ERROR_MESSAGES.some((safeMessage) =>
+      normalized.includes(safeMessage.toLowerCase())
+    )
+  ) {
+    return message
+  }
+  if (
+    normalized.includes('at most') ||
+    normalized.includes('limited to') ||
+    normalized.includes('cannot be assigned')
+  ) {
+    return message
+  }
+
+  return fallback
+}
 
 const SCHEDULE_LEGEND_ITEMS = [
   {
@@ -158,13 +224,18 @@ export function ScheduleGrid({
     startTransition(() => router.refresh())
   }, [router])
 
-  const showMutationError = useCallback((message: string) => {
-    setFeedback((current) => ({
-      id: (current?.id ?? 0) + 1,
-      message,
-      variant: 'error',
-    }))
-  }, [])
+  const showMutationError = useCallback(
+    (action: ScheduleGridMutationAction, error: CoverageMutationError) => {
+      const message = resolveScheduleGridMutationErrorMessage(action, error)
+
+      setFeedback((current) => ({
+        id: (current?.id ?? 0) + 1,
+        message,
+        variant: 'error',
+      }))
+    },
+    []
+  )
 
   const handleAssign = useCallback(async () => {
     if (!activeCellTarget || !interactionMode.canAssignShifts || cellsLocked) return
@@ -181,7 +252,7 @@ export function ScheduleGrid({
         : undefined,
     })
     if (error) {
-      showMutationError(SCHEDULE_GRID_MUTATION_ERROR_MESSAGES.assign)
+      showMutationError('assign', error)
       return
     }
     refreshAfterMutation()
@@ -205,7 +276,7 @@ export function ScheduleGrid({
       shiftId: activeCellTarget.cell.shiftId,
     })
     if (error) {
-      showMutationError(SCHEDULE_GRID_MUTATION_ERROR_MESSAGES.unassign)
+      showMutationError('unassign', error)
       return
     }
     refreshAfterMutation()
@@ -234,7 +305,7 @@ export function ScheduleGrid({
         leftEarlyTime: status === 'left_early' ? (change?.leftEarlyTime ?? null) : null,
       })
       if (error) {
-        showMutationError(SCHEDULE_GRID_MUTATION_ERROR_MESSAGES.status)
+        showMutationError('status', error)
         return
       }
       refreshAfterMutation()
@@ -261,7 +332,7 @@ export function ScheduleGrid({
       shiftType: initialDataset.shiftType,
     })
     if (error) {
-      showMutationError(SCHEDULE_GRID_MUTATION_ERROR_MESSAGES.designateLead)
+      showMutationError('designateLead', error)
       return
     }
     refreshAfterMutation()

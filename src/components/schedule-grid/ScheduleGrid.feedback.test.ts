@@ -9,14 +9,31 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 type ScheduleGridFeedbackTestState = {
   alertCalls: number
   assignCalls: number
+  statusCalls: number
+  leadCalls: number
   refreshCalls: number
   replaceCalls: number
   lastAssignPayload: unknown
 }
 
+type ScheduleGridFeedbackTestError = {
+  code?: string
+  message?: string
+}
+
+type ScheduleGridFeedbackTestScenario = {
+  cellStatus: 'off' | 'staff'
+  errors: {
+    assign?: ScheduleGridFeedbackTestError
+    updateStatus?: ScheduleGridFeedbackTestError
+    setDesignatedLead?: ScheduleGridFeedbackTestError
+  }
+}
+
 declare global {
   interface Window {
     __scheduleGridTestState: ScheduleGridFeedbackTestState
+    __scheduleGridScenario: ScheduleGridFeedbackTestScenario
   }
 }
 
@@ -26,9 +43,16 @@ const scheduleGridFeedbackEntry = String.raw`
 
   import { ScheduleGrid } from '@/components/schedule-grid/ScheduleGrid'
 
+  const scenario = window.__scheduleGridScenario ?? {
+    cellStatus: 'off',
+    errors: {},
+  }
+
   window.__scheduleGridTestState = {
     alertCalls: 0,
     assignCalls: 0,
+    statusCalls: 0,
+    leadCalls: 0,
     refreshCalls: 0,
     replaceCalls: 0,
     lastAssignPayload: null,
@@ -51,16 +75,18 @@ const scheduleGridFeedbackEntry = String.raw`
     async assign(payload) {
       window.__scheduleGridTestState.assignCalls += 1
       window.__scheduleGridTestState.lastAssignPayload = payload
-      return { error: new Error('assign failed') }
+      return { error: scenario.errors.assign ?? null }
     },
     async unassign() {
       return { error: null }
     },
     async updateStatus() {
-      return { error: null }
+      window.__scheduleGridTestState.statusCalls += 1
+      return { error: scenario.errors.updateStatus ?? null }
     },
     async setDesignatedLead() {
-      return { error: null }
+      window.__scheduleGridTestState.leadCalls += 1
+      return { error: scenario.errors.setDesignatedLead ?? null }
     },
   }
 
@@ -89,8 +115,8 @@ const scheduleGridFeedbackEntry = String.raw`
         shiftType: 'day',
         cells: {
           '2026-05-04': {
-            shiftId: null,
-            status: 'off',
+            shiftId: scenario.cellStatus === 'off' ? null : 'shift-1',
+            status: scenario.cellStatus,
             hasNeedsOff: false,
             isIneligible: false,
           },
@@ -195,7 +221,10 @@ function scheduleGridFeedbackPlugin(): Plugin {
   }
 }
 
-async function renderScheduleGridFeedbackHarness(page: Page) {
+async function renderScheduleGridFeedbackHarness(
+  page: Page,
+  scenario: ScheduleGridFeedbackTestScenario = { cellStatus: 'off', errors: {} }
+) {
   const bundle = await build({
     stdin: {
       contents: scheduleGridFeedbackEntry,
@@ -214,8 +243,12 @@ async function renderScheduleGridFeedbackHarness(page: Page) {
   })
 
   const script = Buffer.from(bundle.outputFiles[0]?.text ?? '').toString('base64')
+  const scenarioScript = Buffer.from(
+    `window.__scheduleGridScenario = ${JSON.stringify(scenario)};`
+  ).toString('base64')
   await page.setContent(`
     <main id="root"></main>
+    <script src="data:text/javascript;base64,${scenarioScript}"></script>
     <script src="data:text/javascript;base64,${script}"></script>
   `)
 }
@@ -231,17 +264,27 @@ describe('ScheduleGrid feedback rendering', () => {
     await browser.close()
   })
 
-  it('shows non-blocking feedback when assignment fails without refreshing the schedule', async () => {
+  it('shows specific feedback when assignment fails on a known scheduling conflict', async () => {
     const page = await browser.newPage()
     try {
-      await renderScheduleGridFeedbackHarness(page)
+      await renderScheduleGridFeedbackHarness(page, {
+        cellStatus: 'off',
+        errors: {
+          assign: {
+            code: 'availability_conflict',
+            message: 'Conflicts with scheduling constraints.',
+          },
+        },
+      })
 
       await page.getByTestId('cell-therapist-1-2026-05-04').click()
       await page.getByRole('button', { name: 'Assign' }).click()
 
       await page
         .getByRole('alert')
-        .getByText('Could not assign this shift. Refresh Schedule and try again.')
+        .getByText(
+          'This therapist has a scheduling conflict. Review their availability before assigning.'
+        )
         .waitFor({ state: 'visible' })
 
       const state = await page.evaluate(() => window.__scheduleGridTestState)
@@ -254,6 +297,67 @@ describe('ScheduleGrid feedback rendering', () => {
         shiftType: 'day',
         role: 'staff',
       })
+      expect(state.alertCalls).toBe(0)
+      expect(state.refreshCalls).toBe(0)
+    } finally {
+      await page.close()
+    }
+  }, 15_000)
+
+  it('shows stale-state feedback when status update targets a read-only Schedule Block', async () => {
+    const page = await browser.newPage()
+    try {
+      await renderScheduleGridFeedbackHarness(page, {
+        cellStatus: 'staff',
+        errors: {
+          updateStatus: {
+            message: 'This Schedule Block is read-only until it is republished.',
+          },
+        },
+      })
+
+      await page.getByTestId('cell-therapist-1-2026-05-04').click()
+      await page.getByRole('button', { name: 'Cancelled' }).click()
+      await page.getByRole('button', { name: 'Mark Cancelled' }).click()
+
+      await page
+        .getByRole('alert')
+        .getByText('This Schedule Block is read-only until it is republished.')
+        .waitFor({ state: 'visible' })
+
+      const state = await page.evaluate(() => window.__scheduleGridTestState)
+
+      expect(state.statusCalls).toBe(1)
+      expect(state.alertCalls).toBe(0)
+      expect(state.refreshCalls).toBe(0)
+    } finally {
+      await page.close()
+    }
+  }, 15_000)
+
+  it('uses action-specific fallback feedback for unknown failures', async () => {
+    const page = await browser.newPage()
+    try {
+      await renderScheduleGridFeedbackHarness(page, {
+        cellStatus: 'staff',
+        errors: {
+          setDesignatedLead: {
+            message: 'database timeout on relation shifts',
+          },
+        },
+      })
+
+      await page.getByTestId('cell-therapist-1-2026-05-04').click()
+      await page.getByRole('button', { name: 'Designate as lead' }).click()
+
+      await page
+        .getByRole('alert')
+        .getByText('Could not set the lead for this shift. Refresh Schedule and try again.')
+        .waitFor({ state: 'visible' })
+
+      const state = await page.evaluate(() => window.__scheduleGridTestState)
+
+      expect(state.leadCalls).toBe(1)
       expect(state.alertCalls).toBe(0)
       expect(state.refreshCalls).toBe(0)
     } finally {
