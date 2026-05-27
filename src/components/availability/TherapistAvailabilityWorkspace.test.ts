@@ -203,6 +203,78 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).not.toContain('Request to Work')
   })
 
+  it('disables locked local draft controls that would create unsavable changes', () => {
+    const html = renderToStaticMarkup(
+      createElement(TherapistAvailabilityWorkspace, {
+        cycles: [
+          {
+            id: 'cycle-1',
+            label: 'Apr 2026',
+            start_date: '2026-04-24',
+            end_date: '2026-05-07',
+            published: false,
+          },
+        ],
+        availabilityRows: [],
+        conflicts: [],
+        initialCycleId: 'cycle-1',
+        todayKey: '2026-04-24',
+        hasSavedRecurringPattern: false,
+        recurringPatternSummary: 'No normal schedule saved yet.',
+        generatedBaselineByCycleId: { 'cycle-1': {} },
+        submissionsByCycleId: {},
+        availabilityLocked: true,
+        availabilityLockedReason: 'manager_closed',
+        submitTherapistAvailabilityGridAction: async () => {},
+      })
+    )
+
+    expect(html).toContain(
+      'Availability is locked, so Schedule Block availability changes are disabled.'
+    )
+    expect(html).toMatch(/id="range-start"[\s\S]*?disabled=""/)
+    expect(html).toMatch(/id="range-end"[\s\S]*?disabled=""/)
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Use previous Schedule Block<\/button>/)
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Clear block changes<\/button>/)
+    expect(html).toContain('aria-describedby="locked-availability-draft-controls"')
+  })
+
+  it('keeps range, copy, and clear draft controls available when availability is unlocked', () => {
+    const html = renderToStaticMarkup(
+      createElement(TherapistAvailabilityWorkspace, {
+        cycles: [
+          {
+            id: 'cycle-1',
+            label: 'Apr 2026',
+            start_date: '2026-04-24',
+            end_date: '2026-05-07',
+            published: false,
+          },
+        ],
+        availabilityRows: [],
+        conflicts: [],
+        initialCycleId: 'cycle-1',
+        todayKey: '2026-04-24',
+        hasSavedRecurringPattern: false,
+        recurringPatternSummary: 'No normal schedule saved yet.',
+        generatedBaselineByCycleId: { 'cycle-1': {} },
+        submissionsByCycleId: {},
+        submitTherapistAvailabilityGridAction: async () => {},
+      })
+    )
+
+    expect(html).not.toContain(
+      'Availability is locked, so Schedule Block availability changes are disabled.'
+    )
+    expect(html).not.toMatch(/id="range-start"[\s\S]*?disabled=""/)
+    expect(html).not.toMatch(/id="range-end"[\s\S]*?disabled=""/)
+    expect(html).toContain('Use previous Schedule Block')
+    expect(html).toContain('Clear block changes')
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Use previous Schedule Block<\/button>/)
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Clear block changes<\/button>/)
+    expect(html).not.toContain('locked-availability-draft-controls')
+  })
+
   it('explains submitted blank-state cycles without implying missing work', () => {
     const html = renderToStaticMarkup(
       createElement(TherapistAvailabilityWorkspace, {
@@ -330,5 +402,10 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(src).toContain('function dayOfMonthFromIsoDate(isoDate: string): number')
     expect(src).toContain('const dayNum = dayOfMonthFromIsoDate(date)')
     expect(src).not.toContain('new Date(`${date}T00:00:00`).getDate()')
+    expect(src).toContain('function copyPreviousCycleOverrides()')
+    expect(src).toContain('function clearOverrides()')
+    expect(src).toContain('if (availabilityLocked) return')
+    expect(src).toContain('disabled={availabilityLocked}')
+    expect(src).toContain('locked-availability-draft-controls')
   })
 })

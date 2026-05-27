@@ -259,6 +259,7 @@ export function TherapistAvailabilityWorkspace({
   const baselineSummary = summarizeBaseline(cycleDays, baselineByDate)
 
   function setOverride(date: string, status: DayStatus | null) {
+    if (availabilityLocked) return
     const nextDraft = applyOverrideToDraft({
       statusByDate: draftStatusByDate,
       notesByDate: draftNotesByDate,
@@ -271,7 +272,7 @@ export function TherapistAvailabilityWorkspace({
   }
 
   function updateSelectedDateNote(note: string) {
-    if (!selectedDate) return
+    if (!selectedDate || availabilityLocked) return
     setDraftNotesByDate((current) => updateDraftNote(current, selectedDate, note))
   }
 
@@ -286,6 +287,7 @@ export function TherapistAvailabilityWorkspace({
   )
 
   function applySelection(status: DayStatus | null) {
+    if (availabilityLocked) return
     const nextDraft = applySelectionToDraft({
       statusByDate: draftStatusByDate,
       notesByDate: draftNotesByDate,
@@ -298,12 +300,14 @@ export function TherapistAvailabilityWorkspace({
   }
 
   function clearOverrides() {
+    if (availabilityLocked) return
     const nextDraft = clearAvailabilityDraft()
     setDraftStatusByDate(nextDraft.statusByDate)
     setDraftNotesByDate(nextDraft.notesByDate)
   }
 
   function copyPreviousCycleOverrides() {
+    if (availabilityLocked) return
     const nextDraft = buildCopiedCycleDraft({
       cycles,
       availabilityRows,
@@ -362,6 +366,9 @@ export function TherapistAvailabilityWorkspace({
         : availabilityLocked
           ? 'Availability changes are locked for this Schedule Block.'
           : null
+  const lockedDraftControlsMessage = availabilityLocked
+    ? 'Availability is locked, so Schedule Block availability changes are disabled.'
+    : null
   const selectedDayOptionClass = (active: boolean, tone: 'can' | 'cant' | 'neutral') =>
     cn(
       'flex min-h-10 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
@@ -570,6 +577,14 @@ export function TherapistAvailabilityWorkspace({
             <summary className="cursor-pointer text-sm font-semibold text-foreground">
               Edit several days
             </summary>
+            {lockedDraftControlsMessage ? (
+              <p
+                id="locked-availability-draft-controls"
+                className="mt-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-xs font-medium text-muted-foreground"
+              >
+                {lockedDraftControlsMessage}
+              </p>
+            ) : null}
             <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
@@ -581,7 +596,12 @@ export function TherapistAvailabilityWorkspace({
                     max={selectedCycle?.end_date}
                     value={rangeStart}
                     onChange={(event) => setRangeStart(event.target.value)}
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                    disabled={availabilityLocked}
+                    aria-describedby={
+                      availabilityLocked ? 'locked-availability-draft-controls' : undefined
+                    }
+                    title={lockedDraftControlsMessage ?? undefined}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -593,7 +613,12 @@ export function TherapistAvailabilityWorkspace({
                     max={selectedCycle?.end_date}
                     value={rangeEnd}
                     onChange={(event) => setRangeEnd(event.target.value)}
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                    disabled={availabilityLocked}
+                    aria-describedby={
+                      availabilityLocked ? 'locked-availability-draft-controls' : undefined
+                    }
+                    title={lockedDraftControlsMessage ?? undefined}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -606,6 +631,11 @@ export function TherapistAvailabilityWorkspace({
                   variant="outline"
                   size="sm"
                   onClick={copyPreviousCycleOverrides}
+                  disabled={availabilityLocked}
+                  aria-describedby={
+                    availabilityLocked ? 'locked-availability-draft-controls' : undefined
+                  }
+                  title={lockedDraftControlsMessage ?? undefined}
                   className="min-h-9 rounded-xl px-3"
                 >
                   Use previous Schedule Block
@@ -615,6 +645,11 @@ export function TherapistAvailabilityWorkspace({
                   variant="outline"
                   size="sm"
                   onClick={clearOverrides}
+                  disabled={availabilityLocked}
+                  aria-describedby={
+                    availabilityLocked ? 'locked-availability-draft-controls' : undefined
+                  }
+                  title={lockedDraftControlsMessage ?? undefined}
                   className="min-h-9 rounded-xl px-3"
                 >
                   Clear block changes
