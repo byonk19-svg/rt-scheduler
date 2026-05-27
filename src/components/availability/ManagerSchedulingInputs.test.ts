@@ -110,6 +110,7 @@ describe('ManagerSchedulingInputs', () => {
     expect(html).toContain('href="/schedule/planning?cycle=cycle-1"')
     expect(html).not.toContain('Selected therapist</span><select')
     expect(source).toContain('AvailabilityStatusSummary')
+    expect(source).toContain('reminderMissingCount={missingRows.length}')
     expect(source).toContain('TherapistContextPanel')
     expect(source).toContain('id="staff-scheduling-inputs"')
     expect(source).not.toContain('AvailabilityCalendarPanel')

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -98,7 +101,7 @@ describe('AvailabilityStatusSummary', () => {
     expect(html).not.toContain('overflow-y-auto')
   })
 
-  it('renders the send-reminders button when onSendReminders prop is provided and there are missing rows', () => {
+  it('renders the send-reminders button with the full Schedule Block scope', () => {
     const html = renderToStaticMarkup(
       createElement(AvailabilityStatusSummary, {
         submittedRows: [],
@@ -118,11 +121,60 @@ describe('AvailabilityStatusSummary', () => {
     )
 
     expect(html).toContain('data-testid="send-reminders-trigger"')
-    expect(html).toContain('Remind missing submissions')
+    expect(html).toContain('Remind all missing submissions (1)')
     expect(html).toContain('Requests: 0')
   })
 
-  it('does not render the send-reminders button when missingRows is empty', () => {
+  it('uses the unfiltered missing count for reminder copy when the queue is filtered', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityStatusSummary, {
+        submittedRows: [],
+        missingRows: [
+          {
+            therapistId: 'visible-missing-1',
+            therapistName: 'Layne P.',
+            overridesCount: 0,
+            lastUpdatedAt: null,
+            shiftType: 'day',
+            employmentType: 'full_time',
+          },
+        ],
+        reminderMissingCount: 4,
+        cycleId: 'cycle-abc',
+        onSendReminders: async () => ({ sent: 4, skipped: 0, failed: 0 }),
+      })
+    )
+
+    expect(html).toContain('Remind all missing submissions (4)')
+    expect(html).not.toContain('Remind all missing submissions (1)')
+  })
+
+  it('still shows the reminder action when filters hide all missing rows', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityStatusSummary, {
+        submittedRows: [],
+        missingRows: [],
+        reminderMissingCount: 2,
+        cycleId: 'cycle-abc',
+        onSendReminders: async () => ({ sent: 2, skipped: 0, failed: 0 }),
+      })
+    )
+
+    expect(html).toContain('Remind all missing submissions (2)')
+    expect(html).toContain('No therapists match the current work queue view.')
+  })
+
+  it('keeps the reminder dialog copy explicit about filtered queue scope', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/AvailabilityStatusSummary.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain('all missing submissions for the Schedule')
+    expect(source).toContain('even if the queue is filtered')
+  })
+
+  it('does not render the send-reminders button when the full reminder scope is empty', () => {
     const html = renderToStaticMarkup(
       createElement(AvailabilityStatusSummary, {
         submittedRows: [
@@ -134,6 +186,7 @@ describe('AvailabilityStatusSummary', () => {
           },
         ],
         missingRows: [],
+        reminderMissingCount: 0,
         cycleId: 'cycle-abc',
         onSendReminders: async () => ({ sent: 0, skipped: 0, failed: 0 }),
       })
