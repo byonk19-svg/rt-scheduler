@@ -573,6 +573,7 @@ export function ManagerSchedulingInputs({
             activeShift={activeShift}
             searchTerm={therapistSearch}
             cycleId={selectedCycleId}
+            reminderMissingCount={missingRows.length}
             onSendReminders={
               selectedCycleId ? () => sendAvailabilityRemindersAction(selectedCycleId) : undefined
             }

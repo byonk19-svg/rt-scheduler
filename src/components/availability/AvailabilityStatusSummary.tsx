@@ -46,6 +46,7 @@ type AvailabilityStatusSummaryProps = {
   searchTerm?: string
   activeShift?: 'day' | 'night'
   cycleId?: string
+  reminderMissingCount?: number
   onSendReminders?: () => Promise<{ sent: number; skipped: number; failed: number; error?: string }>
 }
 
@@ -97,11 +98,8 @@ function queueStatusLabel(row: CombinedRosterRow) {
   return row.overridesCount > 0 ? 'Submitted with requests' : 'Submitted no requests'
 }
 
-function reminderButtonLabel(activeFilter: AvailabilityRosterFilter, missingCount: number) {
-  const count = `(${missingCount})`
-  return activeFilter === 'missing'
-    ? `Remind missing submissions ${count}`
-    : `Send reminders ${count}`
+function reminderButtonLabel(missingCount: number) {
+  return `Remind all missing submissions (${missingCount})`
 }
 
 export function AvailabilityStatusSummary({
@@ -116,6 +114,7 @@ export function AvailabilityStatusSummary({
   embedded = false,
   searchTerm = '',
   activeShift,
+  reminderMissingCount,
   onSendReminders,
 }: AvailabilityStatusSummaryProps) {
   const [uncontrolledActiveFilter, setUncontrolledActiveFilter] =
@@ -215,6 +214,7 @@ export function AvailabilityStatusSummary({
   }, [resolvedActiveFilter, visibleRows])
 
   const missingCount = visibleRows.filter((row) => !row.submitted).length
+  const reminderScopeMissingCount = reminderMissingCount ?? missingRows.length
   const submittedWithExceptionsCount = visibleRows.filter(
     (row) => row.submitted && row.overridesCount > 0
   ).length
@@ -277,7 +277,7 @@ export function AvailabilityStatusSummary({
           </button>
         ))}
 
-        {onSendReminders && missingRows.length > 0 ? (
+        {onSendReminders && reminderScopeMissingCount > 0 ? (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <button
@@ -289,7 +289,7 @@ export function AvailabilityStatusSummary({
                 {isSending ? (
                   <span aria-live="polite">Sending…</span>
                 ) : (
-                  <>{reminderButtonLabel(resolvedActiveFilter, missingRows.length)}</>
+                  <>{reminderButtonLabel(reminderScopeMissingCount)}</>
                 )}
               </button>
             </AlertDialogTrigger>
@@ -297,9 +297,11 @@ export function AvailabilityStatusSummary({
               <AlertDialogHeader>
                 <AlertDialogTitle>Send availability reminders?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {missingRows.length} therapist{missingRows.length === 1 ? '' : 's'}{' '}
-                  {missingRows.length === 1 ? "hasn't" : "haven't"} submitted yet. They&apos;ll
-                  receive an email with a link to submit their availability.
+                  {reminderScopeMissingCount} therapist
+                  {reminderScopeMissingCount === 1 ? '' : 's'}{' '}
+                  {reminderScopeMissingCount === 1 ? "hasn't" : "haven't"} submitted for this
+                  Schedule Block. This sends reminders to all missing submissions for the Schedule
+                  Block, even if the queue is filtered.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
