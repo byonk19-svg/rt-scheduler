@@ -244,6 +244,32 @@ describe('ScheduleGridTable', () => {
     expect(offCell).toContain('disabled=""')
   })
 
+  it('adds a subtle persistent affordance only to cells that can open actions', () => {
+    const managerHtml = renderTable(makeDataset())
+    const managerCell = getCellButton(managerHtml, 'u1', '2026-05-04')
+
+    expect(managerCell).toContain('data-actionable="true"')
+    expect(managerCell).toContain('aria-haspopup="dialog"')
+    expect(managerCell).toContain('after:h-px')
+    expect(managerCell).toContain('after:bg-[var(--print-ink-muted)]')
+
+    const staffHtml = renderTable(
+      makeDataset({
+        viewerUserId: 'u1',
+        viewerRole: 'therapist',
+        interactionMode: STAFF_VIEW_MODE,
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: false,
+        isPublished: true,
+      })
+    )
+    const staffCell = getCellButton(staffHtml, 'u1', '2026-05-04')
+
+    expect(staffCell).not.toContain('data-actionable')
+    expect(staffCell).not.toContain('aria-haspopup')
+    expect(staffCell).not.toContain('after:h-px')
+  })
+
   it('pins the viewer row for staff viewers', () => {
     const html = renderTable(
       makeDataset({
