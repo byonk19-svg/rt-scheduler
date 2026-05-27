@@ -315,7 +315,9 @@ function TherapistRow({
             <button
               type="button"
               data-testid={`cell-${row.userId}-${date}`}
+              data-actionable={clickable ? 'true' : undefined}
               aria-label={accessibleLabel}
+              aria-haspopup={clickable ? 'dialog' : undefined}
               title={accessibleLabel}
               className={cn(
                 'inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] px-0 text-[8px] font-black leading-none tabular-nums',
@@ -324,7 +326,7 @@ function TherapistRow({
                   ? 'text-[var(--print-ink-muted)] hover:bg-muted/35'
                   : display.colorClass,
                 clickable
-                  ? 'cursor-pointer ring-offset-background transition hover:ring-2 hover:ring-ring/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                  ? 'relative cursor-pointer ring-offset-background transition after:absolute after:inset-x-1 after:bottom-0.5 after:h-px after:bg-[var(--print-ink-muted)] after:content-[""] hover:ring-2 hover:ring-ring/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                   : 'cursor-default',
                 cell.isIneligible && 'opacity-45'
               )}
