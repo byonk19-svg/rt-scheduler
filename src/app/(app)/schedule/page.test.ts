@@ -146,6 +146,17 @@ describe('schedule route', () => {
     expect(html).toContain('Staff will see their Team Schedule here after a block is available.')
   })
 
+  it('renders a load error state without treating failed reads as an empty schedule', async () => {
+    loadScheduleGridDataMock.mockResolvedValue({ status: 'load_error' })
+
+    const html = renderToStaticMarkup(await SchedulePage({ searchParams: Promise.resolve({}) }))
+
+    expect(html).toContain('Could not load Team Schedule.')
+    expect(html).toContain('Refresh this page. If this keeps happening, contact an administrator.')
+    expect(html).not.toContain('No active Schedule Block is available yet.')
+    expect(html).not.toContain('Mock Schedule Grid')
+  })
+
   it('keeps setup completion feedback visible when no Schedule Block is available', async () => {
     loadScheduleGridDataMock.mockResolvedValue({ status: 'no_cycle' })
 

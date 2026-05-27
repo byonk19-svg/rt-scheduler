@@ -87,6 +87,20 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     )
   }
 
+  if (result.status === 'load_error') {
+    return (
+      <div className="mx-auto max-w-7xl space-y-4 px-4 py-12 md:px-6">
+        {showSetupCompleteBanner ? <SetupCompleteBanner /> : null}
+        <section className="mx-auto max-w-md rounded-xl border border-border/70 bg-card px-6 py-8 text-center shadow-tw-sm">
+          <p className="text-base font-semibold text-foreground">Could not load Team Schedule.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Refresh this page. If this keeps happening, contact an administrator.
+          </p>
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-[96rem] scroll-mt-24 space-y-4 px-4 pb-6 pt-2 md:px-6 md:pt-3">
       {showSetupCompleteBanner ? <SetupCompleteBanner /> : null}
