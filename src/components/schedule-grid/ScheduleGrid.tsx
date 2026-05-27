@@ -16,7 +16,12 @@ import { AssignCellPopover } from './AssignCellPopover'
 import { ScheduleGridTable } from './ScheduleGridTable'
 import { ScheduleGridToolbar } from './ScheduleGridToolbar'
 import { StatusCellPopover } from './StatusCellPopover'
-import type { GridCell, GridDataset, ScheduleGridPreFlightSummary } from './schedule-grid-types'
+import type {
+  GridCell,
+  GridDataset,
+  ScheduleGridPreFlightSummary,
+  ScheduleInteractionMode,
+} from './schedule-grid-types'
 
 type CellTarget = {
   userId: string
@@ -145,6 +150,19 @@ const SCHEDULE_LEGEND_ITEMS = [
   },
   { label: 'Requested off', code: '*', className: 'text-foreground' },
 ] as const
+
+function getScheduleInteractionHint(interactionMode: ScheduleInteractionMode): string {
+  switch (interactionMode.kind) {
+    case 'manager_edit':
+      return 'Select actionable cells to edit coverage or update shift status.'
+    case 'lead_status':
+      return 'Select assigned published shifts to update live status. Off cells are read-only.'
+    case 'combined_readonly':
+      return 'Read-only combined schedule view.'
+    case 'staff_view':
+      return 'Read-only team schedule. Your row is highlighted for quick reference.'
+  }
+}
 
 export function ScheduleGrid({
   initialDataset,
@@ -351,6 +369,7 @@ export function ScheduleGrid({
   const sheetTitle =
     loadedShiftTab === 'Night' ? 'Respiratory Therapy Night Shift' : 'Respiratory Therapy Day Shift'
   const sheetDayCount = `${initialDataset.cycleDates.length} days`
+  const interactionHint = getScheduleInteractionHint(interactionMode)
 
   return (
     <div className="rounded-xl border border-border/60 bg-[color-mix(in_srgb,var(--muted)_68%,var(--background))] p-3 shadow-inner sm:p-4 lg:p-5">
@@ -430,6 +449,9 @@ export function ScheduleGrid({
                 <span>{item.label}</span>
               </span>
             ))}
+            <span className="ml-auto border-l border-border/60 pl-3 font-medium text-[var(--print-ink-muted)]">
+              {interactionHint}
+            </span>
           </div>
           <ScheduleGridTable
             dataset={initialDataset}
