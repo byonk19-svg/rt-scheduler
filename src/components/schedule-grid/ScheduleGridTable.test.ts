@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import { ScheduleGridTable } from './ScheduleGridTable'
-import type { GridDataset, ScheduleInteractionMode } from './schedule-grid-types'
+import type { GridCell, GridDataset, ScheduleInteractionMode } from './schedule-grid-types'
 
 const MANAGER_EDIT_MODE: ScheduleInteractionMode = {
   kind: 'manager_edit',
@@ -104,6 +104,27 @@ function getCellButton(html: string, userId: string, date: string) {
   return html.match(new RegExp(`<button[^>]*data-testid="cell-${userId}-${date}"[^>]*>`))?.[0] ?? ''
 }
 
+function makeDatasetWithAliceCell(
+  date: string,
+  cell: GridCell,
+  overrides: Partial<GridDataset> = {}
+): GridDataset {
+  const base = makeDataset()
+
+  return makeDataset({
+    ...overrides,
+    therapistRows: [
+      {
+        ...base.therapistRows[0],
+        cells: {
+          ...base.therapistRows[0].cells,
+          [date]: cell,
+        },
+      },
+    ],
+  })
+}
+
 describe('ScheduleGridTable', () => {
   it('renders therapist names', () => {
     expect(renderTable(makeDataset())).toContain('Alice Johnson')
@@ -120,6 +141,107 @@ describe('ScheduleGridTable', () => {
 
   it('renders a needs-off asterisk', () => {
     expect(renderTable(makeDataset())).toContain('data-testid="asterisk-u1-2026-05-05"')
+  })
+
+  it('labels scheduled staff cells with therapist, date, shift, status, and action context', () => {
+    const html = renderTable(
+      makeDatasetWithAliceCell('2026-05-04', {
+        shiftId: 's1',
+        status: 'staff',
+        hasNeedsOff: false,
+        isIneligible: false,
+      })
+    )
+    const cell = getCellButton(html, 'u1', '2026-05-04')
+
+    expect(cell).toContain(
+      'aria-label="Alice Johnson, Mon, May 4, 2026, day shift, scheduled staff, opens schedule actions"'
+    )
+    expect(cell).toContain(
+      'title="Alice Johnson, Mon, May 4, 2026, day shift, scheduled staff, opens schedule actions"'
+    )
+  })
+
+  it('distinguishes lead cells from regular scheduled cells in the accessible name', () => {
+    const html = renderTable(makeDataset())
+    const cell = getCellButton(html, 'u1', '2026-05-04')
+
+    expect(cell).toContain(
+      'aria-label="Alice Johnson, Mon, May 4, 2026, day shift, lead, opens schedule actions"'
+    )
+    expect(cell).not.toContain('scheduled staff')
+  })
+
+  it('expands operational status codes in cell accessible names', () => {
+    const cases: Array<[GridCell['status'], string]> = [
+      ['on_call', 'on call'],
+      ['cancelled', 'cancelled'],
+      ['call_in', 'call in'],
+      ['left_early', 'left early'],
+    ]
+
+    for (const [status, statusLabel] of cases) {
+      const html = renderTable(
+        makeDatasetWithAliceCell('2026-05-04', {
+          shiftId: `shift-${status}`,
+          status,
+          hasNeedsOff: false,
+          isIneligible: false,
+        })
+      )
+      const cell = getCellButton(html, 'u1', '2026-05-04')
+
+      expect(cell).toContain(`day shift, ${statusLabel}, opens schedule actions`)
+    }
+  })
+
+  it('announces requested-off context for asterisk cells', () => {
+    const html = renderTable(makeDataset())
+    const cell = getCellButton(html, 'u1', '2026-05-05')
+
+    expect(cell).toContain(
+      'aria-label="Alice Johnson, Tue, May 5, 2026, day shift, not scheduled, requested off, opens schedule actions"'
+    )
+    expect(html).toContain('data-testid="asterisk-u1-2026-05-05"')
+  })
+
+  it('labels non-actionable cells as read-only', () => {
+    const html = renderTable(
+      makeDataset({
+        viewerUserId: 'u1',
+        viewerRole: 'therapist',
+        interactionMode: STAFF_VIEW_MODE,
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: false,
+        isPublished: true,
+      })
+    )
+    const cell = getCellButton(html, 'u1', '2026-05-04')
+
+    expect(cell).toContain(
+      'aria-label="Alice Johnson, Mon, May 4, 2026, day shift, lead, read-only"'
+    )
+    expect(cell).toContain('disabled=""')
+  })
+
+  it('keeps lead status cells actionable only when existing lead permissions allow it', () => {
+    const html = renderTable(
+      makeDataset({
+        viewerUserId: 'lead-1',
+        viewerRole: 'lead',
+        interactionMode: LEAD_STATUS_MODE,
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: true,
+        isPublished: true,
+      })
+    )
+    const assignedCell = getCellButton(html, 'u1', '2026-05-04')
+    const offCell = getCellButton(html, 'u1', '2026-05-05')
+
+    expect(assignedCell).toContain('opens schedule actions')
+    expect(assignedCell).not.toContain('disabled')
+    expect(offCell).toContain('read-only')
+    expect(offCell).toContain('disabled=""')
   })
 
   it('pins the viewer row for staff viewers', () => {
