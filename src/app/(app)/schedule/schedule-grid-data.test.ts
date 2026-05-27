@@ -65,6 +65,14 @@ type Profile = {
   max_work_days_per_week?: number
 }
 
+type ScheduleGridReadFailures = {
+  viewerProfile?: unknown
+  cycles?: unknown
+  therapists?: unknown
+  shifts?: unknown
+  forceOff?: unknown
+}
+
 const draftCycle: Cycle = {
   id: 'draft-cycle',
   label: 'Draft cycle',
@@ -102,7 +110,15 @@ const therapistRows: Profile[] = [
   },
 ]
 
-function makeSupabaseMock({ viewer, cycles }: { viewer: Profile; cycles: Cycle[] }) {
+function makeSupabaseMock({
+  viewer,
+  cycles,
+  failures = {},
+}: {
+  viewer: Profile
+  cycles: Cycle[]
+  failures?: ScheduleGridReadFailures
+}) {
   const profiles = [viewer, ...therapistRows.filter((profile) => profile.id !== viewer.id)]
 
   const from = (table: string) => {
@@ -148,14 +164,32 @@ function makeSupabaseMock({ viewer, cycles }: { viewer: Profile; cycles: Cycle[]
 
     const resolve = (single: boolean) => {
       if (table === 'profiles') {
+        if (single && typeof state.filters.id === 'string' && failures.viewerProfile) {
+          return Promise.resolve({ data: null, error: failures.viewerProfile })
+        }
+        if (!single && Array.isArray(state.inFilters.role) && failures.therapists) {
+          return Promise.resolve({ data: null, error: failures.therapists })
+        }
         const rows = applyProfiles()
         return Promise.resolve({ data: single ? (rows[0] ?? null) : rows, error: null })
       }
       if (table === 'schedule_cycles') {
+        if (failures.cycles) {
+          return Promise.resolve({ data: null, error: failures.cycles })
+        }
         const rows = applyCycles()
         return Promise.resolve({ data: single ? (rows[0] ?? null) : rows, error: null })
       }
-      if (table === 'shifts' || table === 'availability_overrides') {
+      if (table === 'shifts') {
+        if (failures.shifts) {
+          return Promise.resolve({ data: null, error: failures.shifts })
+        }
+        return Promise.resolve({ data: single ? null : [], error: null })
+      }
+      if (table === 'availability_overrides') {
+        if (failures.forceOff) {
+          return Promise.resolve({ data: null, error: failures.forceOff })
+        }
         return Promise.resolve({ data: single ? null : [], error: null })
       }
       return Promise.resolve({ data: single ? null : [], error: null })
@@ -184,7 +218,7 @@ function makeSupabaseMock({ viewer, cycles }: { viewer: Profile; cycles: Cycle[]
       },
       maybeSingle: () => resolve(true),
       then: (
-        onFulfilled?: (value: { data: unknown; error: null }) => unknown,
+        onFulfilled?: (value: { data: unknown; error: unknown }) => unknown,
         onRejected?: (reason: unknown) => unknown
       ) => resolve(false).then(onFulfilled, onRejected),
     }
@@ -200,9 +234,11 @@ function makeSupabaseMock({ viewer, cycles }: { viewer: Profile; cycles: Cycle[]
   }
 }
 
-function setViewer(viewer: Profile, cycles: Cycle[]) {
+function setViewer(viewer: Profile, cycles: Cycle[], failures?: ScheduleGridReadFailures) {
   vi.mocked(createClient).mockResolvedValue(
-    makeSupabaseMock({ viewer, cycles }) as unknown as Awaited<ReturnType<typeof createClient>>
+    makeSupabaseMock({ viewer, cycles, failures }) as unknown as Awaited<
+      ReturnType<typeof createClient>
+    >
   )
 }
 
@@ -275,6 +311,34 @@ describe('loadScheduleGridData visibility', () => {
       status: 'no_cycle',
     })
   })
+
+  it.each([
+    ['viewer profile', { viewerProfile: { message: 'profile read failed' } }],
+    ['schedule cycles', { cycles: { message: 'cycle read failed' } }],
+    ['therapist roster', { therapists: { message: 'therapist read failed' } }],
+    ['shift assignments', { shifts: { message: 'shift read failed' } }],
+    ['requested-off overrides', { forceOff: { message: 'force-off read failed' } }],
+  ] satisfies Array<[string, ScheduleGridReadFailures]>)(
+    'surfaces %s read failures instead of returning empty schedule data',
+    async (_label, failures) => {
+      setViewer(
+        {
+          id: 'manager-1',
+          role: 'manager',
+          shift_type: 'day',
+          is_active: true,
+          archived_at: null,
+          site_id: 'site-a',
+        },
+        [draftCycle],
+        failures
+      )
+
+      await expect(loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })).resolves.toEqual({
+        status: 'load_error',
+      })
+    }
+  )
 
   it('includes employment type so the grid can group PRN therapists at the bottom', async () => {
     setViewer(

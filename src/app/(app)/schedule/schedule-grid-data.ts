@@ -50,10 +50,16 @@ export type ScheduleGridServerData =
   | { status: 'unauthenticated' }
   | { status: 'forbidden' }
   | { status: 'no_cycle' }
+  | { status: 'load_error' }
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
+}
+
+function scheduleLoadError(source: string, error: unknown): ScheduleGridServerData {
+  console.error(`Could not load ${source}:`, error)
+  return { status: 'load_error' }
 }
 
 export async function loadScheduleGridData(
@@ -66,11 +72,13 @@ export async function loadScheduleGridData(
 
   if (!user) return { status: 'unauthenticated' }
 
-  const { data: profileData } = await supabase
+  const { data: profileData, error: profileError } = await supabase
     .from('profiles')
     .select('role, shift_type, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
+
+  if (profileError) return scheduleLoadError('schedule viewer profile', profileError)
 
   const profile = (profileData ?? null) as ViewerProfile | null
   const actorRole = parseRole(profile?.role)
@@ -104,7 +112,9 @@ export async function loadScheduleGridData(
     cyclesQuery.eq('site_id', profile.site_id)
   }
 
-  const { data: cyclesData } = await cyclesQuery
+  const { data: cyclesData, error: cyclesError } = await cyclesQuery
+
+  if (cyclesError) return scheduleLoadError('schedule blocks', cyclesError)
 
   const cycles = (cyclesData ?? []) as CycleRow[]
   const cycleIdFromUrl = firstParam(searchParams?.cycle)
@@ -137,23 +147,30 @@ export async function loadScheduleGridData(
     therapistQuery.eq('site_id', profile.site_id)
   }
 
-  const [{ data: therapistsData }, { data: shiftsData }, { data: forceOffData }] =
-    await Promise.all([
-      therapistQuery,
-      supabase
-        .from('shifts')
-        .select('id, user_id, date, shift_type, status, assignment_status, role')
-        .eq('cycle_id', cycle.id)
-        .eq('shift_type', shiftType)
-        .not('user_id', 'is', null),
-      supabase
-        .from('availability_overrides')
-        .select('therapist_id, date, shift_type')
-        .eq('cycle_id', cycle.id)
-        .eq('override_type', 'force_off')
-        .gte('date', cycle.start_date)
-        .lte('date', cycle.end_date),
-    ])
+  const [
+    { data: therapistsData, error: therapistsError },
+    { data: shiftsData, error: shiftsError },
+    { data: forceOffData, error: forceOffError },
+  ] = await Promise.all([
+    therapistQuery,
+    supabase
+      .from('shifts')
+      .select('id, user_id, date, shift_type, status, assignment_status, role')
+      .eq('cycle_id', cycle.id)
+      .eq('shift_type', shiftType)
+      .not('user_id', 'is', null),
+    supabase
+      .from('availability_overrides')
+      .select('therapist_id, date, shift_type')
+      .eq('cycle_id', cycle.id)
+      .eq('override_type', 'force_off')
+      .gte('date', cycle.start_date)
+      .lte('date', cycle.end_date),
+  ])
+
+  if (therapistsError) return scheduleLoadError('schedule therapist roster', therapistsError)
+  if (shiftsError) return scheduleLoadError('schedule shift assignments', shiftsError)
+  if (forceOffError) return scheduleLoadError('schedule requested-off overrides', forceOffError)
 
   const shifts = (shiftsData ?? []) as ShiftRow[]
   const activeOperationalDetails = await fetchActiveOperationalDetailMap(
