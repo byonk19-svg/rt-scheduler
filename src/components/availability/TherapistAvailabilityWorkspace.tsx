@@ -24,12 +24,14 @@ import {
   buildAvailabilityDraftSummary,
   buildCopiedCycleDraft,
   buildCycleDays,
+  buildTherapistAvailabilityDayLabel,
   buildNotesMap,
   buildRangeDates,
   buildStatusMap,
   clearAvailabilityDraft,
   getDisplayState,
   getDisplayStateLabel,
+  hasAvailabilityDayDraftChanges,
   hasAvailabilityDraftChanges,
   summarizeBaseline,
   updateDraftNote,
@@ -699,13 +701,29 @@ export function TherapistAvailabilityWorkspace({
                         dayIndex > 0 ? cycleDays[dayIndex - 1] : null
                       )
                       const dayNum = dayOfMonthFromIsoDate(date)
+                      const dateLabel = formatDateLabel(date)
+                      const dayLabel = buildTherapistAvailabilityDayLabel({
+                        dateLabel,
+                        displayState,
+                        hasUnsavedChanges: hasAvailabilityDayDraftChanges({
+                          date,
+                          initialStatusByDate,
+                          draftStatusByDate,
+                          initialNotesByDate,
+                          draftNotesByDate,
+                        }),
+                        isLocked: availabilityLocked,
+                        isSelected: selectedDate === date,
+                        isSubmitted: submissionUi.isSubmitted,
+                      })
 
                       return (
                         <button
                           key={date}
                           type="button"
-                          aria-label={formatDateLabel(date)}
+                          aria-label={dayLabel}
                           aria-pressed={selectedDate === date}
+                          title={dayLabel}
                           disabled={availabilityLocked}
                           onClick={() => {
                             setSelectedDate(date)

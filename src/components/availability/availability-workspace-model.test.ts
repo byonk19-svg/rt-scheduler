@@ -9,8 +9,10 @@ import {
   buildNotesMap,
   buildRangeDates,
   buildStatusMap,
+  buildTherapistAvailabilityDayLabel,
   clearAvailabilityDraft,
   getDisplayState,
+  hasAvailabilityDayDraftChanges,
   hasAvailabilityDraftChanges,
   updateDraftNote,
 } from '@/components/availability/availability-workspace-model'
@@ -130,6 +132,56 @@ describe('availability workspace model', () => {
       })
     )
     expect(clearAvailabilityDraft()).toEqual({ statusByDate: {}, notesByDate: {} })
+  })
+
+  it('builds therapist day labels with state, draft, selected, and locked context', () => {
+    expect(
+      buildTherapistAvailabilityDayLabel({
+        dateLabel: 'May 3, 2026',
+        displayState: 'normal_work',
+        hasUnsavedChanges: false,
+        isLocked: false,
+        isSelected: false,
+        isSubmitted: false,
+      })
+    ).toBe(
+      'May 3, 2026. Normal schedule: Need to Work. No Schedule Block exception. Response not submitted. Editable; select to review or change'
+    )
+
+    expect(
+      buildTherapistAvailabilityDayLabel({
+        dateLabel: 'May 4, 2026',
+        displayState: 'cannot_work',
+        hasUnsavedChanges: true,
+        isLocked: true,
+        isSelected: true,
+        isSubmitted: true,
+      })
+    ).toBe(
+      'May 4, 2026. Schedule Block exception: Need Off. Unsaved draft changes. Selected day. Submitted response. Read-only because availability is locked'
+    )
+  })
+
+  it('detects per-day draft changes for staff availability labels', () => {
+    expect(
+      hasAvailabilityDayDraftChanges({
+        date: '2026-05-04',
+        initialStatusByDate: { '2026-05-04': 'force_off' },
+        draftStatusByDate: { '2026-05-04': 'force_off' },
+        initialNotesByDate: { '2026-05-04': 'Appointment' },
+        draftNotesByDate: { '2026-05-04': '  Appointment  ' },
+      })
+    ).toBe(false)
+
+    expect(
+      hasAvailabilityDayDraftChanges({
+        date: '2026-05-04',
+        initialStatusByDate: { '2026-05-04': 'force_off' },
+        draftStatusByDate: {},
+        initialNotesByDate: { '2026-05-04': 'Appointment' },
+        draftNotesByDate: {},
+      })
+    ).toBe(true)
   })
 
   it('does not mark the draft dirty when notes only differ by surrounding whitespace', () => {
