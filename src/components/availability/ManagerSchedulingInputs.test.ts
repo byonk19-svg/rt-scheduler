@@ -15,6 +15,55 @@ vi.mock('next/navigation', () => ({
 
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 
+function renderManagerSchedulingInputs(
+  cycle: {
+    id: string
+    label: string
+    start_date: string
+    end_date: string
+    published: boolean
+    availability_due_at?: string | null
+    availability_closed_at?: string | null
+    availability_reopened_at?: string | null
+    status?: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+  },
+  availabilityWindow?: {
+    locked: boolean
+    reason:
+      | 'archived'
+      | 'published'
+      | 'offline'
+      | 'preliminary'
+      | 'manager_closed'
+      | 'schedule_building_started'
+      | null
+  }
+) {
+  return renderToStaticMarkup(
+    createElement(ManagerSchedulingInputs, {
+      cycles: [cycle],
+      therapists: [
+        {
+          id: 'therapist-1',
+          full_name: 'Barbara C.',
+          shift_type: 'day',
+          employment_type: 'full_time',
+        },
+      ],
+      overrides: [],
+      availabilityEntries: [],
+      initialCycleId: cycle.id,
+      initialTherapistId: 'therapist-1',
+      submittedRows: [],
+      missingRows: [],
+      saveManagerPlannerDatesAction: async () => {},
+      saveManagerAvailabilityRequestsAction: async () => {},
+      copyAvailabilityFromPreviousCycleAction: async () => {},
+      availabilityWindow,
+    })
+  )
+}
+
 describe('ManagerSchedulingInputs', () => {
   it('renders the queue-first manager workspace with toolbar, queue, detail panel, and inline editor', () => {
     const source = readFileSync(
@@ -176,5 +225,76 @@ describe('ManagerSchedulingInputs', () => {
     expect(source).not.toContain('reviewRequestsPanel')
     expect(source).toContain('AvailabilityStatusSummary')
     expect(source).toContain('TherapistContextPanel')
+  })
+
+  it('shows when availability collection is open to staff', () => {
+    const html = renderManagerSchedulingInputs(
+      {
+        id: 'cycle-1',
+        label: 'Apr 2026',
+        start_date: '2026-03-22',
+        end_date: '2026-05-02',
+        published: false,
+        availability_due_at: '2026-03-10',
+      },
+      { locked: false, reason: null }
+    )
+
+    expect(html).toContain('Availability open')
+    expect(html).toContain('Availability collection is open to staff.')
+  })
+
+  it('shows when availability collection is locked to staff', () => {
+    const html = renderManagerSchedulingInputs(
+      {
+        id: 'cycle-1',
+        label: 'Apr 2026',
+        start_date: '2026-03-22',
+        end_date: '2026-05-02',
+        published: false,
+        availability_due_at: '2026-03-10',
+        availability_closed_at: '2026-03-11T12:00:00.000Z',
+      },
+      { locked: true, reason: 'manager_closed' }
+    )
+
+    expect(html).toContain('Availability locked')
+    expect(html).toContain('Availability collection is locked to staff.')
+  })
+
+  it('shows when availability was reopened for late changes', () => {
+    const html = renderManagerSchedulingInputs(
+      {
+        id: 'cycle-1',
+        label: 'Apr 2026',
+        start_date: '2026-03-22',
+        end_date: '2026-05-02',
+        published: false,
+        availability_due_at: '2026-03-10',
+        availability_closed_at: '2026-03-11T12:00:00.000Z',
+        availability_reopened_at: '2026-03-12T12:00:00.000Z',
+      },
+      { locked: false, reason: null }
+    )
+
+    expect(html).toContain('Availability reopened')
+    expect(html).toContain('Availability was reopened for late changes.')
+  })
+
+  it('shows when the schedule has been posted', () => {
+    const html = renderManagerSchedulingInputs(
+      {
+        id: 'cycle-1',
+        label: 'Apr 2026',
+        start_date: '2026-03-22',
+        end_date: '2026-05-02',
+        published: true,
+        availability_due_at: '2026-03-10',
+      },
+      { locked: true, reason: 'published' }
+    )
+
+    expect(html).toContain('Schedule posted')
+    expect(html).toContain('Schedule has been posted.')
   })
 })

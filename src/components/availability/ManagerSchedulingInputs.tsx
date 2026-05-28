@@ -14,6 +14,7 @@ import type {
 import type { PlannerMode, PlannerOverrideRow } from '@/lib/availability-planner'
 import { splitPlannerDatesByMode } from '@/lib/availability-planner'
 import { sendAvailabilityRemindersAction } from '@/app/(app)/availability/manager-planner-actions'
+import type { AvailabilityWindowState } from '@/lib/availability-window'
 import { formatDateLabel, formatHumanCycleRange } from '@/lib/calendar-utils'
 import { isDateWithinCycle } from '@/lib/employee-directory'
 import { availabilityDueDateKey } from '@/lib/schedule-block-planning'
@@ -37,6 +38,8 @@ type Cycle = {
   end_date: string
   published: boolean
   availability_due_at?: string | null
+  availability_closed_at?: string | null
+  availability_reopened_at?: string | null
   status?: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
 }
 
@@ -84,6 +87,7 @@ type Props = {
   saveManagerPlannerDatesAction: (formData: FormData) => void | Promise<void>
   saveManagerAvailabilityRequestsAction: (formData: FormData) => void | Promise<void>
   copyAvailabilityFromPreviousCycleAction: (formData: FormData) => void | Promise<void>
+  availabilityWindow?: AvailabilityWindowState
   toolbarUtilities?: ReactNode
 }
 
@@ -134,7 +138,21 @@ function uniqueSortedDates(dates: string[]) {
   return [...new Set(dates)].sort((a, b) => a.localeCompare(b))
 }
 
-function availabilityVisibilitySummary(cycle: Cycle | null): {
+function wasAvailabilityReopened(cycle: Cycle | null) {
+  const closedAt = cycle?.availability_closed_at
+    ? new Date(cycle.availability_closed_at).getTime()
+    : null
+  const reopenedAt = cycle?.availability_reopened_at
+    ? new Date(cycle.availability_reopened_at).getTime()
+    : null
+
+  return closedAt !== null && reopenedAt !== null && reopenedAt > closedAt
+}
+
+function availabilityWindowStatusSummary(
+  cycle: Cycle | null,
+  availabilityWindow?: AvailabilityWindowState
+): {
   label: string
   detail: string
   tone: 'visible' | 'draft' | 'locked'
@@ -143,8 +161,27 @@ function availabilityVisibilitySummary(cycle: Cycle | null): {
   if (cycle.published || cycle.status === 'final' || cycle.status === 'offline') {
     return {
       label: 'Schedule posted',
-      detail: 'Availability is no longer the active therapist step.',
+      detail: 'Schedule has been posted.',
       tone: 'locked',
+    }
+  }
+
+  if (availabilityWindow?.locked) {
+    return {
+      label: 'Availability locked',
+      detail:
+        availabilityWindow.reason === 'schedule_building_started'
+          ? 'Schedule building has started. Staff edits are locked.'
+          : 'Availability collection is locked to staff.',
+      tone: 'locked',
+    }
+  }
+
+  if (wasAvailabilityReopened(cycle)) {
+    return {
+      label: 'Availability reopened',
+      detail: 'Availability was reopened for late changes.',
+      tone: 'visible',
     }
   }
 
@@ -158,8 +195,8 @@ function availabilityVisibilitySummary(cycle: Cycle | null): {
   }
 
   return {
-    label: 'Visible to therapists',
-    detail: `Due ${formatDateLabel(dueDate)}`,
+    label: 'Availability open',
+    detail: `Availability collection is open to staff. Due ${formatDateLabel(dueDate)}.`,
     tone: 'visible',
   }
 }
@@ -177,6 +214,7 @@ export function ManagerSchedulingInputs({
   saveManagerPlannerDatesAction,
   saveManagerAvailabilityRequestsAction,
   copyAvailabilityFromPreviousCycleAction,
+  availabilityWindow,
   toolbarUtilities,
 }: Props) {
   const plannerFocus = useAvailabilityPlannerFocus()
@@ -219,7 +257,7 @@ export function ManagerSchedulingInputs({
     () => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null,
     [cycles, selectedCycleId]
   )
-  const selectedCycleVisibility = availabilityVisibilitySummary(selectedCycle)
+  const selectedCycleVisibility = availabilityWindowStatusSummary(selectedCycle, availabilityWindow)
   const selectedTherapist = useMemo(
     () => therapists.find((therapist) => therapist.id === selectedTherapistId) ?? null,
     [selectedTherapistId, therapists]

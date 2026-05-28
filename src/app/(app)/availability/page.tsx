@@ -633,6 +633,7 @@ export default async function AvailabilityPage({
           saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
           saveManagerAvailabilityRequestsAction={saveManagerAvailabilityRequestsAction}
           copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
+          availabilityWindow={availabilityWindow}
           toolbarUtilities={
             <MoreActionsMenu
               label="Utilities"
