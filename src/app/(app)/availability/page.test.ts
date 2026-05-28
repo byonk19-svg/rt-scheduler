@@ -78,4 +78,60 @@ describe('availability page role-specific actions', () => {
     expect(source).not.toContain('const scheduledShiftsPromise =')
     expect(source).not.toContain('conflicts={conflicts}')
   })
+
+  it('surfaces required manager availability read failures instead of rendering empty data', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain('function AvailabilityManagerLoadError()')
+    expect(source).toContain('Could not load Availability Manager.')
+    expect(source).toContain('if (profileError) return availabilityLoadError')
+    expect(source).toContain('if (cyclesError) return availabilityLoadError')
+    expect(source).toContain('if (draftScheduleResult.error)')
+    expect(source).toContain('if (entriesResult.error)')
+    expect(source).toContain('if (plannerTherapistsResult.error)')
+    expect(source).toContain('if (plannerOverridesResult.error)')
+    expect(source).toContain('if (officialSubmissionRowsError)')
+  })
+
+  it('preserves successful empty availability states after checking for required read errors', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
+      'utf8'
+    )
+    const managerInputsSource = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
+      'utf8'
+    )
+
+    expect(source.indexOf('if (cyclesError)')).toBeLessThan(
+      source.indexOf('const cycles = (cyclesData ?? []) as Cycle[]')
+    )
+    expect(source.indexOf('if (entriesResult.error)')).toBeLessThan(
+      source.indexOf('const entries = (entriesResult.data ?? []) as AvailabilityRow[]')
+    )
+    expect(source.indexOf('if (plannerTherapistsResult.error)')).toBeLessThan(
+      source.indexOf('const plannerTherapists = (plannerTherapistsResult.data ?? [])')
+    )
+    expect(source.indexOf('if (officialSubmissionRowsError)')).toBeLessThan(
+      source.indexOf('(officialSubmissionRows ?? []).map')
+    )
+    expect(source).toContain(': { data: [], error: null }')
+    expect(managerInputsSource).toContain('No Schedule Block is ready for availability.')
+    expect(managerInputsSource).toContain('No active therapists are available to review right now.')
+  })
+
+  it('keeps optional intake badge failures out of the required load-error path', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain('if (intakeReviewCountError)')
+    expect(source).toContain("console.warn('Could not load availability intake review count:'")
+    expect(source).toContain('const intakeNeedsReviewCount = intakeReviewCount ?? 0')
+    expect(source).not.toContain("availabilityLoadError('availability intake review count'")
+  })
 })
