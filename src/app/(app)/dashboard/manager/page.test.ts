@@ -21,4 +21,13 @@ describe('manager dashboard Schedule Block Planning cues', () => {
     expect(source).toContain('Preliminary target')
     expect(source).toContain('Final Publish target')
   })
+
+  it('derives manager review work from unresolved workflow rows instead of unread notifications', () => {
+    expect(source).toContain('countManagerActionableShiftPosts')
+    expect(source).toContain('buildManagerReviewSummary')
+    expect(source).toContain(".from('shift_posts')")
+    expect(source).toContain(".from('shift_post_interests')")
+    expect(source).toContain('reviewHref={reviewHref}')
+    expect(source).not.toContain('MANAGER_ACTIONABLE_REVIEW_EVENTS')
+  })
 })

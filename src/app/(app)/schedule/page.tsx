@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { ScheduleGrid } from '@/components/schedule-grid/ScheduleGrid'
+import { Button } from '@/components/ui/button'
 import type { GridDataset } from '@/components/schedule-grid/schedule-grid-types'
 import { generateDraftScheduleAction } from '@/app/(app)/schedule/actions/draft-actions'
 import { toggleCyclePublishedAction } from '@/app/(app)/schedule/actions/publish-actions'
@@ -81,6 +83,17 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Managers can create or publish a Schedule Block before this view has shifts to show.
             Staff will see their Team Schedule here after a block is available.
+          </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button asChild>
+              <Link href="/schedule/planning">Plan Schedule Block</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/dashboard">Open dashboard</Link>
+            </Button>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Manager action required: set up or publish the next Schedule Block.
           </p>
         </section>
       </div>

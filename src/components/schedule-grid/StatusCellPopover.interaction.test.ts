@@ -6,6 +6,8 @@ import { chromium, type Page } from '@playwright/test'
 import { build, type Plugin } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+const PLAYWRIGHT_TEST_TIMEOUT = 30_000
+
 const statusPopoverResetEntry = String.raw`
   import React, { useState } from 'react'
   import { createRoot } from 'react-dom/client'
@@ -156,25 +158,29 @@ describe('StatusCellPopover target reset behavior', () => {
     await browser.close()
   })
 
-  it('clears pending confirmation, note, and left-early time when retargeted', async () => {
-    const page = await browser.newPage()
-    try {
-      await renderStatusPopoverHarness(page)
+  it(
+    'clears pending confirmation, note, and left-early time when retargeted',
+    async () => {
+      const page = await browser.newPage()
+      try {
+        await renderStatusPopoverHarness(page)
 
-      await page.getByRole('button', { name: 'Left early' }).click()
-      await page.getByLabel('Left at').fill('14:05')
-      await page.getByLabel('Note').fill('First cell note')
+        await page.getByRole('button', { name: 'Left early' }).click()
+        await page.getByLabel('Left at').fill('14:05')
+        await page.getByLabel('Note').fill('First cell note')
 
-      await page.getByText('Mark Left Early?').waitFor({ state: 'visible' })
-      await page.getByRole('button', { name: 'Switch target' }).click()
-      await page.getByText('Bob Stone - May 5, 2026').waitFor({ state: 'visible' })
-      await page.getByText('Mark Left Early?').waitFor({ state: 'detached' })
+        await page.getByText('Mark Left Early?').waitFor({ state: 'visible' })
+        await page.getByRole('button', { name: 'Switch target' }).click()
+        await page.getByText('Bob Stone - May 5, 2026').waitFor({ state: 'visible' })
+        await page.getByText('Mark Left Early?').waitFor({ state: 'detached' })
 
-      await page.getByRole('button', { name: 'Left early' }).click()
-      expect(await page.getByLabel('Left at').inputValue()).toBe('')
-      expect(await page.getByLabel('Note').inputValue()).toBe('')
-    } finally {
-      await page.close()
-    }
-  }, 15_000)
+        await page.getByRole('button', { name: 'Left early' }).click()
+        expect(await page.getByLabel('Left at').inputValue()).toBe('')
+        expect(await page.getByLabel('Note').inputValue()).toBe('')
+      } finally {
+        await page.close()
+      }
+    },
+    PLAYWRIGHT_TEST_TIMEOUT
+  )
 })

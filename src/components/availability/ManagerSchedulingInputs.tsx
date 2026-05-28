@@ -489,6 +489,23 @@ export function ManagerSchedulingInputs({
           No Schedule Block is ready for availability. Create or plan a Schedule Block before
           requesting or reviewing therapist availability.
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href="/schedule/planning"
+            className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground no-underline hover:bg-primary/90 hover:no-underline"
+          >
+            Plan Schedule Block
+          </Link>
+          <Link
+            href="/schedule"
+            className="inline-flex min-h-10 items-center rounded-md border border-border bg-background px-3 text-sm font-semibold text-foreground no-underline hover:bg-muted hover:no-underline"
+          >
+            Open Team Schedule
+          </Link>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Manager action required: planning dates must exist before availability can be collected.
+        </p>
       </section>
     )
   }

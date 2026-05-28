@@ -69,6 +69,21 @@ type AttentionItem = {
   show: boolean
 }
 
+function getAttentionPriority(item: AttentionItem): number {
+  if (item.count === '--') return 10
+
+  const toneWeight = item.tone === 'danger' ? 4000 : item.tone === 'warning' ? 3000 : 1000
+  const countWeight = Math.min(item.count, 999)
+
+  if (item.key === 'review' && item.count >= 10) return 5000 + countWeight
+  if (item.key === 'open-shifts' && item.count > 0) return toneWeight + 300 + countWeight
+  if (item.key === 'approvals' && item.count > 0) return toneWeight + 200 + countWeight
+  if (item.key === 'leads' && item.count > 0) return toneWeight + 100 + countWeight
+  if (item.key === 'coverage' && item.count > 0) return 4500 + countWeight
+
+  return toneWeight + countWeight
+}
+
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`
 }
@@ -297,7 +312,22 @@ export function ManagerTriageDashboard({
           : ('success' as const),
       show: needsReviewCount === '--' || needsReviewCount > 0,
     },
-  ].filter((item) => item.show)
+  ]
+    .filter((item) => item.show)
+    .sort((left, right) => getAttentionPriority(right) - getAttentionPriority(left))
+  const primaryAttention = attentionItems[0] ?? null
+  const primaryAttentionProps = primaryAttention
+    ? {
+        count: primaryAttention.count,
+        label: primaryAttention.label,
+        detail: primaryAttention.detail,
+        href: primaryAttention.href,
+        action: primaryAttention.action,
+        icon: primaryAttention.icon,
+        tone: primaryAttention.tone,
+      }
+    : null
+  const secondaryAttentionItems = attentionItems.slice(1)
 
   const exceptionRows = [
     ...upcomingShiftDays.map((item) => ({
@@ -371,22 +401,27 @@ export function ManagerTriageDashboard({
             <h2 className="text-xl font-bold text-foreground">Needs your attention</h2>
             <p className="text-sm text-muted-foreground">Approvals, gaps, and publish blockers.</p>
           </div>
-          <Button
-            className="min-h-10 bg-[var(--warning)] text-accent-foreground hover:brightness-105"
-            asChild
-          >
-            <Link href={attentionItems[0]?.href ?? scheduleHref}>
-              {attentionItems[0]?.action ?? 'Open schedule'}
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </Button>
+          {primaryAttention ? (
+            <Button
+              className="min-h-10 bg-[var(--warning)] text-accent-foreground hover:brightness-105"
+              asChild
+            >
+              <Link href={primaryAttention.href}>
+                {primaryAttention.action}
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </Button>
+          ) : null}
         </div>
-        <div className="grid gap-2 lg:grid-cols-3">
-          {attentionItems.map((item) => {
-            const { key, ...attentionItem } = item
-            return <AttentionRow key={key} {...attentionItem} />
-          })}
-        </div>
+        {primaryAttentionProps ? <PrimaryAttentionItem {...primaryAttentionProps} /> : null}
+        {secondaryAttentionItems.length > 0 ? (
+          <div className="mt-2 grid gap-2 lg:grid-cols-3">
+            {secondaryAttentionItems.map((item) => {
+              const { key, ...attentionItem } = item
+              return <AttentionRow key={key} {...attentionItem} />
+            })}
+          </div>
+        ) : null}
       </section>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(22rem,0.75fr)]">
@@ -495,6 +530,64 @@ export function ManagerTriageDashboard({
         <p className="sr-only">{LOADING_LABEL}</p>
       ) : null}
     </div>
+  )
+}
+
+function PrimaryAttentionItem({
+  count,
+  label,
+  detail,
+  href,
+  action,
+  icon,
+  tone,
+}: Omit<AttentionItem, 'key' | 'show'>) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'flex flex-col gap-3 rounded-lg border bg-card p-4 text-foreground shadow-tw-md hover:bg-background hover:no-underline sm:flex-row sm:items-center sm:justify-between',
+        tone === 'danger'
+          ? 'border-[var(--error-border)]'
+          : tone === 'warning'
+            ? 'border-[var(--warning-border)]'
+            : tone === 'success'
+              ? 'border-[var(--success-border)]'
+              : 'border-border/70'
+      )}
+    >
+      <span className="flex min-w-0 items-start gap-3">
+        <span
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-md',
+            tone === 'danger'
+              ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
+              : tone === 'warning'
+                ? 'bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+                : tone === 'success'
+                  ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+                  : 'bg-muted text-muted-foreground'
+          )}
+        >
+          {icon}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+            Top priority
+          </span>
+          <span className="mt-1 block text-2xl font-bold leading-tight text-foreground tabular-nums">
+            {count === '--' ? LOADING_LABEL : label}
+          </span>
+          {count !== '--' ? (
+            <span className="mt-1 block text-sm leading-5 text-muted-foreground">{detail}</span>
+          ) : null}
+        </span>
+      </span>
+      <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary">
+        {action}
+        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+      </span>
+    </Link>
   )
 }
 

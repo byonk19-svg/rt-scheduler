@@ -137,15 +137,16 @@ export function ManagerRequestCard({
 
   return (
     <div
-      className="fade-up scroll-mt-24 overflow-hidden rounded-xl border border-l-4 border-border bg-card shadow-sm transition-shadow hover:shadow-md"
+      className={cn(
+        'fade-up scroll-mt-24 overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md',
+        requestTone === 'info'
+          ? 'border-[var(--info-border)]'
+          : requestTone === 'success'
+            ? 'border-[var(--success-border)]'
+            : 'border-border'
+      )}
       style={{
         animationDelay: `${delay}s`,
-        borderLeftColor:
-          requestTone === 'info'
-            ? 'var(--info)'
-            : requestTone === 'success'
-              ? 'var(--success)'
-              : 'var(--muted-foreground)',
       }}
     >
       <div className="flex flex-col gap-2 border-b border-border bg-background px-3 py-2 lg:flex-row lg:items-start lg:justify-between">
@@ -363,7 +364,7 @@ function ResponderQueue({
             className={cn(
               'flex items-start gap-2 rounded-lg border px-2 py-1.5',
               selected
-                ? 'border-l-4 border-[var(--success-border)] border-l-[var(--success)] bg-[var(--success-subtle)]/45'
+                ? 'border-[var(--success-border)] bg-[var(--success-subtle)]/45 ring-1 ring-[var(--success)]/35'
                 : 'border-border bg-muted/30'
             )}
           >

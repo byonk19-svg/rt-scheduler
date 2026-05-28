@@ -6,6 +6,12 @@ import { ManagerTriageDashboard } from '@/components/manager/ManagerTriageDashbo
 import { can } from '@/lib/auth/can'
 import { resolveUserRole } from '@/lib/auth/role-source'
 import { buildCycleRoute } from '@/lib/cycle-route'
+import {
+  buildManagerReviewSummary,
+  countManagerActionableShiftPosts,
+  type ManagerActionShiftPostInterestRow,
+  type ManagerActionShiftPostRow,
+} from '@/lib/manager-action-work'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { availabilityDueDateKey } from '@/lib/schedule-block-planning'
 import { createClient } from '@/lib/supabase/server'
@@ -215,8 +221,7 @@ export default async function ManagerDashboardPage() {
     profileResult,
     cyclesResult,
     pendingApprovalsResult,
-    unreadReviewCountResult,
-    latestUnreadResult,
+    pendingShiftPostsResult,
     recentActivityResult,
   ] = await Promise.all([
     supabase
@@ -237,18 +242,9 @@ export default async function ManagerDashboardPage() {
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending'),
     supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .is('read_at', null),
-    supabase
-      .from('notifications')
-      .select('event_type, title, target_type')
-      .eq('user_id', user.id)
-      .is('read_at', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .from('shift_posts')
+      .select('id, type, status, created_at, claimed_by, visibility, recipient_response')
+      .eq('status', 'pending'),
     supabase
       .from('notifications')
       .select('event_type, title, target_type, created_at')
@@ -266,11 +262,8 @@ export default async function ManagerDashboardPage() {
   if (pendingApprovalsResult.error) {
     console.error('Failed to load pending preliminary approvals:', pendingApprovalsResult.error)
   }
-  if (unreadReviewCountResult.error) {
-    console.error('Failed to load unread review count:', unreadReviewCountResult.error)
-  }
-  if (latestUnreadResult.error) {
-    console.error('Failed to load latest unread review item:', latestUnreadResult.error)
+  if (pendingShiftPostsResult.error) {
+    console.error('Failed to load manager shift post review work:', pendingShiftPostsResult.error)
   }
   if (recentActivityResult.error) {
     console.error('Failed to load recent manager activity:', recentActivityResult.error)
@@ -295,7 +288,28 @@ export default async function ManagerDashboardPage() {
   const activeCycleDateRange = activeCycle
     ? `${formatCycleDate(activeCycle.start_date)} - ${formatCycleDate(activeCycle.end_date)}`
     : null
-  const latestUnread = (latestUnreadResult.data ?? null) as NotificationRow | null
+  const pendingShiftPostRows = (pendingShiftPostsResult.data ?? []) as ManagerActionShiftPostRow[]
+  const pendingShiftPostIds = pendingShiftPostRows.map((row) => row.id)
+  const pendingShiftPostInterestsResult =
+    pendingShiftPostIds.length > 0
+      ? await supabase
+          .from('shift_post_interests')
+          .select('shift_post_id, status')
+          .in('shift_post_id', pendingShiftPostIds)
+          .in('status', ['pending', 'selected'])
+      : { data: [], error: null }
+
+  if (pendingShiftPostInterestsResult.error) {
+    console.error(
+      'Failed to load manager shift post responder work:',
+      pendingShiftPostInterestsResult.error
+    )
+  }
+
+  const managerShiftPostReviewCount = countManagerActionableShiftPosts({
+    posts: pendingShiftPostRows,
+    interests: (pendingShiftPostInterestsResult.data ?? []) as ManagerActionShiftPostInterestRow[],
+  })
 
   let todayCoverageQuery = supabase.from('shifts').select('id').eq('date', todayKey)
   let upcomingShiftsQuery = supabase
@@ -411,11 +425,13 @@ export default async function ManagerDashboardPage() {
   const nextCycleLabel = nextCyclePlanning.label
   const nextCycleDetail = nextCyclePlanning.detail
 
-  const needsReviewCount = unreadReviewCountResult.count ?? 0
-  const needsReviewDetail =
-    needsReviewCount > 0
-      ? (latestUnread?.title ?? 'Unread review items are waiting.')
-      : 'You are caught up.'
+  const managerReviewSummary = buildManagerReviewSummary({
+    shiftPostReviewCount: managerShiftPostReviewCount,
+    preliminaryApprovalCount: pendingApprovalsResult.count ?? 0,
+  })
+  const needsReviewCount = managerReviewSummary.count
+  const needsReviewDetail = managerReviewSummary.detail
+  const reviewHref = managerReviewSummary.href
 
   return (
     <ManagerTriageDashboard
@@ -443,7 +459,7 @@ export default async function ManagerDashboardPage() {
       approvalsHref={MANAGER_WORKFLOW_LINKS.approvals}
       lotteryHref={MANAGER_WORKFLOW_LINKS.lottery}
       scheduleHref={scheduleHref}
-      reviewHref={latestUnread ? getNotificationHref(latestUnread) : '/schedule'}
+      reviewHref={reviewHref}
       activeCycleDateRange={activeCycleDateRange ?? undefined}
       currentCycleCtaHref={!activeCycle ? '/schedule' : undefined}
       nextCycleCtaHref={nextCyclePlanning.ctaHref}

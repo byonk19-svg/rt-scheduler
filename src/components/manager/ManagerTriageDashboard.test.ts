@@ -71,6 +71,7 @@ describe('ManagerTriageDashboard', () => {
   it('replaces separate KPI cards with attention rows and primary actions', () => {
     const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
 
+    expect(html).toContain('Top priority')
     expect(html).toContain('5 approvals waiting')
     expect(html).toContain('Review requests')
     expect(html).toContain('9 open shifts in this Schedule Block')
@@ -85,6 +86,37 @@ describe('ManagerTriageDashboard', () => {
     expect(html).not.toContain('Pending Approvals')
     expect(html).not.toContain('Upcoming Shifts')
     expect(html).not.toContain('Open Assignments')
+  })
+
+  it('promotes coverage safety issues above routine review items', () => {
+    const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
+
+    const topPriorityIndex = html.indexOf('Top priority')
+    const coverageIndex = html.indexOf('2 coverage safety issues')
+    const reviewIndex = html.indexOf('2 review items waiting')
+
+    expect(topPriorityIndex).toBeGreaterThan(-1)
+    expect(coverageIndex).toBeGreaterThan(topPriorityIndex)
+    expect(reviewIndex).toBeGreaterThan(coverageIndex)
+    expect(html).toContain('href="/schedule"')
+  })
+
+  it('promotes a large review queue above lower-count coverage warnings', () => {
+    const html = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        ...baseProps,
+        needsReviewCount: 12,
+        needsReviewDetail: 'Unread manager review items are waiting.',
+      })
+    )
+
+    const topPriorityIndex = html.indexOf('Top priority')
+    const reviewIndex = html.indexOf('12 review items waiting')
+    const coverageIndex = html.indexOf('2 coverage safety issues')
+
+    expect(topPriorityIndex).toBeGreaterThan(-1)
+    expect(reviewIndex).toBeGreaterThan(topPriorityIndex)
+    expect(coverageIndex).toBeGreaterThan(reviewIndex)
   })
 
   it('shows day and night staffing with lead, workers, open count, and status', () => {

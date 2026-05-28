@@ -34,7 +34,9 @@
     "shots:links": "node scripts/site-shots.mjs --mode links",
     "test:e2e": "playwright test",
     "test:e2e:pickup-concurrency": "playwright test e2e/pickup-interest-concurrency.spec.ts --project=chromium --workers=1",
-    "test:unit": "vitest run"
+    "test:unit": "npm run test:unit:parallel && npm run test:unit:browser-backed",
+    "test:unit:parallel": "vitest run --exclude src/components/schedule-grid/ScheduleGrid.feedback.test.ts --exclude src/components/schedule-grid/StatusCellPopover.interaction.test.ts",
+    "test:unit:browser-backed": "vitest run src/components/schedule-grid/ScheduleGrid.feedback.test.ts src/components/schedule-grid/StatusCellPopover.interaction.test.ts --maxWorkers=1 --no-file-parallelism"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.97",
