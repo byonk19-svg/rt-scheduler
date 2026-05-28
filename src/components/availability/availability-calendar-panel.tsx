@@ -50,6 +50,68 @@ function renderStateChip(type: keyof typeof CHIP_STYLES, label: string, title?: 
   )
 }
 
+function describeDraftSelection(value: CalendarDayState['draftSelection']): string | null {
+  switch (value) {
+    case 'will_work':
+      return 'Unsaved draft change: Need to Work'
+    case 'cannot_work':
+      return 'Unsaved draft change: blocked or unavailable'
+    case 'need_off':
+      return 'Unsaved draft change: Need Off request'
+    case 'request_to_work':
+      return 'Unsaved draft change: Need to Work request'
+    default:
+      return null
+  }
+}
+
+function describeSavedPlanner(value: CalendarDayState['savedPlanner']): string | null {
+  switch (value) {
+    case 'will_work':
+      return 'Planning assumption: Need to Work'
+    case 'cannot_work':
+      return 'Planning assumption: blocked or unavailable'
+    default:
+      return null
+  }
+}
+
+function describeRequestTypes(requestTypes: CalendarDayState['requestTypes']): string[] {
+  return (requestTypes ?? []).map((requestType) =>
+    requestType === 'need_off' ? 'Therapist request: Need Off' : 'Therapist request: Need to Work'
+  )
+}
+
+export function buildManagerAvailabilityDayLabel({
+  dateLabel,
+  isInCycle,
+  state,
+}: {
+  dateLabel: string
+  isInCycle: boolean
+  state: CalendarDayState
+}): string {
+  const parts = [dateLabel]
+
+  const savedPlanner = describeSavedPlanner(state.savedPlanner)
+  if (savedPlanner) parts.push(savedPlanner)
+
+  parts.push(...describeRequestTypes(state.requestTypes))
+
+  const draftSelection = describeDraftSelection(state.draftSelection)
+  if (draftSelection) parts.push(draftSelection)
+
+  if (!savedPlanner && !state.requestTypes?.length && !draftSelection) {
+    parts.push('Baseline day with no marked request or planning assumption')
+  }
+
+  parts.push(
+    isInCycle ? 'Editable; select to update planning' : 'Read-only; outside this Schedule Block'
+  )
+
+  return parts.join('. ')
+}
+
 export function AvailabilityCalendarPanel({
   cycleStart,
   cycleEnd,
@@ -100,6 +162,11 @@ export function AvailabilityCalendarPanel({
                 const dayKey = toIsoDate(day)
                 const isInCycle = dayKey >= cycleStart && dayKey <= cycleEnd
                 const state = dayStates[dayKey] ?? {}
+                const dayLabel = buildManagerAvailabilityDayLabel({
+                  dateLabel: formatDateLabel(dayKey),
+                  isInCycle,
+                  state,
+                })
                 const chips = []
 
                 if (state.savedPlanner)
@@ -130,7 +197,8 @@ export function AvailabilityCalendarPanel({
                   <button
                     key={dayKey}
                     type="button"
-                    aria-label={formatDateLabel(dayKey)}
+                    aria-label={dayLabel}
+                    title={dayLabel}
                     data-in-cycle={isInCycle}
                     data-status={
                       state.draftSelection ??

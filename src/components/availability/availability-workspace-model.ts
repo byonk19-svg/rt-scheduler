@@ -92,6 +92,72 @@ export function getDisplayStateLabel(state: DayDisplayState): string {
   }
 }
 
+export function buildTherapistAvailabilityDayLabel({
+  dateLabel,
+  displayState,
+  hasUnsavedChanges,
+  isLocked,
+  isSelected,
+  isSubmitted,
+}: {
+  dateLabel: string
+  displayState: DayDisplayState
+  hasUnsavedChanges: boolean
+  isLocked: boolean
+  isSelected: boolean
+  isSubmitted: boolean
+}): string {
+  const parts = [dateLabel]
+
+  switch (displayState) {
+    case 'normal_work':
+      parts.push('Normal schedule: Need to Work')
+      parts.push('No Schedule Block exception')
+      break
+    case 'normal_off':
+      parts.push('Normal schedule: Need Off')
+      parts.push('No Schedule Block exception')
+      break
+    case 'can_work':
+      parts.push('Schedule Block exception: Need to Work')
+      break
+    case 'cannot_work':
+      parts.push('Schedule Block exception: Need Off')
+      break
+    default:
+      parts.push('Unmarked day')
+      parts.push('No baseline availability')
+  }
+
+  if (hasUnsavedChanges) parts.push('Unsaved draft changes')
+  if (isSelected) parts.push('Selected day')
+  parts.push(isSubmitted ? 'Submitted response' : 'Response not submitted')
+  parts.push(
+    isLocked ? 'Read-only because availability is locked' : 'Editable; select to review or change'
+  )
+
+  return parts.join('. ')
+}
+
+export function hasAvailabilityDayDraftChanges({
+  date,
+  initialStatusByDate,
+  draftStatusByDate,
+  initialNotesByDate,
+  draftNotesByDate,
+}: {
+  date: string
+  initialStatusByDate: StatusByDate
+  draftStatusByDate: StatusByDate
+  initialNotesByDate: NotesByDate
+  draftNotesByDate: NotesByDate
+}): boolean {
+  return (
+    (initialStatusByDate[date] ?? null) !== (draftStatusByDate[date] ?? null) ||
+    (initialNotesByDate[date] ?? '').trim() !== (draftNotesByDate[date] ?? '').trim()
+  )
+}
+
 function getBaselineStatus(
   baselineByDate: AvailabilityBaselineByDate,
   date: string

@@ -28,6 +28,15 @@ describe('AvailabilityCalendarPanel', () => {
     expect(html).toContain('Sat')
     expect(html).toContain('data-status="need_off"')
     expect(html).toContain('data-in-cycle="true"')
+    expect(html).toContain(
+      'aria-label="Mar 24, 2026. Unsaved draft change: Need Off request. Editable; select to update planning"'
+    )
+    expect(html).toContain(
+      'aria-label="Mar 26, 2026. Planning assumption: blocked or unavailable. Editable; select to update planning"'
+    )
+    expect(html).toContain(
+      'aria-label="Mar 27, 2026. Therapist request: Need to Work. Editable; select to update planning"'
+    )
     expect(html).not.toContain('overflow-x-auto')
   })
 
@@ -48,5 +57,23 @@ describe('AvailabilityCalendarPanel', () => {
 
     expect(html).toContain('title="Therapist Need Off request"')
     expect(html).toContain('title="Draft Need Off"')
+    expect(html).toContain(
+      'aria-label="Mar 24, 2026. Therapist request: Need Off. Unsaved draft change: Need Off request. Editable; select to update planning"'
+    )
+  })
+
+  it('labels out-of-cycle manager days as read-only baseline days', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityCalendarPanel, {
+        cycleStart: '2026-03-23',
+        cycleEnd: '2026-03-27',
+        dayStates: {},
+        onToggleDate: () => {},
+      })
+    )
+
+    expect(html).toContain(
+      'aria-label="Mar 22, 2026. Baseline day with no marked request or planning assumption. Read-only; outside this Schedule Block"'
+    )
   })
 })

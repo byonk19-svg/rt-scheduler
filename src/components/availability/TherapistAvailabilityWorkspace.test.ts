@@ -112,6 +112,12 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Click a day to review it and make a change.')
     expect(html).toContain('Mar')
     expect(html).toContain('Apr')
+    expect(html).toContain(
+      'aria-label="Mar 23, 2026. Normal schedule: Need to Work. No Schedule Block exception. Response not submitted. Editable; select to review or change"'
+    )
+    expect(html).toContain(
+      'aria-label="Mar 24, 2026. Schedule Block exception: Need Off. Response not submitted. Editable; select to review or change"'
+    )
     expect(html).not.toContain('Request to Work')
     expect(html).not.toContain('Can work')
     expect(html).not.toContain('Can&#x27;t work')
@@ -237,6 +243,9 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Use previous Schedule Block<\/button>/)
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Clear block changes<\/button>/)
     expect(html).toContain('aria-describedby="locked-availability-draft-controls"')
+    expect(html).toContain(
+      'aria-label="Apr 24, 2026. Unmarked day. No baseline availability. Response not submitted. Read-only because availability is locked"'
+    )
   })
 
   it('keeps range, copy, and clear draft controls available when availability is unlocked', () => {
