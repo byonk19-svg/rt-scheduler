@@ -73,6 +73,14 @@ security_best_practices_report.md
 .tmp-dev*.log
 .tmp-prod*.log
 .omx/
+
+# Local visual-audit/browser artifacts
+/critique-shots/
+/dev-critique.log
+/login-after.png
+/rt-login.png
+/rt-signup.png
+
 # Codex CLI: ignore local/session files; keep shared repo skills
 .codex/**
 !.codex/skills/

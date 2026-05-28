@@ -63,6 +63,15 @@ Keep runtime marker contracts stable and non-destructive when overlays are appli
 - When the user explicitly invokes `$accurate-commits` after implementation work, default to commit + push as the finish path unless they explicitly say commit-only, PR-only, or otherwise narrow the Git scope.
 - Final reports must include changed files, simplifications made, and remaining risks.
 
+## Codex Quick Reference
+
+- Start implementation lanes with `git status -sb`; leave unrelated local artifacts and user changes untouched.
+- Use `npm run verify:quick -- --skip-cleanup` for docs/config/package-only checks when cleanup would disturb a running dev server, `npm run verify:full` for release-like local validation, and focused `npm run test:unit` / `npm run test:e2e -- <spec>` for behavior changes.
+- Prefer `rg` and `git ls-files` for repo searches. Avoid broad recursive scans through `.claude/`, `.codex/` non-skills, `.omx/`, `.worktrees/`, `.next/`, `node_modules/`, screenshots, and logs.
+- On Windows, stale Next.js processes can lock `.next`; stop the relevant dev server before cleanup/build work, or run `npm run cleanup:local -- --execute` only when deleting generated local artifacts is safe.
+- Do not copy chat transcripts, secrets, credentials, private conversation excerpts, local screenshots, or logs into committed files. Summarize and redact.
+- Never edit `.env*` files except examples or templates, and do not commit local browser/session artifacts.
+
 <lore_commit_protocol>
 
 ## Lore Commit Protocol
