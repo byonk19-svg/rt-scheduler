@@ -18,7 +18,7 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { PrintMenuItem } from '@/components/print-menu-item'
 import { can } from '@/lib/auth/can'
-import { loadAvailabilityWindowState } from '@/lib/availability-window'
+import { resolveAvailabilityWindowState } from '@/lib/availability-window'
 import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { parseRole } from '@/lib/auth/roles'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
@@ -358,6 +358,26 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null
 }
 
+function AvailabilityManagerLoadError() {
+  return (
+    <div className="availability-page-print space-y-5">
+      <section className="mx-auto max-w-md rounded-xl border border-border/70 bg-card px-6 py-8 text-center shadow-tw-sm">
+        <p className="text-base font-semibold text-foreground">
+          Could not load Availability Manager.
+        </p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Refresh this page. If this keeps happening, contact an administrator.
+        </p>
+      </section>
+    </div>
+  )
+}
+
+function availabilityLoadError(source: string, error: unknown) {
+  console.error(`Could not load ${source}:`, error)
+  return <AvailabilityManagerLoadError />
+}
+
 export default async function AvailabilityPage({
   searchParams,
 }: {
@@ -380,11 +400,13 @@ export default async function AvailabilityPage({
     redirect(`/availability/intake${toSearchString(params)}`)
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
+
+  if (profileError) return availabilityLoadError('availability manager profile', profileError)
 
   const canManageAvailability = can(parseRole(profile?.role), 'access_manager_ui', {
     isActive: profile?.is_active !== false,
@@ -394,17 +416,21 @@ export default async function AvailabilityPage({
     redirect(`/therapist/availability${toSearchString(params)}`)
   }
 
-  const { count: intakeReviewCount } = await supabase
+  const { count: intakeReviewCount, error: intakeReviewCountError } = await supabase
     .from('availability_email_intake_items')
     .select('id', { count: 'exact', head: true })
     .eq('parse_status', 'needs_review')
+
+  if (intakeReviewCountError) {
+    console.warn('Could not load availability intake review count:', intakeReviewCountError)
+  }
 
   const today = new Date()
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
     today.getDate()
   ).padStart(2, '0')}`
 
-  const { data: cyclesData } = await supabase
+  const { data: cyclesData, error: cyclesError } = await supabase
     .from('schedule_cycles')
     .select(
       'id, label, start_date, end_date, published, status, archived_at, availability_due_at, availability_closed_at, availability_reopened_at'
@@ -412,6 +438,8 @@ export default async function AvailabilityPage({
     .is('archived_at', null)
     .gte('end_date', todayKey)
     .order('start_date', { ascending: true })
+
+  if (cyclesError) return availabilityLoadError('availability Schedule Blocks', cyclesError)
 
   const cycles = (cyclesData ?? []) as Cycle[]
   const selectedCycleIdFromParams = getSearchParam(params?.cycle)
@@ -422,18 +450,37 @@ export default async function AvailabilityPage({
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''
-  const availabilityWindow = selectedCycleId
-    ? await loadAvailabilityWindowState(admin as never, selectedCycleId)
-    : { locked: true, reason: null }
+  const draftScheduleResult = selectedCycleId
+    ? await admin
+        .from('shifts')
+        .select('id', { count: 'exact', head: true })
+        .eq('cycle_id', selectedCycleId)
+        .limit(1)
+    : { count: 0, error: null }
 
-  const entriesResult = await supabase
-    .from('availability_overrides')
-    .select(
-      'id, date, shift_type, override_type, note, created_by, created_at, updated_at, source, intent, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
-    )
-    .order('date', { ascending: true })
-    .order('created_at', { ascending: false })
-    .eq('cycle_id', selectedCycleId)
+  if (draftScheduleResult.error) {
+    return availabilityLoadError('availability window state', draftScheduleResult.error)
+  }
+
+  const availabilityWindow = resolveAvailabilityWindowState({
+    cycle: selectedCycle,
+    hasDraftSchedule: (draftScheduleResult.count ?? 0) > 0,
+  })
+
+  const entriesResult = selectedCycleId
+    ? await supabase
+        .from('availability_overrides')
+        .select(
+          'id, date, shift_type, override_type, note, created_by, created_at, updated_at, source, intent, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+        )
+        .order('date', { ascending: true })
+        .order('created_at', { ascending: false })
+        .eq('cycle_id', selectedCycleId)
+    : { data: [], error: null }
+
+  if (entriesResult.error) {
+    return availabilityLoadError('availability overrides', entriesResult.error)
+  }
 
   const entries = (entriesResult.data ?? []) as AvailabilityRow[]
 
@@ -458,7 +505,17 @@ export default async function AvailabilityPage({
             cycles.map((cycle) => cycle.id)
           )
           .order('date', { ascending: true })
-      : { data: [] }
+      : { data: [], error: null }
+
+  if (plannerTherapistsResult.error) {
+    return availabilityLoadError('active therapists and leads', plannerTherapistsResult.error)
+  }
+  if (plannerOverridesResult.error) {
+    return availabilityLoadError(
+      'manager availability planning assumptions',
+      plannerOverridesResult.error
+    )
+  }
 
   const plannerTherapists = (plannerTherapistsResult.data ?? []) as ManagerPlannerTherapistRow[]
   const plannerOverrides = (plannerOverridesResult.data ?? []) as ManagerPlannerOverrideRow[]
@@ -469,10 +526,16 @@ export default async function AvailabilityPage({
     plannerTherapists[0]?.id ??
     ''
 
-  const { data: officialSubmissionRows } = await supabase
-    .from('therapist_availability_submissions')
-    .select('therapist_id')
-    .eq('schedule_cycle_id', selectedCycleId)
+  const { data: officialSubmissionRows, error: officialSubmissionRowsError } = selectedCycleId
+    ? await supabase
+        .from('therapist_availability_submissions')
+        .select('therapist_id')
+        .eq('schedule_cycle_id', selectedCycleId)
+    : { data: [], error: null }
+
+  if (officialSubmissionRowsError) {
+    return availabilityLoadError('official availability submissions', officialSubmissionRowsError)
+  }
 
   const officialSubmissionTherapistIds = new Set(
     (officialSubmissionRows ?? []).map((row) => (row as { therapist_id: string }).therapist_id)
