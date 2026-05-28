@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
+import { resolveAvailabilityWindowState } from '@/lib/availability-window'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildAvailabilityUrl,
@@ -84,14 +85,24 @@ export async function reopenAvailabilityWindowAction(formData: FormData) {
   }
 
   const admin = createAdminClient()
-  const { data: cycle, error: cycleError } = await admin
-    .from('schedule_cycles')
-    .select('id, published, status, archived_at, availability_closed_at, availability_reopened_at')
-    .eq('id', cycleId)
-    .maybeSingle()
+  const [{ data: cycle, error: cycleError }, draftScheduleResult] = await Promise.all([
+    admin
+      .from('schedule_cycles')
+      .select(
+        'id, published, status, archived_at, availability_closed_at, availability_reopened_at'
+      )
+      .eq('id', cycleId)
+      .maybeSingle(),
+    admin
+      .from('shifts')
+      .select('id', { count: 'exact', head: true })
+      .eq('cycle_id', cycleId)
+      .limit(1),
+  ])
 
   if (
     cycleError ||
+    draftScheduleResult.error ||
     !cycle ||
     cycle.published ||
     cycle.archived_at ||
@@ -103,13 +114,12 @@ export async function reopenAvailabilityWindowAction(formData: FormData) {
     redirect(buildAvailabilityUrl({ error: 'availability_window_failed', cycle: cycleId }))
   }
 
-  const closedAt = cycle.availability_closed_at
-    ? new Date(cycle.availability_closed_at).getTime()
-    : null
-  const reopenedAt = cycle.availability_reopened_at
-    ? new Date(cycle.availability_reopened_at).getTime()
-    : null
-  if (closedAt === null || (reopenedAt !== null && reopenedAt > closedAt)) {
+  const availabilityWindow = resolveAvailabilityWindowState({
+    cycle,
+    hasDraftSchedule: (draftScheduleResult.count ?? 0) > 0,
+  })
+
+  if (!availabilityWindow.locked) {
     redirect(buildAvailabilityUrl({ error: 'availability_window_not_locked', cycle: cycleId }))
   }
 

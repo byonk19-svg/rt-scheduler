@@ -574,6 +574,30 @@ describe('availability actions', () => {
     })
   })
 
+  it('lets a manager reopen availability after schedule building has started', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    const admin = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      draftShiftCount: 3,
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+    const formData = new FormData()
+    formData.set('cycle_id', 'cycle-1')
+
+    await expect(reopenAvailabilityWindowAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?success=availability_reopened&cycle=cycle-1'
+    )
+    expect(admin.state.updates.at(-1)).toMatchObject({
+      table: 'schedule_cycles',
+      payload: expect.objectContaining({
+        availability_reopened_by: 'manager-1',
+      }),
+      filters: { id: 'cycle-1' },
+    })
+  })
+
   it('does not lock an already locked availability window again', async () => {
     const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
     const admin = createSupabaseMock({
