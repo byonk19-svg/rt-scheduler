@@ -17,6 +17,19 @@ type ScheduleExportRow = {
     | null
 }
 
+type ExportActorProfile = {
+  role: string | null
+  is_active: boolean | null
+  archived_at: string | null
+  site_id: string | null
+}
+
+type ExportCycleRow = {
+  id: string
+  label: string | null
+  site_id: string | null
+}
+
 function dayOfWeekFromIsoDate(date: string): string {
   const parsed = new Date(`${date}T12:00:00`)
   if (Number.isNaN(parsed.getTime())) return ''
@@ -52,17 +65,37 @@ export async function GET(request: Request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
+  const actorProfile = (profile ?? null) as ExportActorProfile | null
 
   if (
-    !can(parseRole(profile?.role), 'export_all_availability', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
+    !can(parseRole(actorProfile?.role), 'export_all_availability', {
+      isActive: actorProfile?.is_active !== false,
+      archivedAt: actorProfile?.archived_at ?? null,
     })
   ) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  if (!actorProfile?.site_id) {
+    return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
+  }
+
+  const { data: cycleLookup, error: cycleLookupError } = await supabase
+    .from('schedule_cycles')
+    .select('id, label, site_id')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleLookupError || !cycleLookup) {
+    return NextResponse.json({ error: 'Cycle not found' }, { status: 404 })
+  }
+
+  const cycleRow = cycleLookup as ExportCycleRow
+  if (cycleRow.site_id !== actorProfile.site_id) {
+    return NextResponse.json({ error: 'Cycle is outside your site scope.' }, { status: 403 })
   }
 
   const { data, error } = await supabase
@@ -71,6 +104,7 @@ export async function GET(request: Request) {
       'date, shift_type, role, status, profiles!shifts_user_id_fkey(full_name), schedule_cycles!shifts_cycle_id_fkey(label, start_date, end_date)'
     )
     .eq('cycle_id', cycleId)
+    .eq('site_id', actorProfile.site_id)
     .order('date', { ascending: true })
 
   if (error) {
@@ -80,18 +114,11 @@ export async function GET(request: Request) {
 
   const rows = (data ?? []) as ScheduleExportRow[]
 
-  let cycleLabel = ''
+  let cycleLabel = cycleRow.label ?? ''
   if (rows.length > 0) {
     cycleLabel = getOne(rows[0].schedule_cycles)?.label ?? ''
   }
-  if (!cycleLabel) {
-    const { data: cycleRow } = await supabase
-      .from('schedule_cycles')
-      .select('label')
-      .eq('id', cycleId)
-      .maybeSingle()
-    cycleLabel = cycleRow?.label ?? cycleId
-  }
+  if (!cycleLabel) cycleLabel = cycleId
 
   const header = [
     'date',

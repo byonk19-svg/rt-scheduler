@@ -33,7 +33,15 @@ function createSupabaseMock() {
         },
         maybeSingle: async () => {
           if (table === 'profiles') {
-            return { data: { role: 'manager' }, error: null }
+            return {
+              data: {
+                role: 'manager',
+                is_active: true,
+                archived_at: null,
+                site_id: 'site-a',
+              },
+              error: null,
+            }
           }
           return { data: null, error: null }
         },

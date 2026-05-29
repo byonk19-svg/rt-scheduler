@@ -17,6 +17,13 @@ type RosterExportRow = {
   max_work_days_per_week: number | null
 }
 
+type RosterActorProfile = {
+  role: string | null
+  is_active: boolean | null
+  archived_at: string | null
+  site_id: string | null
+}
+
 export async function GET() {
   const supabase = await createClient()
   const {
@@ -29,17 +36,22 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
+  const actorProfile = (profile ?? null) as RosterActorProfile | null
 
   if (
-    !can(parseRole(profile?.role), 'export_all_availability', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
+    !can(parseRole(actorProfile?.role), 'export_all_availability', {
+      isActive: actorProfile?.is_active !== false,
+      archivedAt: actorProfile?.archived_at ?? null,
     })
   ) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  if (!actorProfile?.site_id) {
+    return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
   }
 
   const { data, error } = await supabase
@@ -47,6 +59,7 @@ export async function GET() {
     .select(
       'full_name, role, shift_type, employment_type, is_lead_eligible, is_active, on_fmla, phone_number, max_work_days_per_week'
     )
+    .eq('site_id', actorProfile.site_id)
     .not('role', 'is', null)
     .order('full_name', { ascending: true })
 

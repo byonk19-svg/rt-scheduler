@@ -16,8 +16,8 @@ type AvailabilityExportRow = {
   therapist_id: string
   profiles: { full_name: string } | { full_name: string }[] | null
   schedule_cycles:
-    | { label: string; start_date: string; end_date: string }
-    | { label: string; start_date: string; end_date: string }[]
+    | { label: string; start_date: string; end_date: string; site_id: string | null }
+    | { label: string; start_date: string; end_date: string; site_id: string | null }[]
     | null
 }
 
@@ -25,6 +25,13 @@ type AvailabilitySubmissionExportRow = {
   therapist_id: string
   schedule_cycle_id: string
   submitted_at: string
+}
+
+type ExportActorProfile = {
+  role: string | null
+  is_active: boolean | null
+  archived_at: string | null
+  site_id: string | null
 }
 
 export async function GET() {
@@ -39,24 +46,32 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
 
-  const isManager = can(parseRole(profile?.role), 'export_all_availability', {
-    isActive: profile?.is_active !== false,
-    archivedAt: profile?.archived_at ?? null,
+  const actorProfile = (profile ?? null) as ExportActorProfile | null
+  const isManager = can(parseRole(actorProfile?.role), 'export_all_availability', {
+    isActive: actorProfile?.is_active !== false,
+    archivedAt: actorProfile?.archived_at ?? null,
   })
+
+  if (isManager && !actorProfile?.site_id) {
+    return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
+  }
+  const actorSiteId = actorProfile?.site_id ?? ''
 
   let query = supabase
     .from('availability_overrides')
     .select(
-      'cycle_id, date, override_type, shift_type, note, source, created_at, therapist_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+      'cycle_id, date, override_type, shift_type, note, source, created_at, therapist_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles!inner(label, start_date, end_date, site_id)'
     )
     .order('date', { ascending: true })
     .order('created_at', { ascending: true })
 
-  if (!isManager) {
+  if (isManager) {
+    query = query.eq('schedule_cycles.site_id', actorSiteId)
+  } else {
     query = query.eq('therapist_id', user.id)
   }
 

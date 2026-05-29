@@ -23,6 +23,25 @@ describe('publish actions immediate email processing', () => {
     expect(source).toContain("from('therapist_availability_submissions')")
   })
 
+  it('scopes publish validation and notifications to the Schedule Block site', () => {
+    const filePath = resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source.match(/\.eq\('site_id', cycle\.site_id\)/g)?.length ?? 0).toBeGreaterThanOrEqual(
+      2
+    )
+    expect(source).toContain(".eq('site_id', currentCycle.site_id)")
+    expect(source).toContain(".is('archived_at', null)")
+  })
+
+  it('does not convert full active roster minimums into final publish blockers', () => {
+    const filePath = resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('const minWorkDaysByTherapist = new Map<string, number>()')
+    expect(source).not.toContain('getWeeklyMinimumForEmploymentType')
+  })
+
   it('derives current publish state from the database before mutating', () => {
     const filePath = resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts')
     const source = readFileSync(filePath, 'utf8')

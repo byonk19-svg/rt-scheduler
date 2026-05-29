@@ -41,6 +41,7 @@ type ManagerAccessContext = {
   role?: string | null
   isActive?: boolean | null
   archivedAt?: string | null
+  siteId?: string | null
 }
 
 function makeServerClient(context: ManagerAccessContext) {
@@ -68,6 +69,9 @@ function makeServerClient(context: ManagerAccessContext) {
                         role: context.role ?? 'manager',
                         is_active: context.isActive ?? true,
                         archived_at: context.archivedAt ?? null,
+                        site_id: Object.prototype.hasOwnProperty.call(context, 'siteId')
+                          ? context.siteId
+                          : 'site-a',
                       }
                     : null,
                   error: null,
@@ -84,12 +88,27 @@ function makeServerClient(context: ManagerAccessContext) {
 function makeAdminClient() {
   const state = {
     profileUpdatePayload: null as Record<string, unknown> | null,
+    profileUpdateFilters: [] as Array<[string, unknown]>,
     deletedWorkPatternsForProfileId: null as string | null,
     selectedPendingProfile: {
       id: 'profile-1',
       email: 'therapist@example.com',
       full_name: 'Taylor Therapist',
+      site_id: 'site-a',
     },
+  }
+
+  const makeProfilesSelectChain = () => {
+    const query = {
+      eq() {
+        return query
+      },
+      maybeSingle: async () => ({
+        data: state.selectedPendingProfile,
+        error: null,
+      }),
+    }
+    return query
   }
 
   return {
@@ -98,34 +117,21 @@ function makeAdminClient() {
       if (table === 'profiles') {
         return {
           select() {
-            return {
-              eq() {
-                return {
-                  eq() {
-                    return {
-                      maybeSingle: async () => ({
-                        data: state.selectedPendingProfile,
-                        error: null,
-                      }),
-                    }
-                  },
-                }
-              },
-            }
+            return makeProfilesSelectChain()
           },
           update(payload: Record<string, unknown>) {
             state.profileUpdatePayload = payload
 
-            return {
-              eq() {
-                return {
-                  eq: async () => ({
-                    data: null,
-                    error: null,
-                  }),
-                }
+            const query = {
+              eq(column: string, value: unknown) {
+                state.profileUpdateFilters.push([column, value])
+                return query
+              },
+              then(resolve: (value: unknown) => unknown) {
+                return Promise.resolve(resolve({ data: null, error: null }))
               },
             }
+            return query
           },
         }
       }
@@ -198,6 +204,7 @@ describe('user access approval route', () => {
         preferred_work_days: [],
         preferred_work_days_mode: 'unset',
       })
+      expect(adminClient.state.profileUpdateFilters).toContainEqual(['site_id', 'site-a'])
       expect(adminClient.state.deletedWorkPatternsForProfileId).toBe('profile-1')
       expect(linkEmployeeRosterToProfileMock).toHaveBeenCalledWith({
         id: 'profile-1',
@@ -207,4 +214,19 @@ describe('user access approval route', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1)
     }
   )
+
+  it('blocks managers without a site before admin approval work', async () => {
+    const adminClient = makeAdminClient()
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'manager-1', role: 'manager', siteId: null })
+    )
+    createAdminClientMock.mockReturnValue(adminClient)
+
+    const response = await POST(makeApproveRequest())
+
+    expect(response.status).toBe(403)
+    expect(adminClient.state.profileUpdatePayload).toBeNull()
+    expect(linkEmployeeRosterToProfileMock).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })
