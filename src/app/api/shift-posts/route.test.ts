@@ -31,6 +31,7 @@ type ServerContext = {
   role?: string | null
   isActive?: boolean | null
   archivedAt?: string | null
+  siteId?: string | null
 }
 
 function makeServerClient(context: ServerContext) {
@@ -57,6 +58,9 @@ function makeServerClient(context: ServerContext) {
                     role: context.role ?? null,
                     is_active: context.isActive ?? true,
                     archived_at: context.archivedAt ?? null,
+                    site_id: Object.prototype.hasOwnProperty.call(context, 'siteId')
+                      ? context.siteId
+                      : 'site-a',
                   },
                   error: null,
                 }),
@@ -101,22 +105,36 @@ function makeReviewAdminClient(params: {
   postError?: unknown
   interest?: unknown
   interestError?: unknown
+  shifts?: unknown
+  shiftsError?: unknown
 }) {
   const rpc = params.rpc ?? vi.fn()
+  const defaultPost = {
+    id: 'post-1',
+    type: 'pickup',
+    status: 'pending',
+    visibility: 'team',
+    recipient_response: null,
+    claimed_by: null,
+    shift_id: 'shift-1',
+    swap_shift_id: null,
+  }
   return {
     rpc,
     from(table: string) {
       if (table === 'shift_posts') {
         return makeAdminQuery({
-          data: params.post ?? {
-            id: 'post-1',
-            type: 'pickup',
-            status: 'pending',
-            visibility: 'team',
-            recipient_response: null,
-            claimed_by: null,
-          },
+          data:
+            typeof params.post === 'object' && params.post !== null
+              ? { ...defaultPost, ...params.post }
+              : defaultPost,
           error: params.postError ?? null,
+        })
+      }
+      if (table === 'shifts') {
+        return makeAdminQuery({
+          data: params.shifts ?? [{ id: 'shift-1', site_id: 'site-a' }],
+          error: params.shiftsError ?? null,
         })
       }
       if (table === 'shift_post_interests') {
@@ -273,6 +291,31 @@ describe('shift-post mutation API', () => {
     expect(rpcMock).not.toHaveBeenCalled()
   })
 
+  it('blocks actors without a site before shift-post workflow mutations', async () => {
+    const rpcMock = vi.fn()
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({
+        userId: 'therapist-1',
+        role: 'therapist',
+        siteId: null,
+      })
+    )
+    createAdminClientMock.mockReturnValue({
+      rpc: rpcMock,
+    })
+
+    const response = await POST(
+      makeRequest({
+        action: 'express_interest',
+        requestId: 'post-1',
+      })
+    )
+
+    expect(response.status).toBe(403)
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
   it('blocks review actions for non-managers before calling the review function', async () => {
     const rpcMock = vi.fn()
 
@@ -359,7 +402,13 @@ describe('shift-post mutation API', () => {
           visibility: 'team',
           recipient_response: null,
           claimed_by: null,
+          shift_id: 'requester-shift-1',
+          swap_shift_id: 'partner-shift-1',
         },
+        shifts: [
+          { id: 'requester-shift-1', site_id: 'site-a' },
+          { id: 'partner-shift-1', site_id: 'site-a' },
+        ],
       })
     )
 
@@ -446,6 +495,86 @@ describe('shift-post mutation API', () => {
 
     expect(response.status).toBe(400)
     expect(body.error).toContain('Only pending shift posts can be reviewed')
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks review of cross-site shift posts before revealing request state', async () => {
+    const rpcMock = vi.fn()
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'manager-1', role: 'manager', siteId: 'site-a' })
+    )
+    createAdminClientMock.mockReturnValue(
+      makeReviewAdminClient({
+        rpc: rpcMock,
+        post: {
+          id: 'post-1',
+          type: 'pickup',
+          status: 'approved',
+          visibility: 'team',
+          recipient_response: null,
+          claimed_by: null,
+          shift_id: 'shift-1',
+          swap_shift_id: null,
+        },
+        shifts: [{ id: 'shift-1', site_id: 'site-b' }],
+      })
+    )
+
+    const response = await POST(
+      makeRequest({
+        action: 'review_request',
+        requestId: 'post-1',
+        decision: 'deny',
+      })
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(404)
+    expect(body.error).toContain('was not found')
+    expect(body.error).not.toContain('Only pending')
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks review when a swap request references a cross-site partner shift', async () => {
+    const rpcMock = vi.fn()
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'manager-1', role: 'manager', siteId: 'site-a' })
+    )
+    createAdminClientMock.mockReturnValue(
+      makeReviewAdminClient({
+        rpc: rpcMock,
+        post: {
+          id: 'post-1',
+          type: 'swap',
+          status: 'pending',
+          visibility: 'team',
+          recipient_response: null,
+          claimed_by: 'therapist-2',
+          shift_id: 'requester-shift-1',
+          swap_shift_id: 'partner-shift-1',
+        },
+        shifts: [
+          { id: 'requester-shift-1', site_id: 'site-a' },
+          { id: 'partner-shift-1', site_id: 'site-b' },
+        ],
+      })
+    )
+
+    const response = await POST(
+      makeRequest({
+        action: 'review_request',
+        requestId: 'post-1',
+        decision: 'approve',
+        swapPartnerId: 'therapist-2',
+      })
+    )
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toMatchObject({
+      error: expect.stringContaining('was not found'),
+    })
     expect(rpcMock).not.toHaveBeenCalled()
   })
 

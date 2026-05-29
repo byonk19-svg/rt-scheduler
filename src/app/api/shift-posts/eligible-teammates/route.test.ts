@@ -18,6 +18,7 @@ import { GET } from '@/app/api/shift-posts/eligible-teammates/route'
 type TestShiftRow = {
   id: string
   cycle_id: string
+  site_id?: string | null
   user_id: string | null
   date: string
   shift_type: 'day' | 'night'
@@ -35,6 +36,7 @@ type TestProfileRow = {
   archived_at?: string | null
   role?: string | null
   shift_type?: 'day' | 'night' | null
+  site_id?: string | null
 }
 
 type TestState = {
@@ -71,7 +73,10 @@ function createServerClient(userId = 'therapist-1') {
 
 function createAdminClient(state: TestState) {
   function runQuery(table: string, filters: Array<{ op: string; key: string; value: unknown }>) {
-    const rows = table === 'profiles' ? state.profiles : state.shifts
+    const rows =
+      table === 'profiles'
+        ? state.profiles.map((row) => ({ site_id: 'site-a', ...row }))
+        : state.shifts.map((row) => ({ site_id: 'site-a', ...row }))
 
     return rows.filter((row) =>
       filters.every((filter) => {
@@ -234,6 +239,109 @@ describe('eligible request teammates API', () => {
         isBestOption: true,
       },
     ])
+  })
+
+  it('rejects inactive requesters before exposing teammate candidates', async () => {
+    createAdminClientMock.mockReturnValue(
+      createAdminClient({
+        profiles: [
+          {
+            id: 'therapist-1',
+            full_name: 'Inactive Requester',
+            is_lead_eligible: true,
+            is_active: false,
+            role: 'lead',
+            shift_type: 'day',
+          },
+          {
+            id: 'therapist-2',
+            full_name: 'Therapist Two',
+            is_lead_eligible: true,
+            is_active: true,
+            role: 'therapist',
+            shift_type: 'day',
+          },
+        ],
+        shifts: [
+          {
+            id: 'shift-1',
+            cycle_id: 'cycle-1',
+            user_id: 'therapist-1',
+            date: '2026-05-01',
+            shift_type: 'day',
+            role: 'lead',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            schedule_cycles: { published: true },
+          },
+        ],
+      })
+    )
+
+    const response = await GET(makeRequest('shift-1', 'swap'))
+    const body = await response.json()
+
+    expect(response.status).toBe(404)
+    expect(body).toEqual({ error: 'Shift was not found.' })
+  })
+
+  it('rejects requester shifts outside the actor site before exposing teammate candidates', async () => {
+    createAdminClientMock.mockReturnValue(
+      createAdminClient({
+        profiles: [
+          {
+            id: 'therapist-1',
+            full_name: 'Requester',
+            is_lead_eligible: true,
+            is_active: true,
+            role: 'lead',
+            shift_type: 'day',
+            site_id: 'site-a',
+          },
+          {
+            id: 'therapist-2',
+            full_name: 'Other Site Candidate',
+            is_lead_eligible: true,
+            is_active: true,
+            role: 'therapist',
+            shift_type: 'day',
+            site_id: 'site-b',
+          },
+        ],
+        shifts: [
+          {
+            id: 'shift-1',
+            cycle_id: 'cycle-1',
+            site_id: 'site-b',
+            user_id: 'therapist-1',
+            date: '2026-05-01',
+            shift_type: 'day',
+            role: 'lead',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            schedule_cycles: { published: true },
+          },
+          {
+            id: 'shift-2',
+            cycle_id: 'cycle-1',
+            site_id: 'site-b',
+            user_id: 'therapist-2',
+            date: '2026-05-15',
+            shift_type: 'day',
+            role: 'staff',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            schedule_cycles: { published: true },
+          },
+        ],
+      })
+    )
+
+    const response = await GET(makeRequest('shift-1', 'swap'))
+    const body = await response.json()
+
+    expect(response.status).toBe(404)
+    expect(body).toEqual({ error: 'Shift was not found.' })
   })
 
   it('returns only teammates with a different same-shift-type assignment for direct swaps', async () => {
