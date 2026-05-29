@@ -125,7 +125,7 @@ const SCHEDULE_LEGEND_ITEMS = [
     code: '1',
     className: 'text-[var(--print-ink)]',
   },
-  { label: 'Lead', code: '1', className: 'border border-yellow-300 bg-yellow-200 text-yellow-900' },
+  { label: 'Lead', code: 'L', className: 'border border-yellow-300 bg-yellow-200 text-yellow-900' },
   {
     label: 'On call',
     code: 'OC',
@@ -149,7 +149,7 @@ const SCHEDULE_LEGEND_ITEMS = [
     code: 'LE',
     className: 'border border-orange-200 bg-orange-100 text-orange-800',
   },
-  { label: 'Requested off', code: '*', className: 'text-foreground' },
+  { label: 'Need Off', code: '*', className: 'text-foreground' },
 ] as const
 
 function getScheduleInteractionHint(interactionMode: ScheduleInteractionMode): string {

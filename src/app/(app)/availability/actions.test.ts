@@ -60,6 +60,8 @@ type TestContext = {
   archivedAt?: string | null
   siteId?: string | null
   therapistSiteId?: string | null
+  therapistIsActive?: boolean
+  therapistArchivedAt?: string | null
   cycleSiteId?: string | null
   therapistSubmissionExists?: boolean
   draftShiftCount?: number
@@ -68,6 +70,7 @@ type TestContext = {
   cycleArchivedAt?: string | null
   availabilityClosedAt?: string | null
   availabilityReopenedAt?: string | null
+  overrideRow?: Record<string, unknown> | null
 }
 
 function createSupabaseMock(context: TestContext = {}) {
@@ -195,29 +198,38 @@ function createSupabaseMock(context: TestContext = {}) {
         maybeSingle: async () => {
           if (table === 'profiles' && selected.includes('role')) {
             const profileId = filters.get('id')
+            const isTherapist = profileId === 'therapist-1'
             return {
               data: {
                 role: context.role,
-                is_active: context.isActive ?? true,
-                archived_at: context.archivedAt ?? null,
-                site_id:
-                  profileId === 'therapist-1'
-                    ? (context.therapistSiteId ?? context.siteId ?? 'default')
-                    : (context.siteId ?? 'default'),
+                is_active: isTherapist
+                  ? (context.therapistIsActive ?? context.isActive ?? true)
+                  : (context.isActive ?? true),
+                archived_at: isTherapist
+                  ? (context.therapistArchivedAt ?? context.archivedAt ?? null)
+                  : (context.archivedAt ?? null),
+                site_id: isTherapist
+                  ? (context.therapistSiteId ?? context.siteId ?? 'default')
+                  : (context.siteId ?? 'default'),
               },
               error: null,
             }
           }
           if (table === 'profiles' && selected.includes('site_id')) {
             const profileId = filters.get('id')
+            const isTherapist = profileId === 'therapist-1'
             return {
               data: {
-                is_active: context.isActive ?? true,
-                archived_at: context.archivedAt ?? null,
-                site_id:
-                  profileId === 'therapist-1'
-                    ? (context.therapistSiteId ?? context.siteId ?? 'default')
-                    : (context.siteId ?? 'default'),
+                is_active: isTherapist
+                  ? (context.therapistIsActive ?? context.isActive ?? true)
+                  : (context.isActive ?? true),
+                archived_at: isTherapist
+                  ? (context.therapistArchivedAt ?? context.archivedAt ?? null)
+                  : (context.archivedAt ?? null),
+                site_id: isTherapist
+                  ? (context.therapistSiteId ?? context.siteId ?? 'default')
+                  : (context.siteId ?? 'default'),
+                shift_type: isTherapist ? 'day' : undefined,
               },
               error: null,
             }
@@ -225,7 +237,7 @@ function createSupabaseMock(context: TestContext = {}) {
           if (table === 'schedule_cycles') {
             return {
               data: {
-                id: 'cycle-1',
+                id: filters.get('id') ?? 'cycle-1',
                 label: 'Block 1',
                 start_date: '2026-03-22',
                 end_date: '2026-05-02',
@@ -236,6 +248,24 @@ function createSupabaseMock(context: TestContext = {}) {
                 availability_reopened_at: context.availabilityReopenedAt ?? null,
                 site_id: context.cycleSiteId ?? context.siteId ?? 'default',
               },
+              error: null,
+            }
+          }
+          if (
+            table === 'availability_overrides' &&
+            selected.includes('cycle_id') &&
+            selected.includes('therapist_id') &&
+            selected.includes('source')
+          ) {
+            return {
+              data:
+                context.overrideRow === undefined
+                  ? {
+                      cycle_id: 'cycle-1',
+                      therapist_id: 'therapist-1',
+                      source: 'manager',
+                    }
+                  : context.overrideRow,
               error: null,
             }
           }
@@ -530,6 +560,9 @@ describe('availability actions', () => {
       {
         table: 'availability_overrides',
         filters: {
+          cycle_id: 'cycle-1',
+          therapist_id: 'therapist-1',
+          source: 'manager',
           id: ['override-old-1'],
         },
       },
@@ -570,6 +603,80 @@ describe('availability actions', () => {
 
     await expect(saveManagerPlannerDatesAction(makeManagerPlannerFormData())).rejects.toThrow(
       'REDIRECT:/availability'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(supabase.state.deletes).toHaveLength(0)
+  })
+
+  it('blocks manager planner mutations for a therapist outside the manager site', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager', siteId: 'site-a' })
+    const admin = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+      therapistSiteId: 'site-b',
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(saveManagerPlannerDatesAction(makeManagerPlannerFormData())).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=planner_save_failed'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(supabase.state.deletes).toHaveLength(0)
+  })
+
+  it('blocks manager planner mutations for a Schedule Block outside the manager site', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager', siteId: 'site-a' })
+    const admin = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+      cycleSiteId: 'site-b',
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(saveManagerPlannerDatesAction(makeManagerPlannerFormData())).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=planner_save_failed'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(supabase.state.deletes).toHaveLength(0)
+  })
+
+  it('blocks manager planner mutations for inactive therapists', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    const admin = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      therapistIsActive: false,
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(saveManagerPlannerDatesAction(makeManagerPlannerFormData())).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=planner_save_failed'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(supabase.state.deletes).toHaveLength(0)
+  })
+
+  it('blocks manager planner mutations for archived therapists', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    const admin = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      therapistArchivedAt: '2026-03-01T00:00:00.000Z',
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(saveManagerPlannerDatesAction(makeManagerPlannerFormData())).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=planner_save_failed'
     )
 
     expect(supabase.state.upsertPayloads).toHaveLength(0)
@@ -694,6 +801,9 @@ describe('availability actions', () => {
       {
         table: 'availability_overrides',
         filters: {
+          cycle_id: 'cycle-1',
+          therapist_id: 'therapist-1',
+          source: 'manager',
           id: ['override-old-1'],
         },
       },
@@ -906,10 +1016,37 @@ describe('availability actions', () => {
         table: 'availability_overrides',
         filters: {
           id: 'override-1',
+          cycle_id: 'cycle-1',
+          therapist_id: 'therapist-1',
           source: 'manager',
         },
       },
     ])
+  })
+
+  it('blocks manager planner delete when the row belongs to another parent', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    const admin = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      overrideRow: {
+        cycle_id: 'cycle-2',
+        therapist_id: 'therapist-1',
+        source: 'manager',
+      },
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+    const formData = new FormData()
+    formData.set('override_id', 'override-1')
+    formData.set('cycle_id', 'cycle-1')
+    formData.set('therapist_id', 'therapist-1')
+
+    await expect(deleteManagerPlannerDateAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=planner_delete_failed'
+    )
+
+    expect(supabase.state.deletes).toHaveLength(0)
   })
 
   it('applies parsed inbound email requests into manager availability', async () => {
@@ -1443,6 +1580,11 @@ describe('availability actions', () => {
 })
 
 describe('copyAvailabilityFromPreviousCycleAction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    createAdminClientMock.mockReturnValue(createSupabaseMock())
+  })
+
   function makeCopyFormData() {
     const formData = new FormData()
     formData.set('cycle_id', 'cycle-new')
@@ -1469,12 +1611,30 @@ describe('copyAvailabilityFromPreviousCycleAction', () => {
     )
   })
 
+  it('blocks copying manager availability for a Schedule Block outside the manager site', async () => {
+    const mock = createSupabaseMock({ userId: 'mgr-1', role: 'manager', siteId: 'site-a' })
+    const admin = createSupabaseMock({
+      userId: 'mgr-1',
+      role: 'manager',
+      siteId: 'site-a',
+      cycleSiteId: 'site-b',
+    })
+    createClientMock.mockResolvedValue(mock)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(copyAvailabilityFromPreviousCycleAction(makeCopyFormData())).rejects.toThrow(
+      'REDIRECT:/availability?error=copy_no_source&cycle=cycle-new&therapist=therapist-1'
+    )
+
+    expect(mock.state.upsertPayloads).toHaveLength(0)
+  })
+
   it('redirects with copy_no_source when source cycle has no overrides', async () => {
     const mock = createSupabaseMock({ userId: 'mgr-1', role: 'manager' })
     mock.state.sourceCycleRows = [
       {
         cycle_id: 'cycle-old',
-        schedule_cycles: { start_date: '2026-02-08', end_date: '2026-03-21' },
+        schedule_cycles: { start_date: '2026-02-08', end_date: '2026-03-21', site_id: 'default' },
       },
     ]
     mock.state.sourceOverrideRows = []
@@ -1490,7 +1650,7 @@ describe('copyAvailabilityFromPreviousCycleAction', () => {
     mock.state.sourceCycleRows = [
       {
         cycle_id: 'cycle-old',
-        schedule_cycles: { start_date: '2026-02-08', end_date: '2026-03-21' },
+        schedule_cycles: { start_date: '2026-02-08', end_date: '2026-03-21', site_id: 'default' },
       },
     ]
     mock.state.sourceOverrideRows = [
@@ -1516,7 +1676,7 @@ describe('copyAvailabilityFromPreviousCycleAction', () => {
     mock.state.sourceCycleRows = [
       {
         cycle_id: 'cycle-old',
-        schedule_cycles: { start_date: '2026-02-08', end_date: '2026-03-21' },
+        schedule_cycles: { start_date: '2026-02-08', end_date: '2026-03-21', site_id: 'default' },
       },
     ]
     mock.state.sourceOverrideRows = [

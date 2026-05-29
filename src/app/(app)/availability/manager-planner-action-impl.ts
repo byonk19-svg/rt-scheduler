@@ -9,14 +9,24 @@ import {
   getPlannerDateValidationError,
   toOverrideType,
 } from '@/lib/availability-planner'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildAvailabilityUrl,
   getAuthenticatedUserWithRole,
   type AvailabilityShiftType,
 } from './_actions/shared'
+import { loadManagerAvailabilityPlannerTarget } from './manager-planner-target'
+
+function isPlannerShiftTypeForTherapist(
+  shiftType: AvailabilityShiftType,
+  therapistShiftType: 'day' | 'night'
+): boolean {
+  return shiftType === therapistShiftType
+}
 
 export async function saveManagerPlannerDatesAction(formData: FormData) {
   const { supabase, user, role, permissionContext } = await getAuthenticatedUserWithRole()
+  const admin = createAdminClient()
 
   if (!can(role, 'access_manager_ui', permissionContext)) {
     redirect('/availability')
@@ -32,12 +42,6 @@ export async function saveManagerPlannerDatesAction(formData: FormData) {
     .map((value) => String(value).trim())
     .filter((value) => value.length > 0)
 
-  const { data: cycle } = await supabase
-    .from('schedule_cycles')
-    .select('start_date, end_date')
-    .eq('id', cycleId)
-    .maybeSingle()
-
   if (
     (shiftType !== 'day' && shiftType !== 'night' && shiftType !== 'both') ||
     (mode !== 'will_work' && mode !== 'cannot_work')
@@ -51,8 +55,25 @@ export async function saveManagerPlannerDatesAction(formData: FormData) {
     )
   }
 
+  const target = await loadManagerAvailabilityPlannerTarget({
+    admin,
+    managerId: user.id,
+    therapistId,
+    cycleId,
+  })
+
+  if (!target || !isPlannerShiftTypeForTherapist(shiftType, target.therapist.shift_type)) {
+    redirect(
+      buildAvailabilityUrl({
+        cycle: cycleId || undefined,
+        therapist: therapistId || undefined,
+        error: 'planner_save_failed',
+      })
+    )
+  }
+
   const validationError = getPlannerDateValidationError({
-    cycle: cycle ? { start_date: cycle.start_date, end_date: cycle.end_date } : null,
+    cycle: target.cycle,
     therapistId,
     dates,
     allowEmpty: true,
@@ -108,6 +129,9 @@ export async function saveManagerPlannerDatesAction(formData: FormData) {
     const { error: deleteError } = await supabase
       .from('availability_overrides')
       .delete()
+      .eq('cycle_id', cycleId)
+      .eq('therapist_id', therapistId)
+      .eq('source', 'manager')
       .in('id', rowsToDelete)
 
     if (deleteError) {
@@ -150,7 +174,8 @@ export async function saveManagerPlannerDatesAction(formData: FormData) {
 }
 
 export async function deleteManagerPlannerDateAction(formData: FormData) {
-  const { supabase, role, permissionContext } = await getAuthenticatedUserWithRole()
+  const { supabase, user, role, permissionContext } = await getAuthenticatedUserWithRole()
+  const admin = createAdminClient()
 
   if (!can(role, 'access_manager_ui', permissionContext)) {
     redirect('/availability')
@@ -160,9 +185,27 @@ export async function deleteManagerPlannerDateAction(formData: FormData) {
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   const therapistId = String(formData.get('therapist_id') ?? '').trim()
 
-  if (!overrideId) {
+  if (!overrideId || !cycleId || !therapistId) {
     redirect(
       buildAvailabilityUrl({ cycle: cycleId || undefined, therapist: therapistId || undefined })
+    )
+  }
+
+  const target = await loadManagerAvailabilityPlannerTarget({
+    admin,
+    managerId: user.id,
+    therapistId,
+    cycleId,
+    overrideId,
+  })
+
+  if (!target) {
+    redirect(
+      buildAvailabilityUrl({
+        cycle: cycleId || undefined,
+        therapist: therapistId || undefined,
+        error: 'planner_delete_failed',
+      })
     )
   }
 
@@ -170,6 +213,8 @@ export async function deleteManagerPlannerDateAction(formData: FormData) {
     .from('availability_overrides')
     .delete()
     .eq('id', overrideId)
+    .eq('cycle_id', cycleId)
+    .eq('therapist_id', therapistId)
     .eq('source', 'manager')
 
   if (error) {

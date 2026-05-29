@@ -457,7 +457,6 @@ export default async function ManagerDashboardPage() {
       nightShiftsFilled={nightRows.filter((row) => row.user_id !== null).length}
       nightShiftsTotal={nightRows.length}
       approvalsHref={MANAGER_WORKFLOW_LINKS.approvals}
-      lotteryHref={MANAGER_WORKFLOW_LINKS.lottery}
       scheduleHref={scheduleHref}
       reviewHref={reviewHref}
       activeCycleDateRange={activeCycleDateRange ?? undefined}

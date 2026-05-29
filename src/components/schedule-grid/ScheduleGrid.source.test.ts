@@ -61,6 +61,18 @@ describe('ScheduleGrid source invariants', () => {
     expect(code).toContain('Schedule Block')
   })
 
+  it('uses real Schedule Block lifecycle labels and plain schedule terminology', () => {
+    const code = source()
+    const toolbarCode = toolbarSource()
+
+    expect(toolbarCode).toContain('getScheduleBlockLifecycleLabel')
+    expect(toolbarCode).toContain('scheduleBlockStateLabel')
+    expect(toolbarCode).not.toContain("isPublished ? 'Published' : 'Draft'")
+    expect(code).toContain("label: 'Need Off'")
+    expect(code).toContain("label: 'Lead', code: 'L'")
+    expect(code).not.toContain("label: 'Requested off'")
+  })
+
   it('makes missing-availability publish acknowledgement an explicit second submit state', () => {
     const code = source()
     const toolbarCode = toolbarSource()

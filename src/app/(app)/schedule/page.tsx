@@ -9,6 +9,7 @@ import type { GridDataset } from '@/components/schedule-grid/schedule-grid-types
 import { generateDraftScheduleAction } from '@/app/(app)/schedule/actions/draft-actions'
 import { sendPreliminaryScheduleAction } from '@/app/(app)/schedule/actions/preliminary-actions'
 import { toggleCyclePublishedAction } from '@/app/(app)/schedule/actions/publish-actions'
+import { getScheduleBlockLifecycleLabel } from '@/lib/schedule-block-state'
 
 import { loadScheduleGridData } from './schedule-grid-data'
 import { SetupCompleteBanner } from './SetupCompleteBanner'
@@ -53,6 +54,13 @@ function getScheduleSubtitle(dataset: GridDataset) {
     return 'Review the team schedule and update published shift status in one 42-day grid.'
   }
   return 'Review your row and the live team schedule in one 42-day grid.'
+}
+
+function getScheduleStateLabel(dataset: GridDataset) {
+  return getScheduleBlockLifecycleLabel({
+    published: dataset.isPublished,
+    status: dataset.cycleStatus,
+  })
 }
 
 function getSetupParam(value: string | string[] | undefined): string | undefined {
@@ -181,10 +189,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         summary={
           <>
             <ScheduleHeaderChip label="Block" value={result.dataset.cycleDateRangeLabel} />
-            <ScheduleHeaderChip
-              label="State"
-              value={result.dataset.isPublished ? 'Published' : 'Draft'}
-            />
+            <ScheduleHeaderChip label="State" value={getScheduleStateLabel(result.dataset)} />
             <ScheduleHeaderChip label="Access" value={getScheduleAccessLabel(result.dataset)} />
           </>
         }

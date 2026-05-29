@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { getScheduleBlockLifecycleLabel } from '@/lib/schedule-block-state'
 import { cn } from '@/lib/utils'
 
 import type { ScheduleInteractionMode } from './schedule-grid-types'
@@ -55,6 +56,13 @@ export function ScheduleGridToolbar({
 }: ScheduleGridToolbarProps) {
   const preliminaryLabel =
     cycleStatus === 'preliminary' ? 'Refresh preliminary' : 'Send preliminary'
+  const scheduleBlockStateLabel = getScheduleBlockLifecycleLabel({
+    published: isPublished,
+    status: cycleStatus,
+  })
+  const isLiveState = scheduleBlockStateLabel === 'Published'
+  const isPausedState =
+    scheduleBlockStateLabel === 'Offline' || scheduleBlockStateLabel === 'Archived'
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card/95 px-3 py-2 shadow-tw-sm">
@@ -86,12 +94,14 @@ export function ScheduleGridToolbar({
         <span
           className={cn(
             'inline-flex h-7 items-center rounded-full border px-2.5 text-[11px] font-black',
-            isPublished
+            isLiveState
               ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
-              : 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+              : isPausedState
+                ? 'border-border bg-muted text-muted-foreground'
+                : 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
           )}
         >
-          {isPublished ? 'Published' : 'Draft'}
+          {scheduleBlockStateLabel}
         </span>
         <div className="flex h-7 gap-1 rounded-md border border-border bg-background p-0.5 shadow-tw-2xs">
           {(['Day', 'Night'] as const).map((tab) => (
@@ -114,7 +124,7 @@ export function ScheduleGridToolbar({
               ) : (
                 <Moon className="h-3 w-3" aria-hidden />
               )}
-              {tab}
+              {tab} shift
             </button>
           ))}
         </div>
