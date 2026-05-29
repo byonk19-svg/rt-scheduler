@@ -1,6 +1,15 @@
 'use client'
 
-import { CalendarDays, CheckCircle, Moon, Printer, Send, Sun, Zap } from 'lucide-react'
+import {
+  CalendarDays,
+  CheckCircle,
+  ClipboardCheck,
+  Moon,
+  Printer,
+  Send,
+  Sun,
+  Zap,
+} from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -12,6 +21,7 @@ type ScheduleGridToolbarProps = {
   cycleDateRangeLabel: string
   availableCycles: Array<{ id: string; label: string }>
   isPublished: boolean
+  cycleStatus: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
   shiftTab: 'Day' | 'Night'
   isPending: boolean
   interactionMode: ScheduleInteractionMode
@@ -19,8 +29,10 @@ type ScheduleGridToolbarProps = {
   onShiftTabChange: (tab: 'Day' | 'Night') => void
   onAutoDraft?: () => void
   onPreFlight?: () => void
+  onSendPreliminary?: () => void
   onPrint: () => void
   onPublish?: () => void
+  publishLabel?: string
 }
 
 export function ScheduleGridToolbar({
@@ -28,6 +40,7 @@ export function ScheduleGridToolbar({
   cycleDateRangeLabel,
   availableCycles,
   isPublished,
+  cycleStatus,
   shiftTab,
   isPending,
   interactionMode,
@@ -35,9 +48,14 @@ export function ScheduleGridToolbar({
   onShiftTabChange,
   onAutoDraft,
   onPreFlight,
+  onSendPreliminary,
   onPrint,
   onPublish,
+  publishLabel = 'Publish',
 }: ScheduleGridToolbarProps) {
+  const preliminaryLabel =
+    cycleStatus === 'preliminary' ? 'Refresh preliminary' : 'Send preliminary'
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card/95 px-3 py-2 shadow-tw-sm">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -126,6 +144,17 @@ export function ScheduleGridToolbar({
                 Pre-flight
               </Button>
             ) : null}
+            {onSendPreliminary ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-muted-foreground"
+                onClick={onSendPreliminary}
+              >
+                <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                {preliminaryLabel}
+              </Button>
+            ) : null}
           </>
         ) : null}
         <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={onPrint}>
@@ -135,7 +164,7 @@ export function ScheduleGridToolbar({
         {interactionMode.canUseManagerToolbar && !isPublished && onPublish ? (
           <Button size="sm" className="h-8 px-3 font-bold shadow-tw-sm" onClick={onPublish}>
             <Send className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-            Publish -&gt;
+            {publishLabel}
           </Button>
         ) : null}
       </div>

@@ -170,12 +170,14 @@ async function getWorkedDatesInWeek(
 
 async function getTherapistWeeklyLimit(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  therapistId: string
+  therapistId: string,
+  siteId: string
 ): Promise<number> {
   const { data, error } = await supabase
     .from('profiles')
     .select('max_work_days_per_week, employment_type')
     .eq('id', therapistId)
+    .eq('site_id', siteId)
     .maybeSingle()
 
   if (error) return MAX_WORK_DAYS_PER_WEEK
@@ -191,6 +193,7 @@ async function getTherapistWeeklyLimit(
 async function getTherapistAvailabilityState(
   supabase: Awaited<ReturnType<typeof createClient>>,
   therapistId: string,
+  siteId: string,
   cycleId: string,
   date: string,
   shiftType: 'day' | 'night'
@@ -198,8 +201,9 @@ async function getTherapistAvailabilityState(
   const [profileResult, availabilityResult, patternResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('full_name, is_active, on_fmla, employment_type')
+      .select('full_name, is_active, archived_at, on_fmla, employment_type')
       .eq('id', therapistId)
+      .eq('site_id', siteId)
       .maybeSingle(),
     supabase
       .from('availability_overrides')
@@ -277,7 +281,7 @@ async function getTherapistAvailabilityState(
     therapist: {
       id: therapistId,
       is_active: profileResult.data.is_active !== false,
-      on_fmla: profileResult.data.on_fmla === true,
+      on_fmla: Boolean(profileResult.data.archived_at) || profileResult.data.on_fmla === true,
       employment_type:
         profileResult.data.employment_type === 'prn'
           ? 'prn'
@@ -479,12 +483,18 @@ export async function POST(request: Request) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, start_date, end_date, published, status, archived_at')
+    .select('id, site_id, start_date, end_date, published, status, archived_at')
     .eq('id', payload.cycleId)
     .maybeSingle()
 
   if (cycleError || !cycle) {
     return NextResponse.json({ error: 'Schedule Block not found' }, { status: 404 })
+  }
+  if (cycle.site_id !== managerSiteId) {
+    return NextResponse.json(
+      { error: 'Schedule Block is outside your site scope.' },
+      { status: 403 }
+    )
   }
   if (cycle.status === 'offline' || cycle.status === 'archived' || cycle.archived_at) {
     return NextResponse.json(
@@ -511,7 +521,7 @@ export async function POST(request: Request) {
 
     const { data: targetProfile, error: targetProfileError } = await supabase
       .from('profiles')
-      .select('site_id, shift_type')
+      .select('site_id, shift_type, is_active, archived_at, on_fmla')
       .eq('id', payload.userId)
       .maybeSingle()
 
@@ -524,10 +534,18 @@ export async function POST(request: Request) {
         { status: 409 }
       )
     }
+    if (
+      targetProfile.is_active === false ||
+      Boolean(targetProfile.archived_at) ||
+      targetProfile.on_fmla === true
+    ) {
+      return NextResponse.json({ error: 'This therapist cannot be assigned.' }, { status: 409 })
+    }
 
     const availabilityState = await getTherapistAvailabilityState(
       supabase,
       payload.userId,
+      managerSiteId,
       payload.cycleId,
       payload.date,
       payload.shiftType
@@ -589,7 +607,7 @@ export async function POST(request: Request) {
       if (weekly.error) {
         return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
       }
-      const weeklyLimit = await getTherapistWeeklyLimit(supabase, payload.userId)
+      const weeklyLimit = await getTherapistWeeklyLimit(supabase, payload.userId, managerSiteId)
       if (exceedsWeeklyLimit(weekly.dates, payload.date, weeklyLimit)) {
         return NextResponse.json(
           {
@@ -733,19 +751,30 @@ export async function POST(request: Request) {
     }
     const { data: assignedProfile, error: assignedProfileError } = await supabase
       .from('profiles')
-      .select('shift_type')
+      .select('site_id, shift_type, is_active, archived_at, on_fmla')
       .eq('id', assignedUserId)
       .maybeSingle()
-    if (assignedProfileError || assignedProfile?.shift_type !== payload.targetShiftType) {
+    if (assignedProfileError || assignedProfile?.site_id !== managerSiteId) {
+      return NextResponse.json({ error: 'Therapist is outside your site scope.' }, { status: 403 })
+    }
+    if (assignedProfile.shift_type !== payload.targetShiftType) {
       return NextResponse.json(
         { error: 'Therapist shift type does not match the selected schedule shift.' },
         { status: 409 }
       )
     }
+    if (
+      assignedProfile.is_active === false ||
+      Boolean(assignedProfile.archived_at) ||
+      assignedProfile.on_fmla === true
+    ) {
+      return NextResponse.json({ error: 'This therapist cannot be assigned.' }, { status: 409 })
+    }
 
     const availabilityState = await getTherapistAvailabilityState(
       supabase,
       assignedUserId,
+      managerSiteId,
       payload.cycleId,
       payload.targetDate,
       payload.targetShiftType
@@ -813,7 +842,7 @@ export async function POST(request: Request) {
       if (weekly.error) {
         return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
       }
-      const weeklyLimit = await getTherapistWeeklyLimit(supabase, assignedUserId)
+      const weeklyLimit = await getTherapistWeeklyLimit(supabase, assignedUserId, managerSiteId)
       if (exceedsWeeklyLimit(weekly.dates, payload.targetDate, weeklyLimit)) {
         return NextResponse.json(
           {
@@ -846,6 +875,8 @@ export async function POST(request: Request) {
         availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
       })
       .eq('id', payload.shiftId)
+      .eq('cycle_id', payload.cycleId)
+      .eq('site_id', managerSiteId)
 
     if (error) {
       if (error.code === '23505') {
@@ -962,7 +993,12 @@ export async function POST(request: Request) {
       'Schedule changed after this request was posted.'
     )
 
-    const { error } = await supabase.from('shifts').delete().eq('id', shift.id)
+    const { error } = await supabase
+      .from('shifts')
+      .delete()
+      .eq('id', shift.id)
+      .eq('cycle_id', payload.cycleId)
+      .eq('site_id', managerSiteId)
     if (error) {
       return NextResponse.json({ error: 'Could not remove shift' }, { status: 500 })
     }
@@ -1029,7 +1065,7 @@ export async function POST(request: Request) {
 
     const { data: therapist, error: therapistError } = await supabase
       .from('profiles')
-      .select('id, role, is_lead_eligible, site_id, shift_type')
+      .select('id, role, is_lead_eligible, site_id, shift_type, is_active, archived_at, on_fmla')
       .eq('id', payload.therapistId)
       .maybeSingle()
 
@@ -1053,10 +1089,18 @@ export async function POST(request: Request) {
         { status: 409 }
       )
     }
+    if (
+      therapist.is_active === false ||
+      Boolean(therapist.archived_at) ||
+      therapist.on_fmla === true
+    ) {
+      return NextResponse.json({ error: 'This therapist cannot be assigned.' }, { status: 409 })
+    }
 
     const availabilityState = await getTherapistAvailabilityState(
       supabase,
       payload.therapistId,
+      managerSiteId,
       payload.cycleId,
       payload.date,
       payload.shiftType
@@ -1135,7 +1179,11 @@ export async function POST(request: Request) {
         if (weekly.error) {
           return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
         }
-        const weeklyLimit = await getTherapistWeeklyLimit(supabase, payload.therapistId)
+        const weeklyLimit = await getTherapistWeeklyLimit(
+          supabase,
+          payload.therapistId,
+          managerSiteId
+        )
         if (exceedsWeeklyLimit(weekly.dates, payload.date, weeklyLimit)) {
           return NextResponse.json(
             {
@@ -1199,6 +1247,7 @@ export async function POST(request: Request) {
       .eq('user_id', payload.therapistId)
       .eq('date', payload.date)
       .eq('shift_type', payload.shiftType)
+      .eq('site_id', managerSiteId)
 
     if (overrideUpdateError) {
       return NextResponse.json(
@@ -1227,6 +1276,7 @@ export async function POST(request: Request) {
           .eq('user_id', payload.therapistId)
           .eq('date', payload.date)
           .eq('shift_type', payload.shiftType)
+          .eq('site_id', managerSiteId)
           .maybeSingle()
       ).data?.id ??
       `${payload.cycleId}:${payload.therapistId}:${payload.date}:${payload.shiftType}`

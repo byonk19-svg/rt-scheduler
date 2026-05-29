@@ -107,6 +107,7 @@ const scheduleGridFeedbackEntry = String.raw`
     cycleDates: ['2026-05-04'],
     cycleDateRangeLabel: 'May 4 - May 5, 2026',
     isPublished: true,
+    cycleStatus: 'final',
     therapistRows: [
       {
         userId: 'therapist-1',

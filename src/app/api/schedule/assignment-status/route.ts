@@ -45,6 +45,7 @@ type RpcAssignmentStatusRow = {
 
 type ShiftNotificationLookupRow = {
   id: string
+  site_id: string | null
   cycle_id: string
   date: string
   shift_type: 'day' | 'night'
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
 
   const { data: preflightShiftLookup, error: preflightShiftError } = await supabase
     .from('shifts')
-    .select('id, user_id, schedule_cycles(published, status, archived_at)')
+    .select('id, site_id, user_id, schedule_cycles(published, status, archived_at)')
     .eq('id', assignmentId)
     .maybeSingle()
 
@@ -193,7 +194,14 @@ export async function POST(request: Request) {
     )
   }
 
-  const preflightShift = preflightShiftLookup as { user_id?: string | null }
+  const preflightShift = preflightShiftLookup as {
+    site_id?: string | null
+    user_id?: string | null
+  }
+  if (preflightShift.site_id !== actorProfile.site_id) {
+    return NextResponse.json({ error: 'Assignment is outside your site scope.' }, { status: 403 })
+  }
+
   if (isIncidentAssignmentStatus(status) && !preflightCycle?.published) {
     return NextResponse.json(
       { error: 'Incident statuses can only be applied after the Schedule Block is published.' },
@@ -262,15 +270,16 @@ export async function POST(request: Request) {
   const { data: shiftLookup } = await supabase
     .from('shifts')
     .select(
-      'id, cycle_id, date, shift_type, user_id, schedule_cycles(published, status, archived_at)'
+      'id, site_id, cycle_id, date, shift_type, user_id, schedule_cycles(published, status, archived_at)'
     )
     .eq('id', row.id)
     .maybeSingle()
 
   const shift = (shiftLookup ?? null) as ShiftNotificationLookupRow | null
   const cycle = getOne(shift?.schedule_cycles)
+  const shiftInActorSite = shift?.site_id === actorProfile.site_id
 
-  if (shift && cycle?.published) {
+  if (shift && shiftInActorSite && cycle?.published) {
     await writeAuditLog(admin as never, {
       userId: user.id,
       action: 'post_publish_modification',
@@ -279,7 +288,7 @@ export async function POST(request: Request) {
     })
   }
 
-  if (shift?.user_id && cycle?.published) {
+  if (shift?.user_id && shiftInActorSite && cycle?.published) {
     if (shouldNotifyAffectedTherapist(row.assignment_status)) {
       await notifyPublishedShiftStatusChanged(admin as never, {
         cyclePublished: true,

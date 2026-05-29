@@ -25,10 +25,18 @@ describe('schedule block planning helpers', () => {
   })
 
   it('suggests editable default milestone dates from the block start', () => {
-    expect(suggestPlanningDates('2026-06-14')).toEqual({
+    expect(suggestPlanningDates('2026-06-14', '2026-05-01')).toEqual({
       availabilityDueDate: '2026-05-24',
       preliminaryTargetDate: '2026-05-31',
       finalPublishTargetDate: '2026-06-07',
+    })
+  })
+
+  it('keeps suggested milestone dates actionable when the next block is close', () => {
+    expect(suggestPlanningDates('2026-05-31', '2026-05-29')).toEqual({
+      availabilityDueDate: '2026-05-29',
+      preliminaryTargetDate: '2026-05-30',
+      finalPublishTargetDate: '2026-05-30',
     })
   })
 

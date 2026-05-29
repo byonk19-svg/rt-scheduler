@@ -47,6 +47,7 @@ export type GridDataset = {
   cycleDates: string[]
   cycleDateRangeLabel: string
   isPublished: boolean
+  cycleStatus: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
   therapistRows: TherapistGridRow[]
   dailyTotals: Record<string, number>
   viewerUserId: string

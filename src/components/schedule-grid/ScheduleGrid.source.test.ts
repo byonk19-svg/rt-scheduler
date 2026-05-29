@@ -24,7 +24,9 @@ describe('ScheduleGrid source invariants', () => {
 
     expect(code).toContain('const cellsLocked = isPending')
     expect(code).toContain('startTransition(() => {')
-    expect(code).toContain('router.replace(`${pathname}?${params.toString()}`, { scroll: false })')
+    expect(code).toContain('router.replace(`${pathname}?${query}`, { scroll: false })')
+    expect(code).toContain('window.location.search')
+    expect(code).toContain('latestQueryRef.current = query')
     expect(code).toContain('if (cellsLocked) return')
     expect(code).toContain('interactionsDisabled={cellsLocked}')
   })
@@ -57,6 +59,16 @@ describe('ScheduleGrid source invariants', () => {
 
     expect(code).toContain('{tab} shift')
     expect(code).toContain('Schedule Block')
+  })
+
+  it('makes missing-availability publish acknowledgement an explicit second submit state', () => {
+    const code = source()
+    const toolbarCode = toolbarSource()
+
+    expect(code).toContain("searchParams.get('error') === 'publish_missing_availability_warning'")
+    expect(code).toContain('name="acknowledge_missing_availability"')
+    expect(code).toContain('Publish with missing availability')
+    expect(toolbarCode).toContain('publishLabel')
   })
 
   it('maps each interaction mode to a concise visible grid hint', () => {

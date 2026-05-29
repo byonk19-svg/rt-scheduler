@@ -103,12 +103,34 @@ export function suggestNextScheduleBlock(
   }
 }
 
-export function suggestPlanningDates(startDate: string): SuggestedPlanningDates {
+export function suggestPlanningDates(
+  startDate: string,
+  todayKey: string = toIsoDate(new Date())
+): SuggestedPlanningDates {
   const start = dateFromKey(startDate)
-  return {
+  const defaultDates = {
     availabilityDueDate: toIsoDate(addDays(start, -21)),
     preliminaryTargetDate: toIsoDate(addDays(start, -14)),
     finalPublishTargetDate: toIsoDate(addDays(start, -7)),
+  }
+
+  if (defaultDates.availabilityDueDate >= todayKey) {
+    return defaultDates
+  }
+
+  const latestTargetDate = toIsoDate(addDays(start, -1))
+  if (todayKey > latestTargetDate) {
+    return defaultDates
+  }
+
+  const availableDays =
+    (dateFromKey(latestTargetDate).getTime() - dateFromKey(todayKey).getTime()) / MS_PER_DAY
+  const preliminaryOffset = Math.max(0, Math.ceil(availableDays / 2))
+
+  return {
+    availabilityDueDate: todayKey,
+    preliminaryTargetDate: toIsoDate(addDays(dateFromKey(todayKey), preliminaryOffset)),
+    finalPublishTargetDate: latestTargetDate,
   }
 }
 

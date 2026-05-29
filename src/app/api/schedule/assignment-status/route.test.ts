@@ -103,6 +103,7 @@ type Scenario = {
   shiftLookup?: {
     date: string
     cycleId?: string
+    siteId?: string | null
     shift_type: 'day' | 'night'
     user_id: string | null
     published: boolean
@@ -184,6 +185,7 @@ function makeSupabaseMock(scenario: Scenario) {
           return {
             data: {
               id: state.id ?? 'shift-1',
+              site_id: scenario.shiftLookup.siteId ?? 'site-1',
               cycle_id: scenario.shiftLookup.cycleId ?? 'cycle-1',
               date: scenario.shiftLookup.date,
               shift_type: scenario.shiftLookup.shift_type,
@@ -534,6 +536,41 @@ describe('assignment status API', () => {
       error: 'Incident statuses can only be applied after the Schedule Block is published.',
     })
     expect(createAdminClientMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks cross-site assignments before invoking the privileged mutation', async () => {
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      userId: 'manager-1',
+      shiftLookup: {
+        siteId: 'site-2',
+        date: '2026-02-23',
+        shift_type: 'day',
+        user_id: 'therapist-1',
+        published: true,
+      },
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'on_call',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Assignment is outside your site scope.',
+    })
+    expect(createAdminClientMock).not.toHaveBeenCalled()
+    expect(updateAssignmentStatusWithLotteryMock).not.toHaveBeenCalled()
   })
 
   it('blocks incident statuses on unassigned shift rows', async () => {

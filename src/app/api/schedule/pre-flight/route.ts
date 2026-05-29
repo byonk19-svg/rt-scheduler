@@ -14,6 +14,13 @@ type CycleRow = {
   site_id: string | null
 }
 
+type ActorProfileRow = {
+  role: string | null
+  is_active: boolean | null
+  archived_at: string | null
+  site_id: string | null
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const {
@@ -26,17 +33,22 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
+  const actorProfile = (profile ?? null) as ActorProfileRow | null
 
   if (
-    !can(parseRole(profile?.role), 'manage_schedule', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
+    !can(parseRole(actorProfile?.role), 'manage_schedule', {
+      isActive: actorProfile?.is_active !== false,
+      archivedAt: actorProfile?.archived_at ?? null,
     })
   ) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  if (!actorProfile?.site_id) {
+    return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
   }
 
   const body = (await request.json()) as { cycleId?: string }
@@ -56,6 +68,9 @@ export async function POST(request: Request) {
   }
 
   const cycleRow = cycle as CycleRow
+  if (cycleRow.site_id !== actorProfile.site_id) {
+    return NextResponse.json({ error: 'Cycle is outside your site scope.' }, { status: 403 })
+  }
 
   const draftInputs = await loadDraftInputsForCycle(toDraftInputSupabaseClient(supabase), {
     cycle: {

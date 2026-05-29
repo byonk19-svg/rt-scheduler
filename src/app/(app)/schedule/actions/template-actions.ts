@@ -38,7 +38,7 @@ export async function applyTemplateAction(formData: FormData) {
       supabase.from('cycle_templates').select('id, shift_data').eq('id', templateId).maybeSingle(),
       supabase
         .from('schedule_cycles')
-        .select('id, start_date, published, status, archived_at')
+        .select('id, start_date, published, status, archived_at, site_id')
         .eq('id', cycleId)
         .maybeSingle(),
     ])
@@ -65,6 +65,7 @@ export async function applyTemplateAction(formData: FormData) {
           .in('role', ['therapist', 'lead'])
           .eq('is_active', true)
           .is('archived_at', null)
+          .eq('site_id', cycle.site_id)
       : { data: [], error: null }
 
   if (activeProfilesError) {

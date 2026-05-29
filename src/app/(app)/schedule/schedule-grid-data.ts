@@ -201,6 +201,7 @@ export async function loadScheduleGridData(
       cycleDates,
       cycleDateRangeLabel: formatHumanCycleRange(cycle.start_date, cycle.end_date),
       isPublished,
+      cycleStatus: cycle.status,
       therapistRows,
       dailyTotals: buildDailyTotals(therapistRows, cycleDates),
       viewerUserId: user.id,

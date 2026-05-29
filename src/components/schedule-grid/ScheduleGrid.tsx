@@ -35,6 +35,7 @@ type ScheduleGridProps = {
   initialDataset: GridDataset
   initialShiftTab: 'Day' | 'Night'
   autoDraftAction?: (formData: FormData) => void | Promise<void>
+  preliminaryAction?: (formData: FormData) => void | Promise<void>
   publishAction?: (formData: FormData) => void | Promise<void>
   preFlightSummary?: ScheduleGridPreFlightSummary | null
 }
@@ -168,6 +169,7 @@ export function ScheduleGrid({
   initialDataset,
   initialShiftTab,
   autoDraftAction,
+  preliminaryAction,
   publishAction,
   preFlightSummary,
 }: ScheduleGridProps) {
@@ -181,38 +183,61 @@ export function ScheduleGrid({
   const [showPreFlight, setShowPreFlight] = useState(false)
   const [feedback, setFeedback] = useState<ScheduleGridFeedback | null>(null)
   const autoDraftFormRef = useRef<HTMLFormElement | null>(null)
+  const preliminaryFormRef = useRef<HTMLFormElement | null>(null)
   const publishFormRef = useRef<HTMLFormElement | null>(null)
   const mutator = useMemo(() => createCoverageShiftMutator(), [])
+  const latestQueryRef = useRef(searchParams.toString())
   const interactionMode = initialDataset.interactionMode
   const cellsLocked = isPending
+  const acknowledgeMissingAvailability =
+    searchParams.get('error') === 'publish_missing_availability_warning' ||
+    searchParams.get('acknowledge_missing_availability') === 'true'
+  const preserveWeeklyOverride = searchParams.get('override_weekly_rules') === 'true'
+  const preserveShiftOverride = searchParams.get('override_shift_rules') === 'true'
+  const publishLabel = acknowledgeMissingAvailability
+    ? 'Publish with missing availability'
+    : 'Publish'
+
+  const replaceScheduleQuery = useCallback(
+    (params: URLSearchParams) => {
+      const query = params.toString()
+      latestQueryRef.current = query
+      startTransition(() => {
+        router.replace(`${pathname}?${query}`, { scroll: false })
+      })
+    },
+    [pathname, router, startTransition]
+  )
+
+  const getCurrentScheduleParams = useCallback(() => {
+    const currentSearch =
+      typeof window === 'undefined' ? latestQueryRef.current : window.location.search
+    return new URLSearchParams(currentSearch)
+  }, [])
 
   const handleShiftTabChange = useCallback(
     (tab: 'Day' | 'Night') => {
-      if (tab === loadedShiftTab) {
-        setShiftTab(tab)
+      const params = getCurrentScheduleParams()
+      const nextShift = shiftTabToQueryValue(tab)
+      if (tab === shiftTab && params.get('shift') === nextShift) {
         return
       }
       setShiftTab(tab)
       setActiveCellTarget(null)
-      const params = new URLSearchParams(searchParams.toString())
-      params.set('shift', shiftTabToQueryValue(tab))
-      startTransition(() => {
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-      })
+      params.set('shift', nextShift)
+      replaceScheduleQuery(params)
     },
-    [loadedShiftTab, pathname, router, searchParams, startTransition]
+    [getCurrentScheduleParams, replaceScheduleQuery, shiftTab]
   )
 
   const handleCycleChange = useCallback(
     (cycleId: string) => {
-      const params = new URLSearchParams(searchParams.toString())
+      const params = getCurrentScheduleParams()
       params.set('cycle', cycleId)
       setActiveCellTarget(null)
-      startTransition(() => {
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-      })
+      replaceScheduleQuery(params)
     },
-    [pathname, router, searchParams, startTransition]
+    [getCurrentScheduleParams, replaceScheduleQuery]
   )
 
   const handleCellClick = useCallback(
@@ -388,6 +413,24 @@ export function ScheduleGrid({
             name="currently_published"
             value={String(initialDataset.isPublished)}
           />
+          <input
+            type="hidden"
+            name="acknowledge_missing_availability"
+            value={String(acknowledgeMissingAvailability)}
+          />
+          <input
+            type="hidden"
+            name="override_weekly_rules"
+            value={String(preserveWeeklyOverride)}
+          />
+          <input type="hidden" name="override_shift_rules" value={String(preserveShiftOverride)} />
+          <input type="hidden" name="return_to" value="schedule" />
+          <input type="hidden" name="view" value="grid" />
+        </form>
+      ) : null}
+      {preliminaryAction ? (
+        <form ref={preliminaryFormRef} action={preliminaryAction} className="hidden">
+          <input type="hidden" name="cycle_id" value={initialDataset.cycleId} />
           <input type="hidden" name="return_to" value="schedule" />
           <input type="hidden" name="view" value="grid" />
         </form>
@@ -398,6 +441,7 @@ export function ScheduleGrid({
           cycleDateRangeLabel={initialDataset.cycleDateRangeLabel}
           availableCycles={initialDataset.availableCycles}
           isPublished={initialDataset.isPublished}
+          cycleStatus={initialDataset.cycleStatus}
           shiftTab={shiftTab}
           isPending={isPending}
           interactionMode={interactionMode}
@@ -407,8 +451,12 @@ export function ScheduleGrid({
             autoDraftAction ? () => autoDraftFormRef.current?.requestSubmit() : undefined
           }
           onPreFlight={preFlightSummary ? () => setShowPreFlight((value) => !value) : undefined}
+          onSendPreliminary={
+            preliminaryAction ? () => preliminaryFormRef.current?.requestSubmit() : undefined
+          }
           onPrint={() => window.print()}
           onPublish={publishAction ? () => publishFormRef.current?.requestSubmit() : undefined}
+          publishLabel={publishLabel}
         />
         {showPreFlight && preFlightSummary ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-tw-2xs">

@@ -10,9 +10,20 @@ describe('coverage names route permissions', () => {
       'utf8'
     )
 
-    expect(source).toContain("select('role, is_active, archived_at')")
+    expect(source).toContain("select('role, is_active, archived_at, site_id')")
     expect(source).toContain("can(role, 'manage_coverage', permissionContext)")
     expect(source).toContain("can(role, 'access_lead_tools', permissionContext)")
     expect(source).not.toContain("role === 'lead'")
+  })
+
+  it('site-scopes cycle, shift, and profile reads', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/api/schedule/coverage-names/route.ts'),
+      'utf8'
+    )
+
+    expect(source).toContain("select('id, published, site_id')")
+    expect(source).toContain('cycleRow.site_id !== actorProfile.site_id')
+    expect(source).toContain(".eq('site_id', cycleRow.site_id)")
   })
 })

@@ -21,6 +21,7 @@ type Scenario = {
   coverageStatuses: Array<'scheduled' | 'on_call' | 'sick' | 'called_off'>
   weeklyShifts: Array<{ date: string; status: 'scheduled' | 'on_call' | 'sick' | 'called_off' }>
   cyclePublished?: boolean
+  cycleSiteId?: string
   leadTherapistEligible?: boolean
   leadTherapistRole?: 'therapist' | 'lead' | 'manager'
   existingShiftForLead?: {
@@ -54,6 +55,9 @@ type Scenario = {
       max_work_days_per_week?: number
       site_id?: string
       shift_type?: 'day' | 'night'
+      is_active?: boolean
+      archived_at?: string | null
+      on_fmla?: boolean
     }
   >
   insertError?: { code?: string; message?: string } | null
@@ -68,6 +72,9 @@ function makeSupabaseMock(scenario: Scenario) {
     start_date: '2026-03-01',
     end_date: '2026-03-31',
     published: scenario.cyclePublished ?? false,
+    status: scenario.cyclePublished ? 'final' : 'draft',
+    archived_at: null,
+    site_id: scenario.cycleSiteId ?? 'site-a',
   }
 
   const insertedShiftPayloads: Array<Record<string, unknown>> = []
@@ -95,17 +102,24 @@ function makeSupabaseMock(scenario: Scenario) {
         max_work_days_per_week: 3,
         site_id: 'site-a',
         shift_type: null,
+        is_active: true,
+        archived_at: null,
+        on_fmla: false,
       }
     }
     if (id === 'therapist-lead') {
+      const custom = scenario.therapistProfiles?.[id]
       return {
-        role: scenario.leadTherapistRole ?? 'therapist',
-        is_lead_eligible: scenario.leadTherapistEligible ?? true,
-        full_name: 'Lead Therapist',
-        employment_type: 'full_time',
-        max_work_days_per_week: 3,
-        site_id: 'site-a',
-        shift_type: 'day',
+        role: custom?.role ?? scenario.leadTherapistRole ?? 'therapist',
+        is_lead_eligible: custom?.is_lead_eligible ?? scenario.leadTherapistEligible ?? true,
+        full_name: custom?.full_name ?? 'Lead Therapist',
+        employment_type: custom?.employment_type ?? 'full_time',
+        max_work_days_per_week: custom?.max_work_days_per_week ?? 3,
+        site_id: custom?.site_id ?? 'site-a',
+        shift_type: custom?.shift_type ?? 'day',
+        is_active: custom?.is_active ?? true,
+        archived_at: custom?.archived_at ?? null,
+        on_fmla: custom?.on_fmla ?? false,
       }
     }
     const custom = scenario.therapistProfiles?.[id]
@@ -118,6 +132,9 @@ function makeSupabaseMock(scenario: Scenario) {
         max_work_days_per_week: custom.max_work_days_per_week ?? 3,
         site_id: custom.site_id ?? 'site-a',
         shift_type: custom.shift_type ?? 'day',
+        is_active: custom.is_active ?? true,
+        archived_at: custom.archived_at ?? null,
+        on_fmla: custom.on_fmla ?? false,
       }
     }
     return {
@@ -128,6 +145,9 @@ function makeSupabaseMock(scenario: Scenario) {
       max_work_days_per_week: 3,
       site_id: 'site-a',
       shift_type: 'day',
+      is_active: true,
+      archived_at: null,
+      on_fmla: false,
     }
   }
 
@@ -472,6 +492,73 @@ describe('drag-drop API behavior', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'Therapist is outside your site scope.',
     })
+  })
+
+  it('blocks mutations for Schedule Blocks outside the manager site', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        cycleSiteId: 'site-b',
+        coverageStatuses: [],
+        weeklyShifts: [],
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Schedule Block is outside your site scope.',
+    })
+  })
+
+  it('blocks assignment to inactive, archived, or FMLA therapists before validation work', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: [],
+      weeklyShifts: [],
+      therapistProfiles: {
+        'therapist-1': {
+          site_id: 'site-a',
+          is_active: false,
+        },
+      },
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'This therapist cannot be assigned.',
+    })
+    expect(supabase.insertedShiftPayloads).toEqual([])
   })
 
   it('rejects assignment when the selected shift does not match the therapist shift type', async () => {
@@ -930,6 +1017,44 @@ describe('drag-drop API behavior', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'Only lead-eligible therapists can be designated as lead.',
     })
+  })
+
+  it('blocks designated lead when therapist is archived before calling the mutation', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: ['scheduled'],
+      weeklyShifts: [],
+      leadTherapistEligible: true,
+      therapistProfiles: {
+        'therapist-lead': {
+          is_lead_eligible: true,
+          archived_at: '2026-03-01T00:00:00.000Z',
+        },
+      },
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'set_lead',
+          cycleId: 'cycle-1',
+          therapistId: 'therapist-lead',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'This therapist cannot be assigned.',
+    })
+    expect(supabase.rpc).not.toHaveBeenCalled()
   })
 
   it('surfaces designated lead conflict from mutation', async () => {

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import type { AvailabilityOverrideRow, Therapist } from '@/app/schedule/types'
 
 import { generateDraftForCycle } from '@/lib/coverage/generate-draft'
+import { weeklyCountKey } from '@/lib/schedule-helpers'
+import { summarizePublishWeeklyViolations } from '@/lib/schedule-rule-validation'
 
 const BASE_INPUT = {
   cycleId: 'cycle-1',
@@ -158,5 +160,85 @@ describe('generateDraftForCycle', () => {
         shift_type: 'day',
       })
     )
+  })
+
+  it('creates a draft that does not fail publish weekly validation just because roster capacity is larger than demand', () => {
+    const makeTherapist = (
+      id: string,
+      shiftType: 'day' | 'night',
+      isLeadEligible = false
+    ): Therapist => ({
+      id,
+      full_name: id,
+      shift_type: shiftType,
+      is_lead_eligible: isLeadEligible,
+      employment_type: 'full_time',
+      max_work_days_per_week: 3,
+      works_dow: [0, 1, 2, 3, 4, 5, 6],
+      offs_dow: [],
+      weekend_rotation: 'none',
+      weekend_anchor_date: null,
+      works_dow_mode: 'hard',
+      shift_preference: shiftType,
+      on_fmla: false,
+      fmla_return_date: null,
+      is_active: true,
+    })
+
+    const therapists = [
+      ...Array.from({ length: 32 }, (_, index) =>
+        makeTherapist(`day-${index + 1}`, 'day', index < 3)
+      ),
+      ...Array.from({ length: 32 }, (_, index) =>
+        makeTherapist(`night-${index + 1}`, 'night', index < 3)
+      ),
+    ]
+    const result = generateDraftForCycle({
+      ...BASE_INPUT,
+      cycleStartDate: '2026-05-31',
+      cycleEndDate: '2026-06-06',
+      therapists,
+    })
+
+    expect(result.unfilledSlots).toBe(0)
+    expect(result.missingLeadSlots).toBe(0)
+
+    const scheduledTherapistIds = new Set(result.draftShiftsToInsert.map((shift) => shift.user_id))
+    expect(scheduledTherapistIds.size).toBeLessThan(therapists.length)
+
+    const weeklyWorkedDatesByUserWeek = new Map<string, Set<string>>()
+    for (const shift of result.draftShiftsToInsert) {
+      const key = weeklyCountKey(shift.user_id, '2026-05-31')
+      const workedDates = weeklyWorkedDatesByUserWeek.get(key) ?? new Set<string>()
+      workedDates.add(shift.date)
+      weeklyWorkedDatesByUserWeek.set(key, workedDates)
+    }
+
+    expect(
+      summarizePublishWeeklyViolations({
+        therapistIds: therapists.map((therapist) => therapist.id),
+        cycleWeekDates: new Map([
+          [
+            '2026-05-31',
+            new Set([
+              '2026-05-31',
+              '2026-06-01',
+              '2026-06-02',
+              '2026-06-03',
+              '2026-06-04',
+              '2026-06-05',
+              '2026-06-06',
+            ]),
+          ],
+        ]),
+        weeklyWorkedDatesByUserWeek,
+        maxWorkDaysByTherapist: new Map(therapists.map((therapist) => [therapist.id, 3])),
+        minWorkDaysByTherapist: new Map(),
+      })
+    ).toEqual({
+      underCount: 0,
+      overCount: 0,
+      violations: 0,
+    })
   })
 })
