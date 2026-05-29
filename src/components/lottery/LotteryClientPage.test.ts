@@ -2,7 +2,9 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import LotteryClientPage from '@/components/lottery/LotteryClientPage'
+import LotteryClientPage, {
+  shouldLogLotteryMutationFailure,
+} from '@/components/lottery/LotteryClientPage'
 import type { LotteryPageSnapshot } from '@/lib/lottery/service'
 
 function buildSnapshot(overrides: Partial<LotteryPageSnapshot> = {}): LotteryPageSnapshot {
@@ -176,5 +178,14 @@ describe('LotteryClientPage', () => {
     )
     expect(html).not.toContain('Pick the date, shift, and keep-to-work count')
     expect(html).not.toContain('Decision context')
+  })
+
+  it('keeps expected mutation validation out of error logs', () => {
+    expect(
+      shouldLogLotteryMutationFailure(400, 'That therapist is already on the Lottery list.')
+    ).toBe(false)
+    expect(shouldLogLotteryMutationFailure(409, 'This Lottery decision is stale.')).toBe(false)
+    expect(shouldLogLotteryMutationFailure(500, 'Could not save the Lottery request.')).toBe(true)
+    expect(shouldLogLotteryMutationFailure(400, null)).toBe(true)
   })
 })

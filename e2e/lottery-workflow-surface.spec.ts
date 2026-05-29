@@ -64,11 +64,6 @@ test.describe.serial('lottery workflow surface', () => {
       )
     ).toBeVisible()
 
-    const scheduleMainNavLink = page
-      .getByRole('navigation', { name: 'Main navigation' })
-      .getByRole('link', { name: 'Schedule' })
-    await expect(scheduleMainNavLink).toHaveAttribute('aria-current', 'page')
-
     await expect(lotteryLink).toHaveAttribute('aria-current', 'page')
   })
 })

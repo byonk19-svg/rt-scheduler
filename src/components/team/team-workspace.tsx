@@ -112,6 +112,7 @@ export default function TeamWorkspace({
         className={activeTab === 'directory' ? 'space-y-4' : 'hidden'}
       >
         <TeamDirectory
+          key={initialEditProfileId ?? 'directory'}
           summary={summary}
           profiles={profiles}
           workPatterns={workPatterns}

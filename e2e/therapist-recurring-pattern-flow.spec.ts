@@ -11,6 +11,10 @@ function formatDateLabelE2E(iso: string): string {
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function availabilityDayButtonName(iso: string): RegExp {
+  return new RegExp(`^${formatDateLabelE2E(iso)}\\b`)
+}
+
 function nextSaturdayKey() {
   const today = new Date()
   const offset = (6 - today.getDay() + 7) % 7
@@ -122,7 +126,7 @@ test.describe.serial('therapist recurring pattern flow', () => {
     await expect(page.getByText(/Repeats every 7 days starting/i)).toBeVisible()
 
     const offDayButton = page
-      .getByRole('button', { name: new RegExp(`^${formatDateLabelE2E(ctx!.offDate)}$`) })
+      .getByRole('button', { name: availabilityDayButtonName(ctx!.offDate) })
       .first()
     await expect(offDayButton).toBeVisible({ timeout: 30_000 })
     await offDayButton.click()
@@ -139,7 +143,12 @@ test.describe.serial('therapist recurring pattern flow', () => {
     await page.waitForURL(/success=draft_saved/, { timeout: 45_000 })
 
     await page.goto(`/therapist/availability?cycle=${ctx!.cycleId}`)
-    await offDayButton.click()
+    const reloadedOffDayButton = page
+      .getByRole('button', { name: availabilityDayButtonName(ctx!.offDate) })
+      .first()
+    await expect(reloadedOffDayButton).toBeVisible({ timeout: 30_000 })
+    await reloadedOffDayButton.click()
+    await expect(page.getByRole('heading', { name: 'Selected day' })).toBeVisible()
     await expect(page.locator(`textarea#therapist-day-note-${ctx!.offDate}`)).toHaveValue(
       overrideNote,
       {

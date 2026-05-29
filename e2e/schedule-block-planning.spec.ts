@@ -167,9 +167,18 @@ test.describe.serial('/schedule/planning Schedule Block Planning', () => {
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await gotoWithRetry(page, '/therapist/availability')
 
-    await expect(page.getByText(createdResult.data.label).first()).toBeVisible({
+    const scheduleBlockSelect = page.getByRole('combobox', { name: 'Schedule Block' })
+    await expect(
+      scheduleBlockSelect.locator(`option[value="${createdResult.data.id}"]`)
+    ).toHaveCount(1, {
       timeout: 20_000,
     })
-    await expect(page.getByText(ctx!.hiddenCycle.label)).toHaveCount(0)
+    await expect(scheduleBlockSelect.locator(`option[value="${ctx!.hiddenCycle.id}"]`)).toHaveCount(
+      0
+    )
+    await gotoWithRetry(page, `/therapist/availability?cycle=${createdResult.data.id}`)
+    await expect(page.getByText(`Schedule Block: ${createdResult.data.label}`)).toBeVisible({
+      timeout: 20_000,
+    })
   })
 })

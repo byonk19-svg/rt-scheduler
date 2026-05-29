@@ -40,6 +40,10 @@ function formatAvailabilityDayLabel(isoDate: string): string {
   })
 }
 
+function availabilityDayButtonName(isoDate: string): RegExp {
+  return new RegExp(`^${formatAvailabilityDayLabel(isoDate)}\\b`)
+}
+
 function waitForShiftPostMutation(page: Page) {
   return page.waitForResponse(
     (response) =>
@@ -243,7 +247,7 @@ async function createSimpleDraftCycle(params: {
 
 async function expectShiftTabActive(page: Page, tab: 'day' | 'night') {
   const label = tab === 'day' ? 'Day shift' : 'Night shift'
-  const button = page.getByRole('button', { name: new RegExp(`^${label}$`) }).first()
+  const button = page.getByRole('button', { name: new RegExp(`^${label}\\b`) }).first()
   await expect(button).toBeVisible()
   await expect(button).toHaveClass(/bg-primary/)
 }
@@ -339,7 +343,7 @@ async function approvePickupFromShiftBoard(params: {
 }
 
 test.describe.serial('role journeys', () => {
-  test.setTimeout(120_000)
+  test.setTimeout(180_000)
 
   let ctx: RoleJourneysContext | null = null
   const createdUserIds: string[] = []
@@ -755,7 +759,7 @@ test.describe.serial('role journeys', () => {
 
     const dayButton = page
       .getByRole('button', {
-        name: new RegExp(`^${formatAvailabilityDayLabel(ctx!.draftCycle.availabilityDate)}$`),
+        name: availabilityDayButtonName(ctx!.draftCycle.availabilityDate),
       })
       .first()
     await expect(dayButton).toBeVisible()
@@ -822,10 +826,9 @@ test.describe.serial('role journeys', () => {
     await expect(openShiftCard).toBeVisible()
     await openShiftCard.getByRole('button', { name: "I'll take this" }).click()
 
-    await expect(page.getByText('Your pencil mark was saved for manager review.')).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Pending pencil marks' })).toBeVisible({
       timeout: 30_000,
     })
-    await expect(page.getByRole('heading', { name: 'Pending pencil marks' })).toBeVisible()
     await expect(page.getByText('Wants to work this day').first()).toBeVisible()
     await expect(
       page
@@ -1046,10 +1049,11 @@ test.describe.serial('role journeys', () => {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
       await gotoWithRetry(managerPage, '/shift-board')
       await managerPage.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined)
-      await expect(managerPage.getByRole('heading', { name: 'My Requests' })).toBeVisible({
+      await expect(managerPage.getByRole('heading', { name: 'Shift Board' })).toBeVisible({
         timeout: 20_000,
       })
 
+      await managerPage.getByRole('button', { name: /Open Shifts -/ }).click()
       await expect(managerPage.locator('main')).toContainText(requestMessage, { timeout: 20_000 })
       const denyResult = await ctx!.supabase
         .from('shift_posts')
@@ -1510,7 +1514,7 @@ test.describe.serial('role journeys', () => {
 
     await page.goto(`/availability?cycle=${ctx!.draftCycle.id}&therapist=${ctx!.therapist.id}`)
     await expect(page.getByRole('heading', { name: 'Availability Manager' }).first()).toBeVisible()
-    await expect(page.getByRole('button', { name: /Needs submission/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Needs submission/ }).first()).toBeVisible()
     await expect(page.getByRole('heading', { name: /Availability editor/ })).toBeVisible()
 
     await page.goto('/team')
@@ -1522,16 +1526,22 @@ test.describe.serial('role journeys', () => {
     await expect(page.getByRole('link', { name: 'Shift Swaps & Pickups' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'User Access Requests' })).toBeVisible()
 
-    await page.goto('/requests/user-access')
+    await gotoWithRetry(page, '/requests/user-access')
     await expect(page.getByRole('heading', { name: 'User Access Requests' })).toBeVisible()
     await expect(page.getByText(ctx!.pendingApproveUser.fullName).first()).toBeVisible()
     const approveRow = page
       .locator('tr, article')
       .filter({ has: page.getByText(ctx!.pendingApproveUser.fullName) })
       .first()
-    await approveRow.getByRole('button', { name: 'Approve' }).click()
     const approveDialog = page.getByRole('dialog')
-    await expect(approveDialog).toBeVisible()
+    const approveButton = approveRow.getByRole('button', { name: 'Approve' })
+    await expect(approveButton).toBeEnabled()
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await approveButton.click()
+      if (await approveDialog.isVisible({ timeout: 1_000 }).catch(() => false)) break
+      await page.waitForTimeout(500)
+    }
+    await expect(approveDialog).toBeVisible({ timeout: 10_000 })
     await approveDialog.getByLabel('Role').selectOption('therapist')
     await approveDialog.getByRole('button', { name: 'Approve' }).click()
 

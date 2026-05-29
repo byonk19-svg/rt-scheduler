@@ -55,7 +55,7 @@ async function selectScheduleCycle(page: Page, cycleId: string) {
     await expect(cyclePicker).toBeEnabled({ timeout: 30_000 })
     await cyclePicker.selectOption(cycleId)
 
-    const selected = await Promise.all([
+    const [urlChanged, valueChanged] = await Promise.all([
       page.waitForURL(expectedUrl, { timeout: 5_000 }).then(
         () => true,
         () => false
@@ -64,9 +64,9 @@ async function selectScheduleCycle(page: Page, cycleId: string) {
         (value) => value === cycleId,
         () => false
       ),
-    ]).then(([urlChanged, valueChanged]) => urlChanged || valueChanged)
+    ])
 
-    if (selected) {
+    if (urlChanged && valueChanged) {
       await expect(page).toHaveURL(expectedUrl, { timeout: 30_000 })
       await expect(page.getByRole('combobox', { name: 'Schedule Block' })).toHaveValue(cycleId, {
         timeout: 30_000,
@@ -86,7 +86,7 @@ async function selectScheduleCycle(page: Page, cycleId: string) {
 async function postScheduleDragDrop(page: Page, data: Record<string, unknown>) {
   const response = await page.request.post('/api/schedule/drag-drop', {
     headers: {
-      origin: 'http://127.0.0.1:3000',
+      origin: new URL(page.url()).origin,
       referer: page.url(),
     },
     data,
@@ -577,7 +577,7 @@ test.describe.serial('unified schedule grid route', () => {
     expect(liveShift.data?.id).toBeTruthy()
     const statusResponse = await page.request.post('/api/schedule/assignment-status', {
       headers: {
-        origin: 'http://127.0.0.1:3000',
+        origin: new URL(page.url()).origin,
         referer: page.url(),
       },
       data: {
@@ -617,7 +617,7 @@ test.describe.serial('unified schedule grid route', () => {
 
     const statusResponse = await page.request.post('/api/schedule/assignment-status', {
       headers: {
-        origin: 'http://127.0.0.1:3000',
+        origin: new URL(page.url()).origin,
         referer: page.url(),
       },
       data: {
@@ -683,7 +683,7 @@ test.describe.serial('unified schedule grid route', () => {
     expect(liveShift.data?.id).toBeTruthy()
     const statusResponse = await page.request.post('/api/schedule/assignment-status', {
       headers: {
-        origin: 'http://127.0.0.1:3000',
+        origin: new URL(page.url()).origin,
         referer: page.url(),
       },
       data: {

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 
-import { expect, test, type Response } from '@playwright/test'
+import { expect, test, type Page, type Response } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
@@ -19,6 +19,8 @@ type RequestsCtx = {
   leadEligiblePartner: { id: string; email: string; password: string }
   leadIneligiblePartner: { id: string; email: string; password: string }
 }
+
+const requestPageErrors = new WeakMap<Page, string[]>()
 
 type SeededTeamwiseDirectSwap = {
   message: string
@@ -305,6 +307,18 @@ test.describe.serial('requests workflow', () => {
   let ctx: RequestsCtx | null = null
   const createdCycleIds: string[] = []
   const createdUserIds: string[] = []
+
+  test.beforeEach(async ({ page }) => {
+    const pageErrors: string[] = []
+    requestPageErrors.set(page, pageErrors)
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.stack ?? error.message)
+    })
+  })
+
+  test.afterEach(async ({ page }) => {
+    expect(requestPageErrors.get(page) ?? []).toEqual([])
+  })
 
   test.beforeAll(async () => {
     const supabase = createServiceRoleClientOrNull()

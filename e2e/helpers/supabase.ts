@@ -68,9 +68,14 @@ export async function createE2EUser(
       max_work_days_per_week:
         payload.maxWorkDaysPerWeek ?? (payload.employmentType === 'prn' ? 1 : 3),
       preferred_work_days: [],
+      preferred_work_days_mode: 'no_preference',
       is_lead_eligible: payload.isLeadEligible ?? payload.role === 'lead',
       on_fmla: false,
       is_active: true,
+      staff_onboarding_required: false,
+      staff_onboarding_preferences_confirmed_at: new Date().toISOString(),
+      staff_onboarding_theme_confirmed_at: new Date().toISOString(),
+      staff_onboarding_completed_at: new Date().toISOString(),
       site_id: payload.siteId ?? 'default',
     },
     { onConflict: 'id' }

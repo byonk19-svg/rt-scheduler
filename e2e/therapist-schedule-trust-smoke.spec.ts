@@ -23,6 +23,10 @@ function formatDateLabelE2E(iso: string): string {
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function availabilityDayButtonName(iso: string): RegExp {
+  return new RegExp(`^${formatDateLabelE2E(iso)}\\b`)
+}
+
 async function expectShiftTabActive(page: import('@playwright/test').Page, tab: 'day' | 'night') {
   const label = tab === 'day' ? 'Day shift' : 'Night shift'
   const btn = page.getByRole('button', { name: label }).first()
@@ -235,9 +239,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await loginAs(page, ctx!.dayTherapist.email, ctx!.dayTherapist.password)
     await page.goto(`/therapist/availability?cycle=${ctx!.cycleId}`)
 
-    const dayBtn = page
-      .getByRole('button', { name: new RegExp(`^${formatDateLabelE2E(iso)}$`) })
-      .first()
+    const dayBtn = page.getByRole('button', { name: availabilityDayButtonName(iso) }).first()
     await expect(dayBtn).toBeVisible({ timeout: 30_000 })
     await dayBtn.click()
     await expect(page.getByText('Selected Day')).toBeVisible()
@@ -307,9 +309,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await loginAs(page, ctx!.dayTherapist.email, ctx!.dayTherapist.password)
     await page.goto(`/therapist/availability?cycle=${ctx!.cycleId}`)
 
-    const dayBtn = page
-      .getByRole('button', { name: new RegExp(`^${formatDateLabelE2E(iso2)}$`) })
-      .first()
+    const dayBtn = page.getByRole('button', { name: availabilityDayButtonName(iso2) }).first()
     await expect(dayBtn).toBeVisible({ timeout: 30_000 })
     await dayBtn.click()
     await expect(
