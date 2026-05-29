@@ -58,6 +58,9 @@ type TestContext = {
   role?: string | null
   isActive?: boolean
   archivedAt?: string | null
+  siteId?: string | null
+  therapistSiteId?: string | null
+  cycleSiteId?: string | null
   therapistSubmissionExists?: boolean
   draftShiftCount?: number
   cyclePublished?: boolean
@@ -191,11 +194,30 @@ function createSupabaseMock(context: TestContext = {}) {
         },
         maybeSingle: async () => {
           if (table === 'profiles' && selected.includes('role')) {
+            const profileId = filters.get('id')
             return {
               data: {
                 role: context.role,
                 is_active: context.isActive ?? true,
                 archived_at: context.archivedAt ?? null,
+                site_id:
+                  profileId === 'therapist-1'
+                    ? (context.therapistSiteId ?? context.siteId ?? 'default')
+                    : (context.siteId ?? 'default'),
+              },
+              error: null,
+            }
+          }
+          if (table === 'profiles' && selected.includes('site_id')) {
+            const profileId = filters.get('id')
+            return {
+              data: {
+                is_active: context.isActive ?? true,
+                archived_at: context.archivedAt ?? null,
+                site_id:
+                  profileId === 'therapist-1'
+                    ? (context.therapistSiteId ?? context.siteId ?? 'default')
+                    : (context.siteId ?? 'default'),
               },
               error: null,
             }
@@ -212,6 +234,7 @@ function createSupabaseMock(context: TestContext = {}) {
                 archived_at: context.cycleArchivedAt ?? null,
                 availability_closed_at: context.availabilityClosedAt ?? null,
                 availability_reopened_at: context.availabilityReopenedAt ?? null,
+                site_id: context.cycleSiteId ?? context.siteId ?? 'default',
               },
               error: null,
             }
@@ -421,8 +444,11 @@ describe('availability actions', () => {
       source: 'therapist',
       intent: 'therapist_need_off',
     })
+    const admin = createAdminClientMock.mock.results.at(-1)?.value
     expect(
-      supabase.state.inserts.some((row) => row.table === 'therapist_availability_submissions')
+      admin.state.inserts.some(
+        (row: { table: string }) => row.table === 'therapist_availability_submissions'
+      )
     ).toBe(true)
     expect(revalidatePathMock).toHaveBeenCalledWith('/availability')
     expect(revalidatePathMock).toHaveBeenCalledWith('/therapist/availability')
@@ -440,6 +466,24 @@ describe('availability actions', () => {
     )
 
     expect(supabase.state.upsertPayloads).toHaveLength(0)
+  })
+
+  it('blocks therapist availability submission for another site cycle', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'therapist-1',
+      role: 'therapist',
+      siteId: 'site-a',
+    })
+    const admin = createSupabaseMock({ siteId: 'site-a', cycleSiteId: 'site-b' })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(submitAvailabilityEntryAction(makeTherapistFormData())).rejects.toThrow(
+      'REDIRECT:/availability?error=submit_failed&cycle=cycle-1'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(admin.state.inserts).toHaveLength(0)
   })
 
   it('only lets a therapist delete their own availability row', async () => {
@@ -708,6 +752,32 @@ describe('availability actions', () => {
         intent: 'therapist_need_off',
       },
     ])
+    const admin = createAdminClientMock.mock.results.at(-1)?.value
+    expect(
+      admin.state.inserts.some(
+        (row: { table: string }) => row.table === 'therapist_availability_submissions'
+      )
+    ).toBe(true)
+  })
+
+  it('blocks manager-entered therapist requests across sites', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    const admin = createSupabaseMock({
+      siteId: 'site-a',
+      therapistSiteId: 'site-b',
+      cycleSiteId: 'site-a',
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(
+      saveManagerAvailabilityRequestsAction(makeManagerRequestFormData())
+    ).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=manager_request_save_failed'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(admin.state.inserts).toHaveLength(0)
   })
 
   it('lets a manager clear manager-entered therapist request dates for the active mode', async () => {
@@ -771,9 +841,10 @@ describe('availability actions', () => {
         intent: 'therapist_need_off',
       },
     ])
-    expect(supabase.state.inserts).toHaveLength(1)
-    expect(supabase.state.inserts[0].table).toBe('therapist_availability_submissions')
-    const submissionPayload = supabase.state.inserts[0].payload as Record<string, unknown>
+    const admin = createAdminClientMock.mock.results.at(-1)?.value
+    expect(admin.state.inserts).toHaveLength(1)
+    expect(admin.state.inserts[0].table).toBe('therapist_availability_submissions')
+    const submissionPayload = admin.state.inserts[0].payload as Record<string, unknown>
     expect(submissionPayload.therapist_id).toBe('therapist-1')
     expect(submissionPayload.schedule_cycle_id).toBe('cycle-1')
     expect(revalidatePathMock).toHaveBeenCalledWith('/dashboard/staff')
@@ -789,7 +860,8 @@ describe('availability actions', () => {
       'REDIRECT:/availability?success=draft_saved&cycle=cycle-1'
     )
 
-    expect(supabase.state.inserts).toHaveLength(0)
+    const admin = createAdminClientMock.mock.results.at(-1)?.value
+    expect(admin.state.inserts).toHaveLength(0)
     expect(supabase.state.updates).toHaveLength(0)
   })
 
@@ -799,14 +871,16 @@ describe('availability actions', () => {
       role: 'therapist',
       therapistSubmissionExists: true,
     })
+    const admin = createSupabaseMock({ therapistSubmissionExists: true })
     createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
 
     await expect(
       submitTherapistAvailabilityGridAction(makeTherapistGridFormData())
     ).rejects.toThrow('REDIRECT:/availability?success=entry_submitted&cycle=cycle-1')
 
-    expect(supabase.state.inserts).toHaveLength(0)
-    expect(supabase.state.updates).toEqual([
+    expect(admin.state.inserts).toHaveLength(0)
+    expect(admin.state.updates).toEqual([
       {
         table: 'therapist_availability_submissions',
         payload: expect.objectContaining({ last_edited_at: expect.any(String) }),

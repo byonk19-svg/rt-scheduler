@@ -11,6 +11,7 @@ export type AuthenticatedActionUser = {
     Awaited<ReturnType<Awaited<ReturnType<typeof createClient>>['auth']['getUser']>>['data']['user']
   >
   role: string | null
+  siteId: string | null
   permissionContext: {
     isActive: boolean
     archivedAt: string | null
@@ -57,7 +58,7 @@ export async function getAuthenticatedUserWithRole(): Promise<AuthenticatedActio
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -65,6 +66,7 @@ export async function getAuthenticatedUserWithRole(): Promise<AuthenticatedActio
     supabase,
     user,
     role: profile?.role ?? null,
+    siteId: profile?.site_id ?? null,
     permissionContext: {
       isActive: profile?.is_active !== false,
       archivedAt: profile?.archived_at ?? null,

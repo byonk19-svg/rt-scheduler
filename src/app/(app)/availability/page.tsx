@@ -402,7 +402,7 @@ export default async function AvailabilityPage({
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -414,6 +414,9 @@ export default async function AvailabilityPage({
   })
   if (!canManageAvailability) {
     redirect(`/therapist/availability${toSearchString(params)}`)
+  }
+  if (!profile?.site_id) {
+    return availabilityLoadError('availability manager site', { message: 'missing manager site' })
   }
 
   const { count: intakeReviewCount, error: intakeReviewCountError } = await supabase
@@ -436,6 +439,7 @@ export default async function AvailabilityPage({
       'id, label, start_date, end_date, published, status, archived_at, availability_due_at, availability_closed_at, availability_reopened_at'
     )
     .is('archived_at', null)
+    .eq('site_id', profile.site_id)
     .gte('end_date', todayKey)
     .order('start_date', { ascending: true })
 
@@ -490,6 +494,7 @@ export default async function AvailabilityPage({
     .in('role', ['therapist', 'lead'])
     .eq('is_active', true)
     .is('archived_at', null)
+    .eq('site_id', profile.site_id)
     .order('full_name', { ascending: true })
 
   const plannerOverridesResult =

@@ -20,8 +20,10 @@ describe('availability workflow action exports', () => {
 
     expect(managerPage).toContain('/availability/manager-planner-actions')
     expect(managerPage).toContain('/availability/manager-request-actions')
+    expect(managerPage).toContain(".eq('site_id', profile.site_id)")
     expect(therapistPage).toContain('/availability/therapist-actions')
     expect(intakePage).toContain('/availability/email-intake-actions')
+    expect(intakePage).toContain(".eq('site_id', profile.site_id)")
   })
 
   it('keeps the legacy actions file as a compatibility barrel, not the implementation owner', () => {
@@ -46,6 +48,7 @@ describe('availability workflow action exports', () => {
     expect(reminderAction).toContain(".from('profiles')")
     expect(reminderAction).toContain(".eq('is_active', true)")
     expect(reminderAction).toContain(".is('archived_at', null)")
+    expect(reminderAction).toContain(".eq('site_id', cycle.site_id)")
     expect(reminderAction).toContain(".from('therapist_availability_submissions')")
     expect(reminderAction).toContain(".eq('schedule_cycle_id', cycleId)")
   })

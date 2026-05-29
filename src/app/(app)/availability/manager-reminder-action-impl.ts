@@ -12,9 +12,9 @@ import { getAuthenticatedUserWithRole } from './_actions/shared'
 export async function sendAvailabilityRemindersAction(
   cycleId: string
 ): Promise<{ sent: number; skipped: number; failed: number; error?: string }> {
-  const { supabase, role, permissionContext } = await getAuthenticatedUserWithRole()
+  const { supabase, role, siteId, permissionContext } = await getAuthenticatedUserWithRole()
 
-  if (!can(role, 'access_manager_ui', permissionContext)) {
+  if (!siteId || !can(role, 'access_manager_ui', permissionContext)) {
     return { sent: 0, skipped: 0, failed: 0, error: 'unauthorized' }
   }
 
@@ -25,11 +25,11 @@ export async function sendAvailabilityRemindersAction(
 
   const { data: cycle } = await supabase
     .from('schedule_cycles')
-    .select('start_date, end_date')
+    .select('start_date, end_date, site_id')
     .eq('id', cycleId)
     .maybeSingle()
 
-  if (!cycle) {
+  if (!cycle?.site_id || cycle.site_id !== siteId) {
     return { sent: 0, skipped: 0, failed: 0, error: 'cycle_not_found' }
   }
 
@@ -42,6 +42,7 @@ export async function sendAvailabilityRemindersAction(
     .eq('is_active', true)
     .is('archived_at', null)
     .eq('on_fmla', false)
+    .eq('site_id', cycle.site_id)
 
   if (profileError) {
     console.error('[sendAvailabilityRemindersAction] profile fetch failed:', profileError)

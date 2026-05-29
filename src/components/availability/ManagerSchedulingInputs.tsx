@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
@@ -221,7 +221,7 @@ export function ManagerSchedulingInputs({
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [, startTransition] = useTransition()
+  const latestQueryRef = useRef(searchParams.toString())
 
   const initialSelectedCycleId = initialCycleId || cycles[0]?.id || ''
   const initialSelectedTherapistId = initialTherapistId || therapists[0]?.id || ''
@@ -374,8 +374,14 @@ export function ManagerSchedulingInputs({
     setSelectedDates(getDatesForMode(nextMode, cycleId, therapistId))
   }
 
-  function replacePlannerQuery(nextCycleId: string, nextTherapistId: string) {
-    const params = new URLSearchParams(searchParams.toString())
+  function replacePlannerQuery(
+    nextCycleId: string,
+    nextTherapistId: string,
+    mode: 'navigate' | 'shallow' = 'navigate'
+  ) {
+    const currentSearch =
+      typeof window === 'undefined' ? latestQueryRef.current : window.location.search
+    const params = new URLSearchParams(currentSearch)
     params.set('tab', 'planner')
     if (nextCycleId) {
       params.set('cycle', nextCycleId)
@@ -388,9 +394,13 @@ export function ManagerSchedulingInputs({
       params.delete('therapist')
     }
     const query = params.toString()
-    startTransition(() => {
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
-    })
+    latestQueryRef.current = query
+    const nextUrl = query ? `${pathname}?${query}` : pathname
+    if (mode === 'shallow' && typeof window !== 'undefined') {
+      window.history.replaceState(null, '', nextUrl)
+      return
+    }
+    router.replace(nextUrl, { scroll: false })
   }
 
   function applyTherapistSelection(nextTherapistId: string) {
@@ -401,7 +411,7 @@ export function ManagerSchedulingInputs({
     setActiveShift(nextTherapist.shift_type)
     plannerFocus?.setFocusedTherapistName(nextTherapist.full_name)
     syncSelection(mode, selectedCycleId, nextTherapistId)
-    replacePlannerQuery(selectedCycleId, nextTherapistId)
+    replacePlannerQuery(selectedCycleId, nextTherapistId, 'shallow')
   }
 
   function reviewTherapist(nextTherapistId: string) {
@@ -411,7 +421,7 @@ export function ManagerSchedulingInputs({
   function clearSelectedTherapist() {
     setSelectedTherapistId('')
     plannerFocus?.setFocusedTherapistName(null)
-    replacePlannerQuery(selectedCycleId, '')
+    replacePlannerQuery(selectedCycleId, '', 'shallow')
   }
 
   function handleCycleChange(nextCycleId: string) {

@@ -15,6 +15,41 @@ import {
   type AvailabilityShiftType,
 } from './_actions/shared'
 
+type WritableTherapistCycle = {
+  start_date: string
+  end_date: string
+  site_id: string | null
+}
+
+async function loadWritableTherapistCycle(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  cycleId: string,
+  returnPath: '/availability' | '/therapist/availability'
+): Promise<WritableTherapistCycle> {
+  const { data: profile, error: profileError } = await admin
+    .from('profiles')
+    .select('site_id, is_active, archived_at')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (profileError || !profile?.site_id || profile.is_active === false || profile.archived_at) {
+    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+  }
+
+  const { data: cycle, error: cycleError } = await admin
+    .from('schedule_cycles')
+    .select('start_date, end_date, site_id')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleError || !cycle || cycle.site_id !== profile.site_id) {
+    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+  }
+
+  return cycle
+}
+
 export async function submitAvailabilityEntryAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUserWithRole()
   const admin = createAdminClient()
@@ -36,6 +71,8 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
   ) {
     redirect(buildAvailabilityUrl({ error: 'submit_failed' }, returnPath))
   }
+
+  await loadWritableTherapistCycle(admin, user.id, cycleId, returnPath)
 
   const availabilityWindow = await loadAvailabilityWindowState(admin as never, cycleId)
   if (availabilityWindow.locked) {
@@ -62,7 +99,7 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
     redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
   }
 
-  await recordSubmission(supabase, user.id, cycleId)
+  await recordSubmission(admin as never, user.id, cycleId)
 
   revalidateTherapistAvailabilitySurfaces()
   redirect(buildAvailabilityUrl({ success: 'entry_submitted', cycle: cycleId }, returnPath))
@@ -93,15 +130,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
     redirect(buildAvailabilityUrl({ error: 'submit_failed' }, returnPath))
   }
 
-  const { data: cycle } = await admin
-    .from('schedule_cycles')
-    .select('start_date, end_date')
-    .eq('id', cycleId)
-    .maybeSingle()
-
-  if (!cycle) {
-    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
-  }
+  const cycle = await loadWritableTherapistCycle(admin, user.id, cycleId, returnPath)
 
   const availabilityWindow = await loadAvailabilityWindowState(admin as never, cycleId)
   if (availabilityWindow.locked) {
@@ -196,7 +225,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
   }
 
   if (workflow === 'submit') {
-    await recordSubmission(supabase, user.id, cycleId)
+    await recordSubmission(admin as never, user.id, cycleId)
   }
 
   revalidateTherapistAvailabilitySurfaces()
@@ -216,6 +245,7 @@ export async function deleteAvailabilityEntryAction(formData: FormData) {
 
   if (cycleId) {
     const admin = createAdminClient()
+    await loadWritableTherapistCycle(admin, user.id, cycleId, returnPath)
     const availabilityWindow = await loadAvailabilityWindowState(admin as never, cycleId)
     if (availabilityWindow.locked) {
       redirect(buildAvailabilityUrl({ error: 'submission_closed', cycle: cycleId }, returnPath))
@@ -236,7 +266,8 @@ export async function deleteAvailabilityEntryAction(formData: FormData) {
   }
 
   if (cycleId) {
-    await touchSubmission(supabase, user.id, cycleId)
+    const admin = createAdminClient()
+    await touchSubmission(admin as never, user.id, cycleId)
   }
 
   revalidateTherapistAvailabilitySurfaces()

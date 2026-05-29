@@ -6,14 +6,63 @@ import { can } from '@/lib/auth/can'
 import { recordSubmission, touchSubmission } from '@/lib/availability/submission-lifecycle'
 import { getPlannerDateValidationError } from '@/lib/availability-planner'
 import { buildManagerOverrideInput, intentForTherapistOverride } from '@/lib/employee-directory'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildAvailabilityUrl,
   getAuthenticatedUserWithRole,
   revalidateTherapistAvailabilitySurfaces,
 } from './_actions/shared'
 
+type ManagerAvailabilityRequestTarget = {
+  cycle: {
+    start_date: string
+    end_date: string
+    site_id: string | null
+  }
+}
+
+async function loadManagerAvailabilityRequestTarget(
+  admin: ReturnType<typeof createAdminClient>,
+  managerId: string,
+  therapistId: string,
+  cycleId: string
+): Promise<ManagerAvailabilityRequestTarget | null> {
+  const { data: manager } = await admin
+    .from('profiles')
+    .select('site_id, is_active, archived_at')
+    .eq('id', managerId)
+    .maybeSingle()
+  const { data: therapist } = await admin
+    .from('profiles')
+    .select('site_id, is_active, archived_at')
+    .eq('id', therapistId)
+    .maybeSingle()
+  const { data: cycle } = await admin
+    .from('schedule_cycles')
+    .select('start_date, end_date, site_id')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (
+    !manager?.site_id ||
+    manager.is_active === false ||
+    manager.archived_at ||
+    !therapist?.site_id ||
+    therapist.is_active === false ||
+    therapist.archived_at ||
+    !cycle ||
+    cycle.site_id !== manager.site_id ||
+    therapist.site_id !== manager.site_id
+  ) {
+    return null
+  }
+
+  return { cycle }
+}
+
 export async function saveManagerAvailabilityRequestsAction(formData: FormData) {
   const { supabase, user, role, permissionContext } = await getAuthenticatedUserWithRole()
+  const admin = createAdminClient()
 
   if (!can(role, 'access_manager_ui', permissionContext)) {
     redirect('/availability')
@@ -27,12 +76,6 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
     .map((value) => String(value).trim())
     .filter((value) => value.length > 0)
 
-  const { data: cycle } = await supabase
-    .from('schedule_cycles')
-    .select('start_date, end_date')
-    .eq('id', cycleId)
-    .maybeSingle()
-
   if (mode !== 'need_off' && mode !== 'request_to_work') {
     redirect(
       buildAvailabilityUrl({
@@ -43,6 +86,8 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
     )
   }
 
+  const target = await loadManagerAvailabilityRequestTarget(admin, user.id, therapistId, cycleId)
+  const cycle = target?.cycle ?? null
   const validationError = getPlannerDateValidationError({
     cycle: cycle ? { start_date: cycle.start_date, end_date: cycle.end_date } : null,
     therapistId,
@@ -142,7 +187,7 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
     }
   }
 
-  await recordSubmission(supabase, therapistId, cycleId)
+  await recordSubmission(admin as never, therapistId, cycleId)
   revalidateTherapistAvailabilitySurfaces()
   redirect(
     buildAvailabilityUrl({
@@ -154,7 +199,8 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
 }
 
 export async function deleteManagerAvailabilityRequestAction(formData: FormData) {
-  const { supabase, role, permissionContext } = await getAuthenticatedUserWithRole()
+  const { supabase, user, role, permissionContext } = await getAuthenticatedUserWithRole()
+  const admin = createAdminClient()
 
   if (!can(role, 'access_manager_ui', permissionContext)) {
     redirect('/availability')
@@ -167,6 +213,17 @@ export async function deleteManagerAvailabilityRequestAction(formData: FormData)
   if (!overrideId) {
     redirect(
       buildAvailabilityUrl({ cycle: cycleId || undefined, therapist: therapistId || undefined })
+    )
+  }
+
+  const target = await loadManagerAvailabilityRequestTarget(admin, user.id, therapistId, cycleId)
+  if (!target) {
+    redirect(
+      buildAvailabilityUrl({
+        cycle: cycleId || undefined,
+        therapist: therapistId || undefined,
+        error: 'manager_request_delete_failed',
+      })
     )
   }
 
@@ -188,7 +245,7 @@ export async function deleteManagerAvailabilityRequestAction(formData: FormData)
     )
   }
 
-  await touchSubmission(supabase, therapistId, cycleId)
+  await touchSubmission(admin as never, therapistId, cycleId)
   revalidateTherapistAvailabilitySurfaces()
   redirect(
     buildAvailabilityUrl({
