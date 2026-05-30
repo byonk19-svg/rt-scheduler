@@ -10,6 +10,11 @@ import { FormSubmitButton } from '@/components/form-submit-button'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import type { ConflictItem } from '@/lib/availability-scheduled-conflict'
+import {
+  CLEAR_AVAILABILITY_CONFIRMATION,
+  COPY_PREVIOUS_AVAILABILITY_CONFIRMATION,
+  confirmAvailabilityDestructiveAction,
+} from '@/lib/availability-destructive-confirmation'
 import type { GeneratedAvailabilityBaselineDay } from '@/lib/availability-pattern-generator'
 import { formatDateLabel, formatHumanCycleRange } from '@/lib/calendar-utils'
 import {
@@ -303,6 +308,15 @@ export function TherapistAvailabilityWorkspace({
 
   function clearOverrides() {
     if (availabilityLocked) return
+    if (
+      !confirmAvailabilityDestructiveAction({
+        hasUnsavedChanges,
+        message: CLEAR_AVAILABILITY_CONFIRMATION,
+        confirm: (message) => window.confirm(message),
+      })
+    ) {
+      return
+    }
     const nextDraft = clearAvailabilityDraft()
     setDraftStatusByDate(nextDraft.statusByDate)
     setDraftNotesByDate(nextDraft.notesByDate)
@@ -310,6 +324,15 @@ export function TherapistAvailabilityWorkspace({
 
   function copyPreviousCycleOverrides() {
     if (availabilityLocked) return
+    if (
+      !confirmAvailabilityDestructiveAction({
+        hasUnsavedChanges,
+        message: COPY_PREVIOUS_AVAILABILITY_CONFIRMATION,
+        confirm: (message) => window.confirm(message),
+      })
+    ) {
+      return
+    }
     const nextDraft = buildCopiedCycleDraft({
       cycles,
       availabilityRows,
