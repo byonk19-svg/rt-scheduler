@@ -55,10 +55,20 @@ describe('sendAvailabilityReminderEmails', () => {
     expect(result).toEqual({ sent: 1, failed: 1 })
   })
 
-  it('includes the cycle date range in the email subject', async () => {
+  it('uses Schedule Block language with the date range in the email subject', async () => {
     await sendAvailabilityReminderEmails({ ...baseInput, recipients: [makeRecipient()] })
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string)
+    expect(body.subject).toContain('Schedule Block')
     expect(body.subject).toContain('Apr 28 – May 25')
+  })
+
+  it('uses Schedule Block language in the email body', async () => {
+    await sendAvailabilityReminderEmails({ ...baseInput, recipients: [makeRecipient()] })
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string)
+    expect(body.html).toContain('Schedule Block')
+    expect(body.text).toContain('Schedule Block')
+    expect(body.html).not.toContain('upcoming cycle')
+    expect(body.text).not.toContain('upcoming cycle')
   })
 
   it('includes the availability URL in the email body', async () => {
