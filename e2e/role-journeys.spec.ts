@@ -789,7 +789,7 @@ test.describe.serial('role journeys', () => {
     await expect(
       page
         .getByText(
-          'Post trade requests or coverage requests for the published schedule only. Team board and direct requests both live here.'
+          'Use Need coverage when someone should cover your shift, or Trade shift when you want to exchange assignments. Managers approve final schedule changes here.'
         )
         .first()
     ).toBeVisible()
