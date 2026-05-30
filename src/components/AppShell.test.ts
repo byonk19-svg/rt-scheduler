@@ -163,24 +163,38 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'team-schedule'")
     expect(shellConfigSource).toContain("key: 'availability'")
     expect(shellConfigSource).toContain("key: 'shift-board'")
+    expect(shellConfigSource).toContain("key: 'access'")
     expect(shellConfigSource).toContain("key: 'lottery'")
     expect(shellConfigSource).not.toContain("key: 'coverage'")
     expect(shellConfigSource).not.toContain("key: 'people'")
   })
 
-  it('puts Team Schedule, Availability, Shift Board, and Lottery in manager top navigation', () => {
+  it('puts Team Schedule, Availability, Shift Board, Access, and Lottery in manager top navigation', () => {
     expect(buildManagerSections(0).map((section) => section.label)).toEqual([
       'Dashboard',
       'Team Schedule',
       'Availability',
       'Shift Board',
+      'Access',
       'Lottery',
     ])
     expect(shellConfigSource).toContain("label: 'Team Schedule'")
     expect(shellConfigSource).not.toContain("label: 'Roster View'")
     expect(shellConfigSource).toContain("label: 'Availability'")
     expect(shellConfigSource).toContain("label: 'Shift Board'")
+    expect(shellConfigSource).toContain("label: 'Access'")
     expect(shellConfigSource).toContain("label: 'Lottery'")
+  })
+
+  it('badges manager Access work in desktop and mobile drawer navigation', () => {
+    const accessSection = buildManagerSections(6).find((section) => section.key === 'access')
+
+    expect(accessSection?.href).toBe('/requests/user-access')
+    expect(accessSection?.badgeCount).toBe(6)
+    expect(appShellSource).toContain(
+      'const moreBadgeCount = canAccessManagerUi && pendingCount > 0'
+    )
+    expect(appShellSource).toContain('section.badgeCount')
   })
 
   it('allows the shared local section nav to scroll horizontally on narrow screens', () => {

@@ -318,6 +318,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
     [canAccessManagerUi, canAccessLeadTools, pathname, pendingCount]
   )
   const moreNavCurrent = !mobileQuickItems.some((item) => item.current)
+  const moreBadgeCount = canAccessManagerUi && pendingCount > 0 ? pendingCount : undefined
 
   useEffect(() => {
     function handleEsc(event: KeyboardEvent) {
@@ -518,6 +519,11 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
             >
               <Menu className="h-4 w-4" aria-hidden="true" />
               More
+              {moreBadgeCount ? (
+                <span className="absolute right-3 top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--attention)] px-1 text-[9px] font-bold text-accent-foreground">
+                  {moreBadgeCount}
+                </span>
+              ) : null}
             </button>
           </div>
         </nav>
@@ -599,7 +605,12 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                           aria-current={section.isActive(pathname) ? 'page' : undefined}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          {section.label}
+                          <span>{section.label}</span>
+                          {section.badgeCount ? (
+                            <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--attention)] px-1.5 text-[10px] font-bold text-accent-foreground">
+                              {section.badgeCount}
+                            </span>
+                          ) : null}
                         </Link>
                       )
                     )}
