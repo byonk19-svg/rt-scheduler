@@ -46,4 +46,9 @@ describe('manager dashboard Schedule Block Planning cues', () => {
     expect(source).toContain('target_id, created_at')
     expect(source).not.toContain('function getNotificationHref')
   })
+
+  it('uses shared notification display copy for recent activity titles', () => {
+    expect(source).toContain('getNotificationDisplayCopy(row,')
+    expect(source).not.toContain('const title = row.title?.trim()')
+  })
 })

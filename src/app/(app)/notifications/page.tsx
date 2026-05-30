@@ -8,6 +8,7 @@ import { Bell, CheckCheck, CheckCircle2, Filter, Inbox } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { parseRole } from '@/lib/auth/roles'
+import { getNotificationDisplayCopy } from '@/lib/notification-display'
 import { resolveNotificationHref } from '@/lib/notification-routing'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
@@ -30,6 +31,8 @@ type NotificationRow = {
 
 type NotificationDisplayRow = NotificationRow & {
   href: string | null
+  displayTitle: string
+  displayMessage: string
 }
 
 type NotificationFilter = 'all' | 'unread' | 'schedule' | 'requests' | 'preliminary'
@@ -148,10 +151,15 @@ export default async function NotificationsPage({
 
   const userRole = parseRole((profileData as { role?: string | null } | null)?.role)
   const notifications = (notificationsData ?? []) as NotificationRow[]
-  const notificationRows: NotificationDisplayRow[] = notifications.map((item) => ({
-    ...item,
-    href: resolveNotificationHref(item, userRole),
-  }))
+  const notificationRows: NotificationDisplayRow[] = notifications.map((item) => {
+    const displayCopy = getNotificationDisplayCopy(item, userRole)
+    return {
+      ...item,
+      href: resolveNotificationHref(item, userRole),
+      displayTitle: displayCopy.title,
+      displayMessage: displayCopy.message,
+    }
+  })
   const rawFilter = getSearchParam(params?.filter)
   const filter: NotificationFilter =
     rawFilter === 'unread' ||
@@ -297,11 +305,11 @@ export default async function NotificationsPage({
                             <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
                           ) : null}
                           <h2 className="truncate text-sm font-semibold text-foreground">
-                            {item.title}
+                            {item.displayTitle}
                           </h2>
                         </div>
                         <p className="mt-1 line-clamp-2 text-sm leading-5 text-foreground/80">
-                          {item.message}
+                          {item.displayMessage}
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 sm:justify-end">

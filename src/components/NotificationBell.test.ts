@@ -108,4 +108,12 @@ describe('resolveNotificationHref', () => {
     expect(notificationBellSource).toContain("fetch('/api/notifications/mark-read'")
     expect(notificationBellSource.match(/} catch \{/g)?.length).toBeGreaterThanOrEqual(3)
   })
+
+  it('renders shared notification display copy in the dropdown', () => {
+    expect(notificationBellSource).toContain('getNotificationDisplayCopy(item, userRole)')
+    expect(notificationBellSource).toContain('displayCopy.title')
+    expect(notificationBellSource).toContain('displayCopy.message')
+    expect(notificationBellSource).not.toContain('{item.title}')
+    expect(notificationBellSource).not.toContain('{item.message}')
+  })
 })

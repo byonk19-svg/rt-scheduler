@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Bell } from 'lucide-react'
 
 import { Skeleton } from '@/components/ui/skeleton'
+import { getNotificationDisplayCopy } from '@/lib/notification-display'
 import { resolveNotificationHref } from '@/lib/notification-routing'
 
 type NotificationItem = {
@@ -288,6 +289,7 @@ export function NotificationBell({
             ) : (
               notifications.map((item) => {
                 const href = resolveNotificationHref(item, userRole)
+                const displayCopy = getNotificationDisplayCopy(item, userRole)
                 const isUnread = !item.read_at
                 return (
                   <button
@@ -296,7 +298,7 @@ export function NotificationBell({
                     onClick={() => {
                       void handleNotificationClick(item)
                     }}
-                    aria-label={`${item.title}${isUnread ? ' (unread)' : ''}`}
+                    aria-label={`${displayCopy.title}${isUnread ? ' (unread)' : ''}`}
                     className={`flex w-full gap-3 px-4 py-3 text-left transition-colors ${
                       isUnread ? 'bg-muted/60' : 'bg-card'
                     } ${href ? 'cursor-pointer hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50' : 'cursor-default'}`}
@@ -311,10 +313,10 @@ export function NotificationBell({
                           isUnread ? 'font-semibold' : 'font-medium'
                         } break-words`}
                       >
-                        {item.title}
+                        {displayCopy.title}
                       </p>
                       <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                        {item.message}
+                        {displayCopy.message}
                       </p>
                       <p className="mt-1 text-[11px] text-muted-foreground">
                         {timeAgo(item.created_at)}

@@ -55,4 +55,12 @@ describe('notifications page copy guardrails', () => {
     expect(notificationsPageSource).toContain('href={item.href}')
     expect(notificationsPageSource).toContain("select('role')")
   })
+
+  it('renders normalized notification display copy instead of raw database text', () => {
+    expect(notificationsPageSource).toContain('getNotificationDisplayCopy(item, userRole)')
+    expect(notificationsPageSource).toContain('displayTitle')
+    expect(notificationsPageSource).toContain('displayMessage')
+    expect(notificationsPageSource).not.toContain('{item.title}')
+    expect(notificationsPageSource).not.toContain('{item.message}')
+  })
 })

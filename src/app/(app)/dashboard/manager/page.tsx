@@ -12,6 +12,7 @@ import {
   type ManagerActionShiftPostInterestRow,
   type ManagerActionShiftPostRow,
 } from '@/lib/manager-action-work'
+import { getNotificationDisplayCopy } from '@/lib/notification-display'
 import { resolveNotificationHref } from '@/lib/notification-routing'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { availabilityDueDateKey } from '@/lib/schedule-block-planning'
@@ -188,7 +189,7 @@ function formatShiftLine(row: ShiftAssignmentRow): { label: string; detail: stri
 }
 
 function getActivityTitle(row: NotificationRow): string {
-  const title = row.title?.trim()
+  const title = getNotificationDisplayCopy(row, 'manager').title.trim()
   if (title) return title
   if (row.event_type === 'preliminary_request_submitted') return 'New preliminary request submitted'
   if (row.event_type.includes('publish')) return 'Schedule publish activity'
