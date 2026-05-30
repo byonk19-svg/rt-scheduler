@@ -78,6 +78,17 @@ type ScheduleGridReadFailures = {
   forceOff?: unknown
 }
 
+type ScheduleShift = {
+  id: string
+  user_id: string | null
+  cycle_id: string
+  date: string
+  shift_type: 'day' | 'night'
+  status: 'scheduled'
+  assignment_status: null
+  role: 'staff' | 'lead'
+}
+
 const draftCycle: Cycle = {
   id: 'draft-cycle',
   label: 'Draft cycle',
@@ -118,13 +129,17 @@ const therapistRows: Profile[] = [
 function makeSupabaseMock({
   viewer,
   cycles,
+  therapistProfiles = therapistRows,
+  shiftRows = [],
   failures = {},
 }: {
   viewer: Profile
   cycles: Cycle[]
+  therapistProfiles?: Profile[]
+  shiftRows?: ScheduleShift[]
   failures?: ScheduleGridReadFailures
 }) {
-  const profiles = [viewer, ...therapistRows.filter((profile) => profile.id !== viewer.id)]
+  const profiles = [viewer, ...therapistProfiles.filter((profile) => profile.id !== viewer.id)]
 
   const from = (table: string) => {
     const state: {
@@ -189,7 +204,14 @@ function makeSupabaseMock({
         if (failures.shifts) {
           return Promise.resolve({ data: null, error: failures.shifts })
         }
-        return Promise.resolve({ data: single ? null : [], error: null })
+        let rows = shiftRows
+        if (typeof state.filters.cycle_id === 'string') {
+          rows = rows.filter((row) => row.cycle_id === state.filters.cycle_id)
+        }
+        if (typeof state.filters.shift_type === 'string') {
+          rows = rows.filter((row) => row.shift_type === state.filters.shift_type)
+        }
+        return Promise.resolve({ data: single ? null : rows, error: null })
       }
       if (table === 'availability_overrides') {
         if (failures.forceOff) {
@@ -244,6 +266,30 @@ function setViewer(viewer: Profile, cycles: Cycle[], failures?: ScheduleGridRead
     makeSupabaseMock({ viewer, cycles, failures }) as unknown as Awaited<
       ReturnType<typeof createClient>
     >
+  )
+}
+
+function setScheduleViewer({
+  viewer,
+  cycles,
+  therapistProfiles,
+  shiftRows,
+  failures,
+}: {
+  viewer: Profile
+  cycles: Cycle[]
+  therapistProfiles?: Profile[]
+  shiftRows?: ScheduleShift[]
+  failures?: ScheduleGridReadFailures
+}) {
+  vi.mocked(createClient).mockResolvedValue(
+    makeSupabaseMock({
+      viewer,
+      cycles,
+      therapistProfiles,
+      shiftRows,
+      failures,
+    }) as unknown as Awaited<ReturnType<typeof createClient>>
   )
 }
 
@@ -363,6 +409,136 @@ describe('loadScheduleGridData visibility', () => {
     expect(result.status).toBe('ok')
     if (result.status !== 'ok') return
     expect(result.dataset.therapistRows[0]?.employmentType).toBe('full_time')
+  })
+
+  it('hides inactive unarchived therapists from draft schedule planning when they have no assignments', async () => {
+    setScheduleViewer({
+      viewer: {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      cycles: [draftCycle],
+      therapistProfiles: [
+        ...therapistRows,
+        {
+          id: 'inactive-1',
+          role: 'therapist',
+          shift_type: 'day',
+          is_active: false,
+          archived_at: null,
+          site_id: 'site-a',
+          full_name: 'Inactive Therapist',
+          employment_type: 'full_time',
+          on_fmla: false,
+          max_work_days_per_week: 3,
+        },
+      ],
+    })
+
+    const result = await loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.dataset.therapistRows.map((row) => row.userId)).toEqual(['therapist-1'])
+  })
+
+  it('keeps inactive therapists visible in draft schedule planning when the block already has their assignment', async () => {
+    setScheduleViewer({
+      viewer: {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      cycles: [draftCycle],
+      therapistProfiles: [
+        ...therapistRows,
+        {
+          id: 'inactive-1',
+          role: 'therapist',
+          shift_type: 'day',
+          is_active: false,
+          archived_at: null,
+          site_id: 'site-a',
+          full_name: 'Inactive Therapist',
+          employment_type: 'full_time',
+          on_fmla: false,
+          max_work_days_per_week: 3,
+        },
+      ],
+      shiftRows: [
+        {
+          id: 'shift-inactive-1',
+          user_id: 'inactive-1',
+          cycle_id: 'draft-cycle',
+          date: '2026-05-04',
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: null,
+          role: 'staff',
+        },
+      ],
+    })
+
+    const result = await loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    const inactiveRow = result.dataset.therapistRows.find((row) => row.userId === 'inactive-1')
+    expect(inactiveRow).toMatchObject({
+      name: 'Inactive Therapist',
+      isActive: false,
+    })
+    expect(inactiveRow?.cells['2026-05-04']).toMatchObject({
+      shiftId: 'shift-inactive-1',
+      status: 'staff',
+      isIneligible: false,
+    })
+    expect(inactiveRow?.cells['2026-05-05']).toMatchObject({
+      status: 'off',
+      isIneligible: true,
+    })
+  })
+
+  it('keeps inactive therapists visible on published schedules for historical schedule review', async () => {
+    setScheduleViewer({
+      viewer: {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      cycles: [publishedCycle],
+      therapistProfiles: [
+        ...therapistRows,
+        {
+          id: 'inactive-1',
+          role: 'therapist',
+          shift_type: 'day',
+          is_active: false,
+          archived_at: null,
+          site_id: 'site-a',
+          full_name: 'Inactive Therapist',
+          employment_type: 'full_time',
+          on_fmla: false,
+          max_work_days_per_week: 3,
+        },
+      ],
+    })
+
+    const result = await loadScheduleGridData({ cycle: 'published-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.dataset.therapistRows.map((row) => row.userId)).toContain('inactive-1')
   })
 })
 

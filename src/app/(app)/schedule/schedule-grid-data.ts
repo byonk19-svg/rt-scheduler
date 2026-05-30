@@ -63,6 +63,26 @@ function scheduleLoadError(source: string, error: unknown): ScheduleGridServerDa
   return { status: 'load_error' }
 }
 
+function filterScheduleTherapistsForCycle({
+  therapists,
+  shifts,
+  isPublished,
+}: {
+  therapists: readonly TherapistRow[]
+  shifts: readonly ShiftRow[]
+  isPublished: boolean
+}): TherapistRow[] {
+  if (isPublished) return [...therapists]
+
+  const assignedTherapistIds = new Set(
+    shifts.map((shift) => shift.user_id).filter((userId): userId is string => Boolean(userId))
+  )
+
+  return therapists.filter(
+    (therapist) => therapist.is_active !== false || assignedTherapistIds.has(therapist.id)
+  )
+}
+
 export async function loadScheduleGridData(
   searchParams?: Record<string, string | string[] | undefined>
 ): Promise<ScheduleGridServerData> {
@@ -174,12 +194,17 @@ export async function loadScheduleGridData(
   if (forceOffError) return scheduleLoadError('schedule requested-off overrides', forceOffError)
 
   const shifts = (shiftsData ?? []) as ShiftRow[]
+  const scheduleTherapists = filterScheduleTherapistsForCycle({
+    therapists: (therapistsData ?? []) as TherapistRow[],
+    shifts,
+    isPublished,
+  })
   const activeOperationalDetails = await fetchActiveOperationalDetailMap(
     supabase,
     shifts.map((shift) => shift.id)
   )
   const therapistRows = buildTherapistGridRows({
-    therapists: (therapistsData ?? []) as TherapistRow[],
+    therapists: scheduleTherapists,
     cycleDates,
     shiftType,
     shifts,
