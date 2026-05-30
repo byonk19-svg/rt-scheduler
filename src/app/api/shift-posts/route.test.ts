@@ -109,10 +109,20 @@ function makeReviewAdminClient(params: {
   shiftsError?: unknown
 }) {
   const rpc = params.rpc ?? vi.fn()
+  const shiftPostUpdates: Array<{
+    payload: Record<string, unknown>
+    filters: Array<[string, unknown]>
+  }> = []
+  const shiftPostInterestUpdates: Array<{
+    payload: Record<string, unknown>
+    eqFilters: Array<[string, unknown]>
+    inFilters: Array<[string, unknown[]]>
+  }> = []
   const defaultPost = {
     id: 'post-1',
     type: 'pickup',
     status: 'pending',
+    created_at: '2099-05-01T12:00:00.000Z',
     visibility: 'team',
     recipient_response: null,
     claimed_by: null,
@@ -121,15 +131,33 @@ function makeReviewAdminClient(params: {
   }
   return {
     rpc,
+    shiftPostUpdates,
+    shiftPostInterestUpdates,
     from(table: string) {
       if (table === 'shift_posts') {
-        return makeAdminQuery({
-          data:
-            typeof params.post === 'object' && params.post !== null
-              ? { ...defaultPost, ...params.post }
-              : defaultPost,
-          error: params.postError ?? null,
-        })
+        return {
+          ...makeAdminQuery({
+            data:
+              typeof params.post === 'object' && params.post !== null
+                ? { ...defaultPost, ...params.post }
+                : defaultPost,
+            error: params.postError ?? null,
+          }),
+          update(payload: Record<string, unknown>) {
+            const filters: Array<[string, unknown]> = []
+            const builder = {
+              eq(column: string, value: unknown) {
+                filters.push([column, value])
+                if (filters.length >= 2) {
+                  shiftPostUpdates.push({ payload, filters })
+                  return Promise.resolve({ error: null })
+                }
+                return builder
+              },
+            }
+            return builder
+          },
+        }
       }
       if (table === 'shifts') {
         return makeAdminQuery({
@@ -138,12 +166,30 @@ function makeReviewAdminClient(params: {
         })
       }
       if (table === 'shift_post_interests') {
-        return makeAdminQuery({
-          data: Object.prototype.hasOwnProperty.call(params, 'interest')
-            ? params.interest
-            : { id: 'interest-2', status: 'pending' },
-          error: params.interestError ?? null,
-        })
+        return {
+          ...makeAdminQuery({
+            data: Object.prototype.hasOwnProperty.call(params, 'interest')
+              ? params.interest
+              : { id: 'interest-2', status: 'pending' },
+            error: params.interestError ?? null,
+          }),
+          update(payload: Record<string, unknown>) {
+            const eqFilters: Array<[string, unknown]> = []
+            const inFilters: Array<[string, unknown[]]> = []
+            const builder = {
+              eq(column: string, value: unknown) {
+                eqFilters.push([column, value])
+                return builder
+              },
+              in(column: string, values: unknown[]) {
+                inFilters.push([column, values])
+                shiftPostInterestUpdates.push({ payload, eqFilters, inFilters })
+                return Promise.resolve({ error: null })
+              },
+            }
+            return builder
+          },
+        }
       }
       throw new Error(`Unexpected admin table ${table}`)
     },
@@ -496,6 +542,67 @@ describe('shift-post mutation API', () => {
     expect(response.status).toBe(400)
     expect(body.error).toContain('Only pending shift posts can be reviewed')
     expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('expires stale pending requests before manager review reaches the review RPC', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-04T12:00:00.000Z'))
+    const rpcMock = vi.fn()
+    const adminClient = makeReviewAdminClient({
+      rpc: rpcMock,
+      post: {
+        id: 'post-1',
+        type: 'pickup',
+        status: 'pending',
+        created_at: '2026-05-02T11:59:59.000Z',
+        visibility: 'team',
+        recipient_response: null,
+        claimed_by: null,
+      },
+    })
+
+    createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
+    createAdminClientMock.mockReturnValue(adminClient)
+
+    try {
+      const response = await POST(
+        makeRequest({
+          action: 'review_request',
+          requestId: 'post-1',
+          decision: 'approve',
+          selectedInterestId: 'interest-2',
+        })
+      )
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body.error).toContain('expired')
+      expect(rpcMock).not.toHaveBeenCalled()
+      expect(adminClient.shiftPostUpdates).toEqual([
+        {
+          payload: {
+            status: 'expired',
+            expired_at: '2026-05-04T12:00:00.000Z',
+          },
+          filters: [
+            ['id', 'post-1'],
+            ['status', 'pending'],
+          ],
+        },
+      ])
+      expect(adminClient.shiftPostInterestUpdates).toEqual([
+        {
+          payload: {
+            status: 'declined',
+            responded_at: '2026-05-04T12:00:00.000Z',
+          },
+          eqFilters: [['shift_post_id', 'post-1']],
+          inFilters: [['status', ['pending', 'selected']]],
+        },
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('blocks review of cross-site shift posts before revealing request state', async () => {

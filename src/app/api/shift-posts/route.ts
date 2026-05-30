@@ -5,6 +5,7 @@ import { parseRole } from '@/lib/auth/roles'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { writeAuditLog } from '@/lib/audit-log'
+import { isRequestExpired, type PersistedRequestStatus } from '@/lib/request-workflow'
 import {
   isShiftPostCommand,
   shiftPostCommandRequiresManager,
@@ -91,7 +92,8 @@ type ShiftPostReviewRow = {
 type ReviewPreflightPostRow = {
   id: string
   type: 'swap' | 'pickup'
-  status: string
+  status: PersistedRequestStatus
+  created_at: string
   visibility: 'team' | 'direct' | null
   recipient_response: string | null
   claimed_by: string | null
@@ -162,6 +164,42 @@ async function getActorProfile(userId: string): Promise<ProfileRow | null> {
   return (data ?? null) as ProfileRow | null
 }
 
+async function markShiftPostExpiredBeforeReview(params: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase query builders are structurally large; this preflight uses a narrow fluent subset.
+  admin: any
+  requestId: string
+}): Promise<string | null> {
+  const expiredAt = new Date().toISOString()
+
+  const { error: postUpdateError } = await params.admin
+    .from('shift_posts')
+    .update({
+      status: 'expired',
+      expired_at: expiredAt,
+    })
+    .eq('id', params.requestId)
+    .eq('status', 'pending')
+
+  if (postUpdateError) {
+    return postUpdateError.message ?? 'Could not expire stale request before review.'
+  }
+
+  const { error: interestUpdateError } = await params.admin
+    .from('shift_post_interests')
+    .update({
+      status: 'declined',
+      responded_at: expiredAt,
+    })
+    .eq('shift_post_id', params.requestId)
+    .in('status', ['pending', 'selected'])
+
+  if (interestUpdateError) {
+    return interestUpdateError.message ?? 'Could not close stale request responders.'
+  }
+
+  return null
+}
+
 async function validateReviewRequestBeforeRpc(params: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase query builders are structurally large; this preflight uses a narrow fluent subset.
   admin: any
@@ -175,7 +213,9 @@ async function validateReviewRequestBeforeRpc(params: {
 
   const { data: post, error: postError } = await admin
     .from('shift_posts')
-    .select('id, type, status, visibility, recipient_response, claimed_by, shift_id, swap_shift_id')
+    .select(
+      'id, type, status, created_at, visibility, recipient_response, claimed_by, shift_id, swap_shift_id'
+    )
     .eq('id', requestId)
     .maybeSingle()
 
@@ -199,6 +239,11 @@ async function validateReviewRequestBeforeRpc(params: {
   if (!allShiftsInActorSite) return `Shift post ${requestId} was not found.`
 
   const visibility = request.visibility ?? 'team'
+  if (isRequestExpired(request.status, request.created_at)) {
+    const expirationError = await markShiftPostExpiredBeforeReview({ admin, requestId })
+    if (expirationError) return expirationError
+    return 'This request is no longer pending because it expired. Refresh the Shift Board.'
+  }
   if (request.status !== 'pending') return 'Only pending shift posts can be reviewed.'
   if (decision === 'deny') return null
 
