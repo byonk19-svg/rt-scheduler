@@ -23,6 +23,14 @@ describe('publish actions immediate email processing', () => {
     expect(source).toContain("from('therapist_availability_submissions')")
   })
 
+  it('uses Schedule Block language in final publish notifications', () => {
+    const filePath = resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain("title: 'Schedule Block published'")
+    expect(source).not.toContain("title: 'Cycle published'")
+  })
+
   it('scopes publish validation and notifications to the Schedule Block site', () => {
     const filePath = resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts')
     const source = readFileSync(filePath, 'utf8')
