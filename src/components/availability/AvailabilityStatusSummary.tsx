@@ -95,7 +95,11 @@ function statusBadgeClass(submitted: boolean) {
 }
 
 function queueStatusLabel(row: CombinedRosterRow) {
-  if (!row.submitted) return 'Needs submission'
+  if (!row.submitted) {
+    return (row.managerEnteredCount ?? 0) > 0
+      ? 'Manager-entered; needs submission'
+      : 'Needs submission'
+  }
   if ((row.managerEnteredCount ?? 0) > 0 && row.overridesCount > 0) {
     return 'Submitted + manager-entered'
   }

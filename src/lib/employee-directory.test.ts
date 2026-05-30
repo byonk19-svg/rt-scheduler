@@ -360,6 +360,35 @@ describe('employee directory helpers', () => {
     expect(row?.managerEnteredCount).toBe(1)
     expect(row?.lastUpdatedAt).toBe('2026-03-01T12:00:00.000Z')
   })
+
+  it('keeps manager-entered therapist availability missing until an official therapist submission exists', () => {
+    const rows = buildMissingAvailabilityRows(
+      sampleEmployees,
+      [
+        {
+          id: 'ov-manager-entered',
+          therapist_id: '1',
+          cycle_id: 'cycle-a',
+          date: '2026-03-02',
+          shift_type: 'both',
+          override_type: 'force_off',
+          note: null,
+          created_at: '2026-02-28T12:00:00.000Z',
+          updated_at: '2026-03-01T12:00:00.000Z',
+          source: 'manager',
+          intent: 'therapist_need_off',
+        },
+      ],
+      'cycle-a',
+      { officialSubmissionTherapistIds: new Set() }
+    )
+
+    const row = new Map(rows.map((r) => [r.therapistId, r])).get('1')
+    expect(row?.submitted).toBe(false)
+    expect(row?.overridesCount).toBe(0)
+    expect(row?.managerEnteredCount).toBe(1)
+    expect(row?.lastUpdatedAt).toBe('2026-03-01T12:00:00.000Z')
+  })
 })
 
 // ---------------------------------------------------------------------------

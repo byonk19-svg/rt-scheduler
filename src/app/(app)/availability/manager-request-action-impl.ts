@@ -3,7 +3,6 @@
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
-import { recordSubmission, touchSubmission } from '@/lib/availability/submission-lifecycle'
 import { getPlannerDateValidationError } from '@/lib/availability-planner'
 import { buildManagerOverrideInput, intentForTherapistOverride } from '@/lib/employee-directory'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -187,7 +186,6 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
     }
   }
 
-  await recordSubmission(admin as never, therapistId, cycleId)
   revalidateTherapistAvailabilitySurfaces()
   redirect(
     buildAvailabilityUrl({
@@ -245,7 +243,6 @@ export async function deleteManagerAvailabilityRequestAction(formData: FormData)
     )
   }
 
-  await touchSubmission(admin as never, therapistId, cycleId)
   revalidateTherapistAvailabilitySurfaces()
   redirect(
     buildAvailabilityUrl({
