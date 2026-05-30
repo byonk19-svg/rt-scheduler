@@ -789,7 +789,7 @@ test.describe.serial('role journeys', () => {
     await expect(
       page
         .getByText(
-          'Post swaps or pickups for the published schedule only. Team board and direct requests both live here.'
+          'Post trade requests or coverage requests for the published schedule only. Team board and direct requests both live here.'
         )
         .first()
     ).toBeVisible()
@@ -1019,7 +1019,7 @@ test.describe.serial('role journeys', () => {
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await page.goto('/requests/new?new=1')
     await expect(page.getByText('Which shift are you trying to change?').first()).toBeVisible()
-    await page.getByRole('button', { name: 'Give up shift' }).click()
+    await page.getByRole('button', { name: 'Need coverage' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page.getByText('Request summary').first()).toBeVisible()
     await page.getByLabel(/Message/).fill(requestMessage)
@@ -1053,7 +1053,7 @@ test.describe.serial('role journeys', () => {
         timeout: 20_000,
       })
 
-      await managerPage.getByRole('button', { name: /Open Shifts -/ }).click()
+      await managerPage.getByRole('button', { name: /Open coverage requests -/ }).click()
       await expect(managerPage.locator('main')).toContainText(requestMessage, { timeout: 20_000 })
       const denyResult = await ctx!.supabase
         .from('shift_posts')
@@ -1089,7 +1089,7 @@ test.describe.serial('role journeys', () => {
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await page.goto('/requests/new?new=1')
-    await page.getByRole('button', { name: 'Give up shift' }).click()
+    await page.getByRole('button', { name: 'Need coverage' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await page.getByLabel(/Message/).fill(requestMessage)
     const createResponsePromise = waitForShiftPostMutation(page)
@@ -1311,7 +1311,7 @@ test.describe.serial('role journeys', () => {
     await publishRow.getByRole('button', { name: 'Take offline' }).click()
     await expect(
       page.getByText(
-        'Schedule block taken offline. Assignments were preserved, staff live views are hidden, and new swaps or pickups stay paused until you republish.'
+        'Schedule block taken offline. Assignments were preserved, staff live views are hidden, and new trade or coverage requests stay paused until you republish.'
       )
     ).toBeVisible({
       timeout: 20_000,
@@ -1523,7 +1523,7 @@ test.describe.serial('role journeys', () => {
 
     await page.goto('/requests')
     await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Shift Swaps & Pickups' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Trade & Coverage Requests' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'User Access Requests' })).toBeVisible()
 
     await gotoWithRetry(page, '/requests/user-access')

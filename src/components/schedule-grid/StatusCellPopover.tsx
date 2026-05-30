@@ -62,7 +62,7 @@ export function getStatusConfirmationCopy(
     case 'call_in':
       return {
         title: 'Create Call-In Alert?',
-        body: `${therapistName} will be marked call-in. Eligible staff will see a help-needed pickup alert for this shift.`,
+        body: `${therapistName} will be marked call-in. Eligible staff will see a help-needed coverage alert for this shift.`,
         confirmLabel: 'Mark Call-In',
         requiresTime: false,
       }

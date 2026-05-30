@@ -51,8 +51,8 @@ describe('therapist swaps route', () => {
       'utf8'
     )
 
-    expect(source).toContain("title: 'Shift Swaps & Pickups'")
-    expect(source).toContain('Create and track your shift swap and pickup requests.')
+    expect(source).toContain("title: 'Trade & Coverage Requests'")
+    expect(source).toContain('Create and track your trade and coverage requests.')
   })
 
   it('redirects to login when there is no authenticated user', async () => {

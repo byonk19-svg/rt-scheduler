@@ -36,7 +36,7 @@ describe('request composer steps', () => {
     expect(displayState.totalSteps).toBe(3)
   })
 
-  it('keeps the choose-teammate step for team swaps with a suggested partner', () => {
+  it('keeps the choose-teammate step for team trades with a suggested partner', () => {
     const steps = getRequestComposerSteps('team', 'swap', true)
     const displayState = getRequestComposerDisplayState('team', 'swap', 2, true)
 

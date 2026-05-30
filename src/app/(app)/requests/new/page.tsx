@@ -242,7 +242,7 @@ function SwapRequestPageContent() {
     if (showsTeammateStep && !swapWith) {
       setError(
         requestType === 'swap' && swapPath !== 'direct'
-          ? 'Choose the teammate you want to suggest for this team swap.'
+          ? 'Choose the teammate you want to suggest for this trade request.'
           : 'Choose the teammate you want to ask.'
       )
       return

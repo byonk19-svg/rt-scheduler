@@ -262,7 +262,7 @@ describe('therapist-workflow', () => {
     expect(workflow.primaryAction.href).toBe('/schedule?cycle=cycle-published')
     expect(workflow.secondaryAction).toEqual({
       href: '/therapist/swaps',
-      label: 'Shift Swaps & Pickups',
+      label: 'Trade & Coverage Requests',
     })
     expect(workflow.swapSummary.pendingCount).toBe(3)
     expect(workflow.swapSummary.totalCount).toBe(5)

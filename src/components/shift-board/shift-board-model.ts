@@ -82,7 +82,7 @@ export type ShiftBoardInitialSnapshot = {
 
 export const HISTORY_STATUSES: RequestStatus[] = ['approved', 'denied', 'expired', 'withdrawn']
 export type ShiftBoardSection = 'needs-action' | 'open-shifts' | 'waiting' | 'history'
-export type TypeFilter = 'all' | RequestType | 'give-up'
+export type TypeFilter = 'all' | RequestType
 export type ShiftFilter = 'all' | ShiftType
 export type StatusFilter =
   | 'all'
@@ -94,16 +94,16 @@ export type StatusFilter =
 
 export const BOARD_SECTIONS: Array<{ id: ShiftBoardSection; label: string }> = [
   { id: 'needs-action', label: 'Needs Action' },
-  { id: 'open-shifts', label: 'Open Shifts' },
+  { id: 'open-shifts', label: 'Open coverage requests' },
   { id: 'waiting', label: 'Waiting' },
   { id: 'history', label: 'History' },
 ]
 
 export function getRequestTypeLabel(req: ShiftBoardRequest): string {
-  if (req.type === 'swap' && req.visibility === 'direct') return 'Direct Swap'
-  if (req.type === 'swap') return req.swapWithId ? 'Swap' : 'Open Swap'
-  if (req.requestKind === 'call_in') return 'Pickup'
-  return 'Pickup'
+  if (req.type === 'swap' && req.visibility === 'direct') return 'Direct trade'
+  if (req.type === 'swap') return req.swapWithId ? 'Trade request' : 'Open trade request'
+  if (req.requestKind === 'call_in') return 'Call-in coverage request'
+  return 'Coverage request'
 }
 
 export function isWaitingOnTeammate(req: ShiftBoardRequest): boolean {
@@ -154,7 +154,7 @@ export function getPlainStateLabel(req: ShiftBoardRequest): string {
   if (req.status === 'expired') return 'Expired'
   if (isWaitingOnTeammate(req)) return 'Waiting on teammate'
   if (isPickupWithoutResponders(req)) return 'No responders yet'
-  if (isOpenSwapWithoutPartner(req)) return 'Needs swap partner'
+  if (isOpenSwapWithoutPartner(req)) return 'Needs trade partner'
   if (isReadyForManagerDecision(req)) return 'Ready for decision'
   return 'Waiting'
 }
@@ -165,7 +165,7 @@ export function getStateTone(
   const state = getPlainStateLabel(req)
   if (state === 'Approved') return 'success'
   if (state === 'Denied') return 'error'
-  if (state === 'Ready for decision' || state === 'Needs swap partner') return 'warning'
+  if (state === 'Ready for decision' || state === 'Needs trade partner') return 'warning'
   if (state === 'Waiting on teammate' || state === 'No responders yet') return 'muted'
   return 'info'
 }
@@ -261,7 +261,7 @@ export function getRequestActionModel({
 }): { primary: string; secondary: string[]; showsApprove: boolean } {
   if (!canReview) {
     return {
-      primary: req.type === 'pickup' && req.visibility === 'team' ? 'Respond' : 'View shift',
+      primary: req.type === 'pickup' && req.visibility === 'team' ? 'Pick up shift' : 'View shift',
       secondary: req.type === 'pickup' && req.visibility === 'team' ? ['View shift'] : [],
       showsApprove: false,
     }
@@ -277,7 +277,7 @@ export function getRequestActionModel({
 
   if (isPickupWithoutResponders(req as ShiftBoardRequest)) {
     return {
-      primary: 'View open post',
+      primary: 'View coverage request',
       secondary: ['Add coverage manually'],
       showsApprove: false,
     }
@@ -289,14 +289,14 @@ export function getRequestActionModel({
 
   if (req.type === 'swap') {
     return {
-      primary: 'Approve swap',
+      primary: 'Approve trade request',
       secondary: ['Deny request', 'View shifts'],
       showsApprove: true,
     }
   }
 
   return {
-    primary: 'Approve pickup',
+    primary: 'Approve coverage request',
     secondary: [...(hasBackupResponder ? ['Change responder'] : []), 'Deny request', 'View shift'],
     showsApprove: true,
   }
@@ -304,15 +304,15 @@ export function getRequestActionModel({
 
 export function toReviewErrorMessage(message: string): string {
   return message.includes('Team-visible swap approvals require a swap partner')
-    ? 'Cannot approve: this swap request has no partner assigned. Select a swap partner first.'
+    ? 'Cannot approve: this trade request has no partner assigned. Select a trade partner first.'
     : message.includes('shifts_unique_cycle_user_date')
-      ? 'Cannot approve: the selected swap partner is already scheduled on this date.'
+      ? 'Cannot approve: the selected trade partner is already scheduled on this date.'
       : message.includes('partner shift type mismatch')
-        ? 'Cannot approve: swap partners must be scheduled on the same shift type.'
+        ? 'Cannot approve: trade partners must be scheduled on the same shift type.'
         : message.includes('operational code')
-          ? 'Cannot approve: shifts with active operational codes are locked from swaps.'
+          ? 'Cannot approve: shifts with active operational codes are locked from trade requests.'
           : message.includes('working scheduled shift')
-            ? 'Cannot approve: both swap partners must have working scheduled shifts.'
+            ? 'Cannot approve: both trade partners must have working scheduled shifts.'
             : message.includes('Lead coverage gap')
               ? 'override:Lead coverage gap - approving this request would leave a shift without a lead. You can force-approve below.'
               : message.includes('Double booking')

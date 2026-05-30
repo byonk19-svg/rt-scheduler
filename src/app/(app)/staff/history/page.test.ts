@@ -42,7 +42,7 @@ describe('staff history page', () => {
   })
 
   it('sets route-specific therapist history metadata', () => {
-    expect(source).toContain("title: 'Shift Swaps & Pickups History'")
-    expect(source).toContain('Review earlier swap, pickup, and request outcomes.')
+    expect(source).toContain("title: 'Trade & Coverage History'")
+    expect(source).toContain('Review earlier trade, coverage, and request outcomes.')
   })
 })

@@ -125,7 +125,7 @@ test.describe.serial('staff personal schedule pages', () => {
     await expect(page.getByRole('rowheader').filter({ hasText: 'You' })).toBeVisible()
 
     await page.goto('/staff/history')
-    await expect(page.getByRole('heading', { name: 'Shift Swaps & Pickups History' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Trade & Coverage History' })).toBeVisible()
     await expect(page.getByText(ctx!.historyMessage)).toBeVisible()
     await expect(page.getByText('Posted', { exact: true })).toBeVisible()
     await expect(page.getByText('Approved', { exact: true })).toBeVisible()

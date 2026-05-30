@@ -53,8 +53,8 @@ describe('request workflow helpers', () => {
   })
 
   it('formats request defaults consistently', () => {
-    expect(defaultRequestMessage('swap')).toBe('Requesting a swap for this shift.')
-    expect(defaultRequestMessage('pickup')).toBe('Requesting pickup coverage for this shift.')
+    expect(defaultRequestMessage('swap')).toBe('Requesting a trade for this shift.')
+    expect(defaultRequestMessage('pickup')).toBe('Need coverage for this shift.')
     expect(formatRequestShiftLabel('2026-04-30', 'day')).toBe('Thu, Apr 30 - Day')
     expect(requestSlotKey('2026-04-30', 'night')).toBe('2026-04-30:night')
     expect(requestInitials('Barbara C.')).toBe('BC')

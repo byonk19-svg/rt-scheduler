@@ -136,7 +136,7 @@ async function openRequestComposerForShift(
   await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => undefined)
 
   if (requestType === 'pickup') {
-    await expect(page.getByRole('heading', { name: 'Give up shift' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Need coverage' })).toBeVisible({
       timeout: 20_000,
     })
     return
@@ -239,7 +239,7 @@ async function chooseDirectPickupTeammate(
       await openRequestComposerForShift(page, shiftId, 'pickup')
     }
 
-    await expect(page.getByRole('heading', { name: 'Give up shift' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Need coverage' })).toBeVisible({
       timeout: 10_000,
     })
     await clickButtonNow(page, 'Ask a specific teammate')
@@ -495,7 +495,7 @@ test.describe.serial('requests workflow', () => {
 
     await loginAs(page, 'layne@teamwise.test', 'Teamwise123!')
     await gotoWithRetry(page, '/therapist/swaps')
-    await expect(page.getByRole('heading', { name: 'Shift Swaps & Pickups' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Trade & Coverage Requests' })).toBeVisible()
 
     const directSwapCard = page
       .locator('div.rounded-xl')
@@ -515,7 +515,7 @@ test.describe.serial('requests workflow', () => {
       )
       .toBe(true)
     await expect(
-      directSwapCard.getByText(`Swap requested by: ${seededSwap.requesterName}`)
+      directSwapCard.getByText(`Trade requested by: ${seededSwap.requesterName}`)
     ).toBeVisible()
     await expect(directSwapCard.getByText(`Swap with: ${seededSwap.recipientName}`)).toHaveCount(0)
     await directSwapCard.getByRole('button', { name: 'Accept and send to manager' }).click()
@@ -632,7 +632,7 @@ test.describe.serial('requests workflow', () => {
 
     await loginAs(page, ctx!.requester.email, ctx!.requester.password)
     await openRequestComposerForShift(page, shiftInsert.data.id, 'pickup')
-    await expect(page.getByRole('heading', { name: 'Give up shift' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Need coverage' })).toBeVisible({
       timeout: 10_000,
     })
     const boardReviewStep = page.getByText('Review board request').first()
@@ -1079,13 +1079,15 @@ test.describe.serial('requests workflow', () => {
         .first()
       await expect(requestCard).toBeVisible({ timeout: 20_000 })
       await expect(requestCard.getByText('Ready for decision')).toBeVisible()
-      await expect(requestCard.getByText('Requests User swaps with Requests Partner')).toBeVisible()
+      await expect(
+        requestCard.getByText('Requests User trades with Requests Partner')
+      ).toBeVisible()
       await expect(
         requestCard.getByText(
           'Requests User and Requests Partner trade assigned shifts; staffing count does not change.'
         )
       ).toBeVisible()
-      await expect(requestCard.getByRole('button', { name: 'Approve swap' })).toBeVisible()
+      await expect(requestCard.getByRole('button', { name: 'Approve trade request' })).toBeVisible()
       const approveResponsePromise = waitForShiftPostMutation(managerPage)
       await requestCard.getByRole('button', { name: 'Approve' }).click()
       const approveResponse = await approveResponsePromise

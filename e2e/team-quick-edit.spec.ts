@@ -240,7 +240,7 @@ test.describe.serial('/team quick edit modal', () => {
     await expect(
       dialog
         .locator('div')
-        .filter({ hasText: /^Approve swapsNo$/ })
+        .filter({ hasText: /^Approve trade requestsNo$/ })
         .first()
     ).toBeVisible()
 
@@ -248,7 +248,7 @@ test.describe.serial('/team quick edit modal', () => {
     await expect(
       dialog
         .locator('div')
-        .filter({ hasText: /^Approve swapsYes$/ })
+        .filter({ hasText: /^Approve trade requestsYes$/ })
         .first()
     ).toBeVisible()
   })

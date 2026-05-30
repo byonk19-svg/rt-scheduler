@@ -131,9 +131,7 @@ export function toInterestRequestStatus(
 }
 
 export function defaultRequestMessage(type: RequestType): string {
-  return type === 'swap'
-    ? 'Requesting a swap for this shift.'
-    : 'Requesting pickup coverage for this shift.'
+  return type === 'swap' ? 'Requesting a trade for this shift.' : 'Need coverage for this shift.'
 }
 
 export function requestSlotKey(date: string, shiftType: ShiftType): string {

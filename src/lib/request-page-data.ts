@@ -153,7 +153,7 @@ function deriveRequestStage(params: {
       label: 'Approved',
       detail:
         request.visibility === 'direct'
-          ? 'Teammate accepted and the manager approved the swap.'
+          ? 'Teammate accepted and the manager approved the trade request.'
           : 'Manager approved this request.',
     }
   }
@@ -180,7 +180,7 @@ function deriveRequestStage(params: {
       if (request.recipient_response === 'declined') {
         return {
           label: involvement === 'received_direct' ? 'You declined' : 'Declined by teammate',
-          detail: 'The direct swap stopped before manager approval.',
+          detail: 'The direct trade request stopped before manager approval.',
         }
       }
 
@@ -202,7 +202,7 @@ function deriveRequestStage(params: {
         label: 'Waiting on manager approval',
         detail:
           involvement === 'received_direct'
-            ? 'You accepted this swap. Nothing changes unless a manager approves it.'
+            ? 'You accepted this trade request. Nothing changes unless a manager approves it.'
             : 'Your teammate accepted. Nothing changes unless a manager approves it.',
       }
     }
@@ -222,13 +222,14 @@ function deriveRequestStage(params: {
     if (involvement === 'claimed') {
       return {
         label: 'Waiting on manager approval',
-        detail: 'You are the suggested swap partner. Nothing changes unless a manager approves it.',
+        detail:
+          'You are the suggested trade partner. Nothing changes unless a manager approves it.',
       }
     }
 
     return {
       label: 'Waiting on manager approval',
-      detail: 'You suggested a swap partner. A manager still has to approve the swap.',
+      detail: 'You suggested a trade partner. A manager still has to approve the trade request.',
     }
   }
 
@@ -425,7 +426,7 @@ async function mapOpenRequests(params: {
         createdAt: interest.created_at,
         swapWith: row?.posted_by ? (partnerById.get(row.posted_by) ?? null) : null,
         posted: formatRequestRelativeTime(interest.created_at),
-        message: row?.message ?? 'Pickup interest submitted.',
+        message: row?.message ?? 'Coverage offer submitted.',
       } satisfies OpenRequest
     })
 

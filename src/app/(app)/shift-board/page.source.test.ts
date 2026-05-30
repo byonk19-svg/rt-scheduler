@@ -35,12 +35,28 @@ describe('shift-board route source contract', () => {
 
     expect(routeSource).toContain("title: 'Shift Board'")
     expect(clientSource).toContain('Shift Board')
-    expect(navigationSource).toContain('Open Shifts')
+    expect(navigationSource).toContain('Open coverage requests')
     expect(clientSource).toContain('All statuses')
     expect(navigationSource).toContain('Needs Action')
     expect(navigationSource).toContain('Waiting')
     expect(navigationSource).toContain('History')
     expect(clientSource).toContain('Manager final approval')
+  })
+
+  it('uses actor-facing request vocabulary instead of overloaded pickup/give-up labels', () => {
+    const { clientSource, modelSource, requestCardSource } = readShiftBoardSources()
+    const visibleCopy = [
+      clientSource,
+      scrubNonVisibleShiftBoardCopy(modelSource),
+      requestCardSource,
+    ].join('\n')
+
+    expect(visibleCopy).toContain('Open coverage requests')
+    expect(visibleCopy).toContain('Coverage request')
+    expect(visibleCopy).toContain('Pick up shift')
+    expect(visibleCopy).not.toContain('Give Up')
+    expect(visibleCopy).not.toContain('Approve pickup')
+    expect(visibleCopy).not.toContain('Open Shifts')
   })
 
   it('does not repeat the therapist published-schedule-only guidance in two stacked callouts', () => {

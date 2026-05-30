@@ -96,7 +96,7 @@ function buildSwapAttentionItems(params: {
       if (involvement === 'received_direct' && request.recipient_response === 'pending') {
         return {
           href: `/therapist/swaps?requestId=${request.id}`,
-          title: 'You have a swap request to review',
+          title: 'You have a trade request to review',
           detail: `${shiftLabel}. Decide whether to accept and send it to the manager.`,
         }
       }
@@ -108,7 +108,7 @@ function buildSwapAttentionItems(params: {
       ) {
         return {
           href: `/therapist/swaps?requestId=${request.id}`,
-          title: 'Your swap is waiting for teammate response',
+          title: 'Your trade request is waiting for teammate response',
           detail: `${shiftLabel}. The request stays private until your teammate responds.`,
         }
       }
@@ -120,7 +120,7 @@ function buildSwapAttentionItems(params: {
       ) {
         return {
           href: `/therapist/swaps?requestId=${request.id}`,
-          title: 'A swap is waiting for manager review',
+          title: 'A trade request is waiting for manager review',
           detail: `${shiftLabel}. ${stage.detail ?? 'Manager approval is still required.'}`,
         }
       }
@@ -371,8 +371,8 @@ export default async function StaffDashboardPage({
             ) : null}
           </div>
           <p className="text-sm text-muted-foreground">
-            Start with the next-step card below. The other cards are where you check shifts, swaps,
-            and history.
+            Start with the next-step card below. The other cards are where you check shifts,
+            requests, and history.
           </p>
         </div>
       </section>
@@ -443,7 +443,7 @@ export default async function StaffDashboardPage({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Shift Swaps &amp; Pickups
+                  Trade &amp; Coverage Requests
                 </p>
                 <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
                   {workflow.swapSummary.pendingCount} pending
@@ -452,7 +452,7 @@ export default async function StaffDashboardPage({
               <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
             </div>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Use this to post, claim, or track swap and pickup requests that involve you.
+              Use this to post or track trade and coverage requests that involve you.
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
@@ -464,7 +464,7 @@ export default async function StaffDashboardPage({
             </div>
             <div className="mt-4">
               <Button asChild size="sm" variant="outline">
-                <Link href="/therapist/swaps">Shift Swaps &amp; Pickups</Link>
+                <Link href="/therapist/swaps">Trade &amp; Coverage Requests</Link>
               </Button>
             </div>
             {swapAttentionItems.length > 0 ? (
@@ -499,8 +499,8 @@ export default async function StaffDashboardPage({
               <History className="h-4 w-4 text-muted-foreground" />
             </div>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Use this to review earlier swaps, pickups, and request results without mixing them
-              into what needs attention today.
+              Use this to review earlier trade requests, coverage requests, and request results
+              without mixing them into what needs attention today.
             </p>
             <div className="mt-4">
               <Button asChild size="sm" variant="outline">

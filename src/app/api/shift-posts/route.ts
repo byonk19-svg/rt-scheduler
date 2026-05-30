@@ -222,11 +222,11 @@ async function validateReviewRequestBeforeRpc(params: {
       .maybeSingle()
 
     if (interestError) return interestError.message ?? 'Could not load selected responder.'
-    if (!interest) return 'Selected responder is no longer available for this pickup request.'
+    if (!interest) return 'Selected responder is no longer available for this coverage request.'
   }
 
   if (request.type === 'pickup' && visibility === 'direct' && !request.claimed_by) {
-    return `Direct pickup request ${request.id} has no accepted recipient to approve.`
+    return `Direct coverage request ${request.id} has no accepted recipient to approve.`
   }
 
   return null

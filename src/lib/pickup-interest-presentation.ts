@@ -54,12 +54,12 @@ export function getPickupInterestTherapistCopy(status: PickupInterestStatus): {
   if (status === 'selected') {
     return {
       roleLabel: 'First responder',
-      helperText: 'You are currently first in line for this pickup request.',
+      helperText: 'You are currently first in line for this coverage request.',
     }
   }
 
   return {
     roleLabel: 'Backup responder',
-    helperText: 'You are still interested and listed as a backup for this pickup request.',
+    helperText: 'You are still interested and listed as a backup for this coverage request.',
   }
 }

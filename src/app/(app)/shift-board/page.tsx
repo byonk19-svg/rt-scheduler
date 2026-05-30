@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
   title: 'Shift Board',
-  description: 'Review and manage shift swap and pickup requests.',
+  description: 'Review and manage trade and coverage requests.',
 }
 
 export default async function ShiftBoardPage() {

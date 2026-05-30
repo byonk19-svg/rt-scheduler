@@ -223,10 +223,7 @@ export default function ShiftBoardClientPage({
         return false
       }
 
-      const matchesType =
-        typeFilter === 'all' ||
-        request.type === typeFilter ||
-        (typeFilter === 'give-up' && request.type === 'pickup')
+      const matchesType = typeFilter === 'all' || request.type === typeFilter
       if (!matchesType) {
         return false
       }
@@ -316,7 +313,7 @@ export default function ShiftBoardClientPage({
       ) {
         setRequestErrors((prev) => ({
           ...prev,
-          [id]: 'Please select a swap partner before approving.',
+          [id]: 'Please select a trade partner before approving.',
         }))
         return
       }
@@ -384,8 +381,8 @@ export default function ShiftBoardClientPage({
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             {canReview
-              ? 'Approve post-publish swaps, pickups, and give-up requests.'
-              : 'Post swaps or pickups for the published schedule only. Team board and direct requests both live here.'}
+              ? 'Approve post-publish trade and coverage requests.'
+              : 'Post trade requests or coverage requests for the published schedule only. Team board and direct requests both live here.'}
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[29rem]">
@@ -409,7 +406,7 @@ export default function ShiftBoardClientPage({
 
       {!canReview ? (
         <div className="rounded-[10px] bg-muted px-4 py-3 text-sm text-muted-foreground">
-          Published schedule changes only - swaps affect your published shifts.
+          Published schedule changes only - trade requests affect your published shifts.
         </div>
       ) : null}
 
@@ -462,8 +459,8 @@ export default function ShiftBoardClientPage({
               icon={<CircleAlert className="h-4 w-4" />}
             />
             <SummaryItem
-              label="Open Shifts"
-              detail="Open shifts to fill"
+              label="Open coverage requests"
+              detail="Coverage requests to fill"
               value={loading ? '--' : openPostCount}
               variant={!loading && openPostCount > 0 ? 'info' : 'success'}
               icon={<UsersRound className="h-4 w-4" />}
@@ -519,9 +516,8 @@ export default function ShiftBoardClientPage({
           onChange={(value) => setTypeFilter(value as TypeFilter)}
           options={[
             ['all', 'All Types'],
-            ['swap', 'Swap'],
-            ['pickup', 'Pickup'],
-            ['give-up', 'Give Up'],
+            ['swap', 'Trade'],
+            ['pickup', 'Coverage'],
           ]}
         />
         <FilterButtonGroup
@@ -884,7 +880,7 @@ export function EmptyState({
             className="rounded-lg border border-border bg-background px-4 py-3 text-left text-sm transition-colors hover:bg-muted/50"
           >
             <span className="block font-semibold text-foreground">
-              Open Shifts - {openPostCount}
+              Open coverage requests - {openPostCount}
             </span>
             <span className="mt-1 block text-xs text-muted-foreground">
               Review posts that still need a responder.

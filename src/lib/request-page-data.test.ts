@@ -271,7 +271,7 @@ describe('request page data', () => {
     )
   })
 
-  it('labels team swaps with a suggested partner as manager-review work', () => {
+  it('labels team trades with a suggested partner as manager-review work', () => {
     const stage = deriveRequestStage({
       currentUserId: 'therapist-1',
       involvement: 'posted',
@@ -292,7 +292,7 @@ describe('request page data', () => {
 
     expect(stage).toEqual({
       label: 'Waiting on manager approval',
-      detail: 'You suggested a swap partner. A manager still has to approve the swap.',
+      detail: 'You suggested a trade partner. A manager still has to approve the trade request.',
     })
   })
 

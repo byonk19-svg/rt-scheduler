@@ -17,8 +17,8 @@ import {
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
-  title: 'Shift Swaps & Pickups History',
-  description: 'Review earlier swap, pickup, and request outcomes.',
+  title: 'Trade & Coverage History',
+  description: 'Review earlier trade, coverage, and request outcomes.',
 }
 
 const PAGE_SIZE = 25
@@ -324,7 +324,7 @@ export default async function StaffSwapHistoryPage({
           visibilityLabel,
           requestKind: post?.request_kind ?? 'standard',
           recipientResponse: post?.recipient_response ?? null,
-          message: post?.message ?? 'Pickup interest submitted.',
+          message: post?.message ?? 'Coverage offer submitted.',
         }
       }),
   ].sort((left, right) => {
@@ -347,14 +347,14 @@ export default async function StaffSwapHistoryPage({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-              Shift Swaps & Pickups History
+              Trade & Coverage History
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Posts you created, direct requests, claims, and pickup interests, newest first.
+              Posts you created, direct requests, offers to cover, and outcomes, newest first.
             </p>
           </div>
           <Button asChild size="sm" variant="outline" className="text-xs">
-            <Link href="/therapist/swaps">Back to Shift Swaps & Pickups</Link>
+            <Link href="/therapist/swaps">Back to Trade & Coverage Requests</Link>
           </Button>
         </div>
       </div>
@@ -364,10 +364,10 @@ export default async function StaffSwapHistoryPage({
           <Clock className="h-10 w-10 text-muted-foreground" />
           <p className="text-base font-semibold text-foreground">No history yet</p>
           <p className="max-w-sm text-xs text-muted-foreground">
-            When you post, claim, or express pickup interest, it will show up here.
+            When you post, pick up a shift, or offer to cover, it will show up here.
           </p>
           <Button asChild size="sm" variant="outline" className="mt-2 text-xs">
-            <Link href="/therapist/swaps">Go to Shift Swaps & Pickups</Link>
+            <Link href="/therapist/swaps">Go to Trade & Coverage Requests</Link>
           </Button>
         </div>
       ) : (
