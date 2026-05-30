@@ -8,7 +8,7 @@ export type CellDisplay = {
 }
 
 const STATUS_CODE: Record<GridCellStatus, string> = {
-  lead: '1',
+  lead: 'L',
   staff: '1',
   on_call: 'OC',
   cancelled: 'CX',
@@ -35,6 +35,12 @@ const STATUS_ACCESSIBLE_LABEL: Record<GridCellStatus, string> = {
   call_in: 'call in',
   left_early: 'left early',
   off: 'not scheduled',
+}
+
+const INELIGIBLE_REASON_LABEL: Record<NonNullable<GridCell['ineligibleReason']>, string> = {
+  inactive: 'not eligible: inactive team member',
+  fmla: 'not eligible: FMLA',
+  weekly_limit: 'not eligible: weekly work limit reached',
 }
 
 function formatCellDateLabel(date: string): string {
@@ -79,11 +85,13 @@ export function buildScheduleCellAccessibleLabel({
   ]
 
   if (cell.hasNeedsOff) {
-    parts.push('requested off')
+    parts.push('Need Off')
   }
 
   if (cell.isIneligible) {
-    parts.push('not eligible')
+    parts.push(
+      cell.ineligibleReason ? INELIGIBLE_REASON_LABEL[cell.ineligibleReason] : 'not eligible'
+    )
   }
 
   parts.push(canOpenActions ? 'opens schedule actions' : 'read-only')

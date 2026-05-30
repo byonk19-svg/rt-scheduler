@@ -158,7 +158,7 @@ export async function loadScheduleGridData(
   const therapistQuery = supabase
     .from('profiles')
     .select(
-      'id, full_name, shift_type, employment_type, on_fmla, is_active, archived_at, role, max_work_days_per_week'
+      'id, full_name, shift_type, employment_type, on_fmla, is_active, is_lead_eligible, archived_at, role, max_work_days_per_week'
     )
     .in('role', ['therapist', 'lead'])
     .is('archived_at', null)
@@ -191,7 +191,7 @@ export async function loadScheduleGridData(
 
   if (therapistsError) return scheduleLoadError('schedule therapist roster', therapistsError)
   if (shiftsError) return scheduleLoadError('schedule shift assignments', shiftsError)
-  if (forceOffError) return scheduleLoadError('schedule requested-off overrides', forceOffError)
+  if (forceOffError) return scheduleLoadError('schedule Need Off overrides', forceOffError)
 
   const shifts = (shiftsData ?? []) as ShiftRow[]
   const scheduleTherapists = filterScheduleTherapistsForCycle({

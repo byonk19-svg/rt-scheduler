@@ -29,6 +29,7 @@ export type TherapistRow = {
   employment_type: 'full_time' | 'part_time' | 'prn' | null
   on_fmla: boolean | null
   is_active: boolean | null
+  is_lead_eligible?: boolean | null
   archived_at: string | null
   role: string | null
   max_work_days_per_week: number | null
@@ -188,6 +189,7 @@ export function buildTherapistGridRows({
         name: therapist.full_name?.trim() || 'Unknown',
         isOnFmla: therapist.on_fmla === true,
         isActive: therapist.is_active !== false,
+        isLeadEligible: therapist.is_lead_eligible === true,
         employmentType:
           therapist.employment_type === 'part_time' || therapist.employment_type === 'prn'
             ? therapist.employment_type
@@ -222,6 +224,7 @@ function markWeeklyMaxWorkDaysIneligibility({
     const cell = row.cells[date]
     if (cell?.status === 'off' && weekStart && (weekly.counts.get(weekStart) ?? 0) >= weeklyMax) {
       cell.isIneligible = true
+      cell.ineligibleReason = cell.ineligibleReason ?? 'weekly_limit'
     }
   }
 }
@@ -271,11 +274,14 @@ function buildTherapistCells({
         isIneligible: false,
       }
     } else {
+      const ineligibleReason =
+        therapist.is_active === false ? 'inactive' : therapist.on_fmla === true ? 'fmla' : undefined
       cells[date] = {
         shiftId: null,
         status: 'off',
         hasNeedsOff,
-        isIneligible: therapist.is_active === false || therapist.on_fmla === true,
+        isIneligible: Boolean(ineligibleReason),
+        ineligibleReason,
       }
     }
   }

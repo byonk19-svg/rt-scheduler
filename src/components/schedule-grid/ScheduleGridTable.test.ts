@@ -137,7 +137,7 @@ describe('ScheduleGridTable', () => {
     expect(html).toContain('data-testid="cell-u1-2026-05-04"')
     expect(html).toContain('bg-yellow-200')
     expect(html).toContain('border-yellow-300')
-    expect(html).toContain('1')
+    expect(html).toContain('L')
   })
 
   it('renders a needs-off asterisk', () => {
@@ -196,14 +196,65 @@ describe('ScheduleGridTable', () => {
     }
   })
 
-  it('announces requested-off context for asterisk cells', () => {
+  it('announces Need Off context for asterisk cells', () => {
     const html = renderTable(makeDataset())
     const cell = getCellButton(html, 'u1', '2026-05-05')
 
     expect(cell).toContain(
-      'aria-label="Alice Johnson, Tue, May 5, 2026, day shift, not scheduled, requested off, opens schedule actions"'
+      'aria-label="Alice Johnson, Tue, May 5, 2026, day shift, not scheduled, Need Off, opens schedule actions"'
     )
     expect(html).toContain('data-testid="asterisk-u1-2026-05-05"')
+  })
+
+  it('explains inactive and FMLA assignment blocks in disabled cell labels', () => {
+    const html = renderTable(
+      makeDataset({
+        therapistRows: [
+          {
+            userId: 'inactive-1',
+            name: 'Inactive Therapist',
+            isOnFmla: false,
+            isActive: false,
+            employmentType: 'full_time',
+            shiftType: 'day',
+            cells: {
+              '2026-05-04': {
+                shiftId: null,
+                status: 'off',
+                hasNeedsOff: false,
+                isIneligible: true,
+                ineligibleReason: 'inactive',
+              },
+            },
+          },
+          {
+            userId: 'fmla-1',
+            name: 'FMLA Therapist',
+            isOnFmla: true,
+            isActive: true,
+            employmentType: 'full_time',
+            shiftType: 'day',
+            cells: {
+              '2026-05-04': {
+                shiftId: null,
+                status: 'off',
+                hasNeedsOff: false,
+                isIneligible: true,
+                ineligibleReason: 'fmla',
+              },
+            },
+          },
+        ],
+        dailyTotals: { '2026-05-03': 0, '2026-05-04': 0, '2026-05-05': 0 },
+      })
+    )
+
+    expect(html).toContain('Inactive')
+    expect(html).toContain('FMLA')
+    expect(getCellButton(html, 'inactive-1', '2026-05-04')).toContain(
+      'not eligible: inactive team member'
+    )
+    expect(getCellButton(html, 'fmla-1', '2026-05-04')).toContain('not eligible: FMLA')
   })
 
   it('labels non-actionable cells as read-only', () => {
