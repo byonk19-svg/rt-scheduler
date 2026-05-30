@@ -1,8 +1,15 @@
 'use client'
 
+import type { MouseEvent } from 'react'
+
 import { AvailabilityCalendarPanel } from '@/components/availability/availability-calendar-panel'
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Button } from '@/components/ui/button'
+import {
+  CLEAR_AVAILABILITY_CONFIRMATION,
+  COPY_PREVIOUS_AVAILABILITY_CONFIRMATION,
+  confirmAvailabilityDestructiveAction,
+} from '@/lib/availability-destructive-confirmation'
 import { formatEmployeeDate } from '@/lib/employee-directory'
 import { cn } from '@/lib/utils'
 
@@ -108,6 +115,31 @@ export function ManagerAvailabilityEditorPanel({
     ? saveManagerPlannerDatesAction
     : saveManagerAvailabilityRequestsAction
 
+  function handleCopyPreviousBlockClick(event: MouseEvent<HTMLButtonElement>) {
+    if (
+      !confirmAvailabilityDestructiveAction({
+        hasUnsavedChanges,
+        message: COPY_PREVIOUS_AVAILABILITY_CONFIRMATION,
+        confirm: (message) => window.confirm(message),
+      })
+    ) {
+      event.preventDefault()
+    }
+  }
+
+  function handleClearSelectedDates() {
+    if (
+      !confirmAvailabilityDestructiveAction({
+        hasUnsavedChanges,
+        message: CLEAR_AVAILABILITY_CONFIRMATION,
+        confirm: (message) => window.confirm(message),
+      })
+    ) {
+      return
+    }
+    onClearSelectedDates()
+  }
+
   return (
     <section
       data-availability-editor
@@ -140,6 +172,7 @@ export function ManagerAvailabilityEditorPanel({
             <button
               type="submit"
               formAction={copyAvailabilityFromPreviousCycleAction}
+              onClick={handleCopyPreviousBlockClick}
               className="rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               Copy previous block
@@ -228,7 +261,7 @@ export function ManagerAvailabilityEditorPanel({
               variant="ghost"
               size="sm"
               className="px-3 text-muted-foreground hover:bg-muted hover:text-foreground"
-              onClick={onClearSelectedDates}
+              onClick={handleClearSelectedDates}
               disabled={selectedDates.length === 0}
             >
               Clear selected dates
