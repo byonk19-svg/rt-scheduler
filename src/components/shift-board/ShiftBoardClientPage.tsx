@@ -406,7 +406,8 @@ export default function ShiftBoardClientPage({
 
       {!canReview ? (
         <div className="rounded-[10px] bg-muted px-4 py-3 text-sm text-muted-foreground">
-          Published schedule changes only - trade requests affect your published shifts.
+          Coverage and trade requests can change published schedules after manager approval. Use
+          this board to track requests you posted or offered to pick up.
         </div>
       ) : null}
 

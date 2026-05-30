@@ -62,10 +62,14 @@ describe('shift-board route source contract', () => {
     expect(visibleCopy).not.toContain('Open Shifts')
   })
 
-  it('does not repeat the therapist published-schedule-only guidance in two stacked callouts', () => {
+  it('explains staff Shift Board changes as coverage and trade requests needing manager approval', () => {
     const { clientSource } = readShiftBoardSources()
 
-    expect(clientSource.match(/Published schedule changes only/g)?.length ?? 0).toBe(1)
+    expect(clientSource).toContain(
+      'Coverage and trade requests can change published schedules after manager approval.'
+    )
+    expect(clientSource).toContain('requests you posted or offered to pick up')
+    expect(clientSource).not.toContain('Published schedule changes only')
   })
 
   it('keeps unknown request errors user-safe instead of showing raw backend text', () => {
