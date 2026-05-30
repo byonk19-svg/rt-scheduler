@@ -47,7 +47,7 @@ const PATTERN_OPTIONS: Array<{
   {
     type: 'none',
     title: 'No repeating schedule',
-    description: 'Each future cycle starts blank, and you choose the days manually.',
+    description: 'Each future Schedule Block starts blank, and you choose the days manually.',
   },
 ]
 
@@ -457,8 +457,8 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
             <CardHeader>
               <CardTitle>No repeating schedule</CardTitle>
               <CardDescription>
-                Each future cycle will start blank. Use this only if your schedule does not repeat
-                in a regular way.
+                Each future Schedule Block will start blank. Use this only if your schedule does not
+                repeat in a regular way.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -482,7 +482,7 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
           <CardHeader>
             <CardTitle>What this saves</CardTitle>
             <CardDescription>
-              This becomes the starting point for each future cycle.
+              This becomes the starting point for each future Schedule Block.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -493,7 +493,7 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Fixed work days and repeating off segments become baseline availability. Future
-                cycle edits stay separate as overrides.
+                Schedule Block edits stay separate as overrides.
               </p>
             </div>
           </CardContent>
