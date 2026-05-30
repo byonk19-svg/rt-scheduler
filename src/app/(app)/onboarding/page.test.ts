@@ -246,26 +246,20 @@ describe('onboarding route copy', () => {
     expect(actionSource).toContain('weeklyWeekdays.some((day) => neverWorkDays.includes(day))')
     expect(actionSource).toContain('offs_dow: neverWorkDays')
     expect(actionSource).toContain('safePreferredWorkDays')
-    expect(source).toContain('Go to schedule')
+    expect(source).toContain("redirect('/schedule?setup=complete')")
     expect(source).not.toContain('Your schedule is ready')
     expect(source).toContain('completeScheduleSetupOnboardingAction')
     expect(actionSource).toContain("redirect('/schedule?setup=complete')")
     expect(actionSource).not.toContain("redirect('/onboarding?success=setup_complete')")
   })
 
-  it('renders the completed setup confirmation screen', async () => {
+  it('redirects legacy completed setup URLs to the schedule instead of rendering an interstitial', async () => {
     mockOnboardingContext()
 
-    const html = renderToStaticMarkup(
-      await OnboardingPage({
+    await expect(
+      OnboardingPage({
         searchParams: Promise.resolve({ success: 'setup_complete' }),
       })
-    )
-
-    expect(html).toContain('You&#x27;re all set')
-    expect(html).toContain('Your work pattern and preferences have been saved.')
-    expect(html).toContain('Go to schedule')
-    expect(html).not.toContain('Your schedule is ready')
-    expect(html).not.toContain('Open settings')
+    ).rejects.toThrow('REDIRECT:/schedule?setup=complete')
   })
 })
