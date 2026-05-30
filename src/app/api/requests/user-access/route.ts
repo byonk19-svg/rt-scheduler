@@ -13,6 +13,7 @@ type PendingProfileRow = {
   id: string
   email: string | null
   full_name: string | null
+  site_id: string | null
 }
 
 type AccessRequestMutationBody = {
@@ -35,7 +36,7 @@ async function assertManagerAccess() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -48,7 +49,12 @@ async function assertManagerAccess() {
     return { ok: false as const, status: 403, error: 'forbidden' as const }
   }
 
-  return { ok: true as const }
+  const siteId = typeof profile?.site_id === 'string' ? profile.site_id : ''
+  if (!siteId) {
+    return { ok: false as const, status: 403, error: 'forbidden' as const }
+  }
+
+  return { ok: true as const, siteId }
 }
 
 export async function GET(request: Request) {
@@ -65,6 +71,7 @@ export async function GET(request: Request) {
     .from('profiles')
     .select('id', { count: 'exact', head: summaryOnly })
     .eq('access_status', 'pending')
+    .eq('site_id', access.siteId)
 
   const pendingResult = await pendingQuery
   if (pendingResult.error) {
@@ -79,6 +86,7 @@ export async function GET(request: Request) {
     .from('profiles')
     .select('id, full_name, email, phone_number, created_at', { count: 'exact' })
     .eq('access_status', 'pending')
+    .eq('site_id', access.siteId)
     .order('created_at', { ascending: false })
 
   if (!pendingRows) {
@@ -153,9 +161,10 @@ export async function POST(request: Request) {
 
     const { data: profile, error: profileError } = await admin
       .from('profiles')
-      .select('id, email, full_name')
+      .select('id, email, full_name, site_id')
       .eq('id', profileId)
       .eq('access_status', 'pending')
+      .eq('site_id', access.siteId)
       .maybeSingle()
 
     if (profileError || !profile) {
@@ -178,6 +187,7 @@ export async function POST(request: Request) {
       })
       .eq('id', profileId)
       .eq('access_status', 'pending')
+      .eq('site_id', access.siteId)
 
     if (updateError) {
       console.error('Failed to approve access request:', updateError)
@@ -223,6 +233,7 @@ export async function POST(request: Request) {
     .select('id')
     .eq('id', profileId)
     .eq('access_status', 'pending')
+    .eq('site_id', access.siteId)
     .maybeSingle()
 
   if (profileError || !profile) {

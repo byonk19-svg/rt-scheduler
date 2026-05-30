@@ -9,6 +9,23 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { processQueuedPublishEmails } from '@/lib/publish-events'
 import { createClient } from '@/lib/supabase/server'
 
+type PublishProcessorActorProfile = {
+  role: string | null
+  is_active: boolean | null
+  archived_at: string | null
+  site_id: string | null
+}
+
+type PublishEventSiteRow = {
+  id: string
+  schedule_cycles: { site_id: string | null } | Array<{ site_id: string | null }> | null
+}
+
+function getOne<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
+
 function parseBatchSize(value: unknown): number {
   if (typeof value !== 'number') return 25
   if (!Number.isFinite(value)) return 25
@@ -20,6 +37,7 @@ function parseBatchSize(value: unknown): number {
 
 export async function POST(request: Request) {
   const allowWorkerRequest = await isValidPublishWorkerRequest(request)
+  let browserActorSiteId: string | null = null
 
   if (!allowWorkerRequest) {
     if (!isTrustedMutationRequest(request)) {
@@ -37,7 +55,7 @@ export async function POST(request: Request) {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role, is_active, archived_at')
+      .select('role, is_active, archived_at, site_id')
       .eq('id', user.id)
       .maybeSingle()
 
@@ -45,14 +63,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not verify manager role.' }, { status: 500 })
     }
 
+    const actorProfile = (profile ?? null) as PublishProcessorActorProfile | null
     if (
-      !can(parseRole(profile?.role), 'manage_publish', {
-        isActive: profile?.is_active !== false,
-        archivedAt: profile?.archived_at ?? null,
+      !can(parseRole(actorProfile?.role), 'manage_publish', {
+        isActive: actorProfile?.is_active !== false,
+        archivedAt: actorProfile?.archived_at ?? null,
       })
     ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    if (!actorProfile?.site_id) {
+      return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
+    }
+    browserActorSiteId = actorProfile.site_id
   }
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -66,12 +90,40 @@ export async function POST(request: Request) {
       : null
   const batchSize = parseBatchSize(body.batch_size)
 
+  if (!allowWorkerRequest && !publishEventId) {
+    return NextResponse.json(
+      { error: 'publish_event_id is required for browser-triggered publish processing.' },
+      { status: 400 }
+    )
+  }
+
   let admin: SupabaseClient
   try {
     admin = createAdminClient()
   } catch (error) {
     console.error('Failed to initialize admin client for publish processing:', error)
     return NextResponse.json({ error: 'Could not initialize publish processing.' }, { status: 500 })
+  }
+
+  if (!allowWorkerRequest && publishEventId) {
+    const { data: publishEvent, error: publishEventError } = await admin
+      .from('publish_events')
+      .select('id, schedule_cycles!inner(site_id)')
+      .eq('id', publishEventId)
+      .maybeSingle()
+
+    const eventRow = (publishEvent ?? null) as PublishEventSiteRow | null
+    const eventSiteId = getOne(eventRow?.schedule_cycles)?.site_id ?? null
+
+    if (publishEventError || !eventRow) {
+      return NextResponse.json({ error: 'Publish event not found.' }, { status: 404 })
+    }
+    if (eventSiteId !== browserActorSiteId) {
+      return NextResponse.json(
+        { error: 'Publish event is outside your site scope.' },
+        { status: 403 }
+      )
+    }
   }
 
   try {

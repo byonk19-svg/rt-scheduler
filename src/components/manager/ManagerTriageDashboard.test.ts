@@ -48,8 +48,8 @@ describe('ManagerTriageDashboard', () => {
 
     expect(html).toContain('>Manager Dashboard</h1>')
     expect(html).toContain('What needs to be fixed or approved right now.')
-    expect(html).toContain('Facility')
-    expect(html).toContain('Riverside Medical Center')
+    expect(html).toContain('Schedule scope')
+    expect(html).toContain('Current site')
     expect(html).toContain('Current Schedule Block')
     expect(html).toContain('Mar 17 - Apr 13')
     expect(html).toContain('Shift context')
@@ -210,9 +210,10 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('4 open shifts')
     expect(html).toContain('Requests queue')
     expect(html).toContain('5 approvals affecting schedule changes')
-    expect(html).toContain('Open Lottery')
-    expect(html).toContain('href="/lottery"')
-    expect(html.match(/href="\/lottery"/g)).toHaveLength(1)
+    expect(html).toContain('Open assignments')
+    expect(html).toContain('9 open shifts still need owners.')
+    expect(html).not.toContain('Open Lottery')
+    expect(html).not.toContain('href="/lottery"')
   })
 
   it('keeps recent activity conditional and navigable when activity exists', () => {

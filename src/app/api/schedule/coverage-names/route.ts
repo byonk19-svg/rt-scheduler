@@ -8,6 +8,14 @@ import { createClient } from '@/lib/supabase/server'
 type CycleLookupRow = {
   id: string
   published: boolean
+  site_id: string | null
+}
+
+type ActorProfileRow = {
+  role: string | null
+  is_active: boolean | null
+  archived_at: string | null
+  site_id: string | null
 }
 
 type ShiftUserRow = {
@@ -39,16 +47,21 @@ export async function GET(request: Request) {
   const [{ data: profile }, { data: cycle }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('role, is_active, archived_at')
+      .select('role, is_active, archived_at, site_id')
       .eq('id', user.id)
       .maybeSingle(),
-    supabase.from('schedule_cycles').select('id, published').eq('id', cycleId).maybeSingle(),
+    supabase
+      .from('schedule_cycles')
+      .select('id, published, site_id')
+      .eq('id', cycleId)
+      .maybeSingle(),
   ])
 
-  const role = parseRole(profile?.role)
+  const actorProfile = (profile ?? null) as ActorProfileRow | null
+  const role = parseRole(actorProfile?.role)
   const permissionContext = {
-    isActive: profile?.is_active !== false,
-    archivedAt: profile?.archived_at ?? null,
+    isActive: actorProfile?.is_active !== false,
+    archivedAt: actorProfile?.archived_at ?? null,
   }
   const canReadDraftCoverage =
     can(role, 'manage_coverage', permissionContext) ||
@@ -57,6 +70,14 @@ export async function GET(request: Request) {
 
   if (!cycleRow) {
     return NextResponse.json({ error: 'Cycle not found' }, { status: 404 })
+  }
+
+  if (!actorProfile?.site_id) {
+    return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
+  }
+
+  if (cycleRow.site_id !== actorProfile.site_id) {
+    return NextResponse.json({ error: 'Cycle is outside your site scope.' }, { status: 403 })
   }
 
   if (!cycleRow.published && !canReadDraftCoverage) {
@@ -68,6 +89,7 @@ export async function GET(request: Request) {
     .from('shifts')
     .select('user_id')
     .eq('cycle_id', cycleId)
+    .eq('site_id', cycleRow.site_id)
     .not('user_id', 'is', null)
 
   if (shiftError) {
@@ -91,6 +113,7 @@ export async function GET(request: Request) {
     .from('profiles')
     .select('id, full_name')
     .in('id', userIds)
+    .eq('site_id', cycleRow.site_id)
 
   if (profileError) {
     console.error('Failed to load coverage names from profiles:', profileError)

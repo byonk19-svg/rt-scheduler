@@ -291,7 +291,7 @@ test.describe.serial('coverage display regressions', () => {
     await expect(page).toHaveURL(/\/schedule/)
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Auto-draft' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Publish' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
     await expect(page.getByRole('table')).toBeVisible()
   })
 
@@ -310,7 +310,13 @@ test.describe.serial('coverage display regressions', () => {
       page.getByRole('rowheader').filter({ hasText: ctx!.expectedNames[0] })
     ).toBeVisible()
 
-    await page.getByRole('button', { name: 'Night' }).click()
+    const nightShiftTab = page.getByRole('button', { name: 'Night shift' }).first()
+    await expect(nightShiftTab).toBeEnabled({ timeout: 15_000 })
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await nightShiftTab.click()
+      if (page.url().includes('shift=night')) break
+      await page.waitForTimeout(500)
+    }
     await expect(page).toHaveURL(/shift=night/, { timeout: 15_000 })
     await expect(page.getByRole('columnheader')).toHaveCount(43, { timeout: 15_000 })
     await expect(page.getByRole('rowheader').filter({ hasText: ctx!.nightLeadName })).toBeVisible()

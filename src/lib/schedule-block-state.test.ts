@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   canEditScheduleBlock,
   canPublishScheduleBlock,
+  getScheduleBlockLifecycleLabel,
   resolveScheduleBlockState,
 } from '@/lib/schedule-block-state'
 
@@ -26,9 +27,25 @@ describe('schedule block state', () => {
       })
     ).toBe('offline')
     expect(resolveScheduleBlockState({ published: false, status: 'offline' })).toBe('offline')
+    expect(resolveScheduleBlockState({ published: false, status: 'preliminary' })).toBe(
+      'preliminary_sent'
+    )
+    expect(resolveScheduleBlockState({ published: false, status: 'final' })).toBe('published')
     expect(resolveScheduleBlockState({ published: true, archivedAt: null })).toBe('published')
     expect(resolveScheduleBlockState({ published: true, archivedAt: '2026-05-09T12:00:00Z' })).toBe(
       'archived'
+    )
+  })
+
+  it('formats user-facing lifecycle labels without collapsing preliminary to draft', () => {
+    expect(getScheduleBlockLifecycleLabel({ published: false, status: 'draft' })).toBe('Draft')
+    expect(getScheduleBlockLifecycleLabel({ published: false, status: 'preliminary' })).toBe(
+      'Preliminary'
+    )
+    expect(getScheduleBlockLifecycleLabel({ published: false, status: 'final' })).toBe('Published')
+    expect(getScheduleBlockLifecycleLabel({ published: false, status: 'offline' })).toBe('Offline')
+    expect(getScheduleBlockLifecycleLabel({ published: false, status: 'archived' })).toBe(
+      'Archived'
     )
   })
 

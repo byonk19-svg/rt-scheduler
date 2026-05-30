@@ -20,12 +20,7 @@ import {
   summarizePublishWeeklyViolations,
   summarizeShiftSlotViolations,
 } from '@/lib/schedule-rule-validation'
-import {
-  MAX_SHIFT_COVERAGE_PER_DAY,
-  MAX_WORK_DAYS_PER_WEEK,
-  MIN_SHIFT_COVERAGE_PER_DAY,
-  getWeeklyMinimumForEmploymentType,
-} from '@/lib/scheduling-constants'
+import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 import { createClient } from '@/lib/supabase/server'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import type { ShiftLimitRow, ShiftRole } from '@/app/schedule/types'
@@ -174,6 +169,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
         .in('role', ['therapist', 'lead'])
         .eq('is_active', true)
         .eq('on_fmla', false)
+        .eq('site_id', cycle.site_id)
 
       if (therapistsError) {
         console.error('Failed to load therapists for publish validation:', therapistsError)
@@ -195,13 +191,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
           }),
         ])
       )
-      const minWorkDaysByTherapist = new Map<string, number>(
-        therapists.map((therapist) => {
-          const weeklyLimit = maxWorkDaysByTherapist.get(therapist.id) ?? MAX_WORK_DAYS_PER_WEEK
-          const baselineMinimum = getWeeklyMinimumForEmploymentType(therapist.employment_type)
-          return [therapist.id, Math.min(weeklyLimit, baselineMinimum)]
-        })
-      )
+      const minWorkDaysByTherapist = new Map<string, number>()
       if (therapistIds.length > 0 && cycleWeekDates.size > 0) {
         const weekStarts = Array.from(cycleWeekDates.keys()).sort()
         const minWeekStart = weekStarts[0]
@@ -488,6 +478,8 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       .select('id, email, full_name, notification_email_enabled')
       .in('role', ['therapist', 'lead'])
       .eq('is_active', true)
+      .is('archived_at', null)
+      .eq('site_id', currentCycle.site_id)
 
     if (therapistProfilesError) {
       console.error('Failed to load recipients for publish notifications:', therapistProfilesError)

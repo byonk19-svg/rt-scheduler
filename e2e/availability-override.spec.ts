@@ -127,10 +127,11 @@ test.describe.serial('availability override scheduling', () => {
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
     await expect(page).toHaveURL(/\/schedule/)
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    const pageOrigin = new URL(page.url()).origin
 
     const conflictApiResponse = await page.request.post('/api/schedule/drag-drop', {
       headers: {
-        origin: 'http://127.0.0.1:3000',
+        origin: pageOrigin,
         referer: page.url(),
       },
       data: {
@@ -163,7 +164,7 @@ test.describe.serial('availability override scheduling', () => {
 
     const overrideApiResponse = await page.request.post('/api/schedule/drag-drop', {
       headers: {
-        origin: 'http://127.0.0.1:3000',
+        origin: pageOrigin,
         referer: page.url(),
       },
       data: {

@@ -9,6 +9,7 @@ type RequestType = 'swap' | 'pickup'
 type ShiftRow = {
   id: string
   cycle_id: string
+  site_id: string | null
   user_id: string | null
   date: string
   shift_type: 'day' | 'night'
@@ -26,6 +27,7 @@ type ProfileRow = {
   archived_at?: string | null
   role?: string | null
   shift_type?: 'day' | 'night' | null
+  site_id?: string | null
 }
 
 function isRequestType(value: string): value is RequestType {
@@ -109,17 +111,24 @@ export async function GET(request: Request) {
     admin
       .from('shifts')
       .select(
-        'id, cycle_id, user_id, date, shift_type, role, status, assignment_status, schedule_cycles!inner(published)'
+        'id, cycle_id, site_id, user_id, date, shift_type, role, status, assignment_status, schedule_cycles!inner(published)'
       )
       .eq('id', shiftId)
       .maybeSingle(),
-    admin.from('profiles').select('id, is_lead_eligible').eq('id', user.id).maybeSingle(),
+    admin
+      .from('profiles')
+      .select('id, is_lead_eligible, is_active, archived_at, site_id')
+      .eq('id', user.id)
+      .maybeSingle(),
   ])
 
   const requestShift = (shift ?? null) as ShiftRow | null
-  const actorIsLeadEligible =
-    ((requesterProfile ?? null) as Pick<ProfileRow, 'is_lead_eligible'> | null)
-      ?.is_lead_eligible === true
+  const actorProfile = (requesterProfile ?? null) as Pick<
+    ProfileRow,
+    'is_lead_eligible' | 'is_active' | 'archived_at' | 'site_id'
+  > | null
+  const actorSiteId = actorProfile?.site_id ?? null
+  const actorIsLeadEligible = actorProfile?.is_lead_eligible === true
 
   const requestShiftActiveOperationalCodes = await fetchActiveOperationalCodeMap(admin, [
     requestShift?.id ?? '',
@@ -129,6 +138,10 @@ export async function GET(request: Request) {
     shiftError ||
     !requestShift ||
     requestShift.user_id !== user.id ||
+    requestShift.site_id !== actorSiteId ||
+    actorProfile?.is_active === false ||
+    Boolean(actorProfile?.archived_at) ||
+    !actorSiteId ||
     !isPublishedCycle(requestShift.schedule_cycles) ||
     !isWorkingScheduledShift({
       status: requestShift.status,
@@ -141,6 +154,8 @@ export async function GET(request: Request) {
   const { data: slotLeadRows, error: slotLeadRowsError } = await admin
     .from('shifts')
     .select('id, user_id, status, schedule_cycles!inner(published)')
+    .eq('cycle_id', requestShift.cycle_id)
+    .eq('site_id', actorSiteId)
     .eq('date', requestShift.date)
     .eq('shift_type', requestShift.shift_type)
     .eq('role', 'lead')
@@ -167,6 +182,7 @@ export async function GET(request: Request) {
       .from('profiles')
       .select('id, is_lead_eligible')
       .in('id', leadUserIds)
+      .eq('site_id', actorSiteId)
 
     if (leadProfilesError) {
       return NextResponse.json({ error: 'Could not load eligible teammates.' }, { status: 500 })
@@ -189,6 +205,7 @@ export async function GET(request: Request) {
       .from('shifts')
       .select('id, user_id, date, shift_type, role, status, schedule_cycles!inner(published)')
       .eq('cycle_id', requestShift.cycle_id)
+      .eq('site_id', actorSiteId)
       .eq('shift_type', requestShift.shift_type)
       .gte('date', todayKey)
       .eq('status', 'scheduled')
@@ -223,6 +240,7 @@ export async function GET(request: Request) {
       .select('id, full_name, is_lead_eligible, is_active, archived_at, role')
       .in('id', candidateUserIds)
       .in('role', ['therapist', 'lead'])
+      .eq('site_id', actorSiteId)
       .eq('is_active', true)
       .is('archived_at', null)
 
@@ -240,6 +258,7 @@ export async function GET(request: Request) {
       .from('shifts')
       .select('id, user_id, date, shift_type, status, schedule_cycles!inner(published)')
       .eq('cycle_id', requestShift.cycle_id)
+      .eq('site_id', actorSiteId)
       .in('date', leadCoverageDates)
       .eq('shift_type', requestShift.shift_type)
       .eq('role', 'lead')
@@ -261,6 +280,7 @@ export async function GET(request: Request) {
         .from('profiles')
         .select('id, is_lead_eligible')
         .in('id', swapLeadUserIds)
+        .eq('site_id', actorSiteId)
 
       if (swapLeadProfilesError) {
         return NextResponse.json({ error: 'Could not load eligible teammates.' }, { status: 500 })
@@ -373,6 +393,7 @@ export async function GET(request: Request) {
     .from('profiles')
     .select('id, full_name, is_lead_eligible, is_active, archived_at, role, shift_type')
     .in('role', ['therapist', 'lead'])
+    .eq('site_id', actorSiteId)
     .eq('shift_type', requestShift.shift_type)
     .eq('is_active', true)
     .is('archived_at', null)
@@ -390,7 +411,10 @@ export async function GET(request: Request) {
     const { data: scheduledRows, error: scheduledRowsError } = await admin
       .from('shifts')
       .select('id, user_id, status, schedule_cycles!inner(published)')
+      .eq('cycle_id', requestShift.cycle_id)
+      .eq('site_id', actorSiteId)
       .eq('date', requestShift.date)
+      .eq('shift_type', requestShift.shift_type)
       .eq('status', 'scheduled')
       .eq('schedule_cycles.published', true)
       .in('user_id', pickupCandidateIds)

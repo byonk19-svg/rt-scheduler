@@ -70,6 +70,47 @@ describe('schedule rule validation', () => {
     })
   })
 
+  it('does not treat every active roster member as a minimum-work publish blocker', () => {
+    const cycleWeekDates = new Map<string, Set<string>>([
+      [
+        '2026-05-31',
+        new Set([
+          '2026-05-31',
+          '2026-06-01',
+          '2026-06-02',
+          '2026-06-03',
+          '2026-06-04',
+          '2026-06-05',
+          '2026-06-06',
+        ]),
+      ],
+    ])
+
+    const weeklyWorkedDatesByUserWeek = new Map<string, Set<string>>([
+      [
+        weeklyCountKey('scheduled-full-time', '2026-05-31'),
+        new Set(['2026-05-31', '2026-06-01', '2026-06-02']),
+      ],
+    ])
+
+    const result = summarizePublishWeeklyViolations({
+      therapistIds: ['scheduled-full-time', 'unscheduled-full-time'],
+      cycleWeekDates,
+      weeklyWorkedDatesByUserWeek,
+      maxWorkDaysByTherapist: new Map([
+        ['scheduled-full-time', 3],
+        ['unscheduled-full-time', 3],
+      ]),
+      minWorkDaysByTherapist: new Map(),
+    })
+
+    expect(result).toEqual({
+      underCount: 0,
+      overCount: 0,
+      violations: 0,
+    })
+  })
+
   it('summarizes coverage violations across day/night slots', () => {
     const coverageBySlot = new Map<string, number>([
       ['2026-03-01:day', 2],

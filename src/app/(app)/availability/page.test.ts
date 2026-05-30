@@ -96,6 +96,19 @@ describe('availability page role-specific actions', () => {
     expect(source).toContain('if (officialSubmissionRowsError)')
   })
 
+  it('site-scopes manager availability cycles and therapist roster', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain("select('role, is_active, archived_at, site_id')")
+    expect(source).toContain("availabilityLoadError('availability manager site'")
+    expect(
+      source.match(/\.eq\('site_id', profile\.site_id\)/g)?.length ?? 0
+    ).toBeGreaterThanOrEqual(2)
+  })
+
   it('preserves successful empty availability states after checking for required read errors', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),

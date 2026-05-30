@@ -270,8 +270,8 @@ test.describe.serial('lottery operational flow', () => {
     )
     const applyResponse = await page.request.post('/api/lottery/apply', {
       headers: {
-        origin: 'http://127.0.0.1:3000',
-        referer: `http://127.0.0.1:3000/lottery?date=${ctx!.shiftDate}&shift=day&keepToWork=3`,
+        origin: new URL(page.url()).origin,
+        referer: `${new URL(page.url()).origin}/lottery?date=${ctx!.shiftDate}&shift=day&keepToWork=3`,
       },
       data: {
         shiftDate: ctx!.shiftDate,

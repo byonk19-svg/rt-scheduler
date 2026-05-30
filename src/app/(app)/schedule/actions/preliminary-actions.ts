@@ -73,11 +73,23 @@ export async function sendPreliminaryScheduleAction(formData: FormData) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: sendError }))
   }
 
+  const { data: cycleData, error: cycleError } = await supabase
+    .from('schedule_cycles')
+    .select('site_id')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleError || !cycleData?.site_id) {
+    console.error('Failed to load preliminary schedule site for recipients:', cycleError)
+  }
+
   const { data: recipientsData, error: recipientsError } = await supabase
     .from('profiles')
     .select('id')
     .in('role', ['therapist', 'lead'])
     .eq('is_active', true)
+    .is('archived_at', null)
+    .eq('site_id', cycleData?.site_id ?? '__missing_site__')
     .order('id', { ascending: true })
 
   if (recipientsError) {

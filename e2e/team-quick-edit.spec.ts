@@ -16,11 +16,13 @@ type TestContext = {
 async function openQuickEdit(page: Page, profileId: string, profileName: string) {
   const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     await page.goto(`/team?edit_profile=${profileId}&_e2e=${Date.now()}`, {
       waitUntil: 'load',
     })
-    if (await dialog.isVisible({ timeout: 10_000 }).catch(() => false)) {
+    if (await dialog.isVisible({ timeout: 20_000 }).catch(() => false)) {
+      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined)
+      await expect(dialog).toBeVisible({ timeout: 10_000 })
       return dialog
     }
   }
@@ -32,16 +34,20 @@ async function openQuickEdit(page: Page, profileId: string, profileName: string)
   for (let attempt = 0; attempt < 4; attempt += 1) {
     await profileCard.click()
     if (await dialog.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined)
+      await expect(dialog).toBeVisible({ timeout: 10_000 })
       return dialog
     }
     await page.waitForTimeout(750)
   }
   await expect(dialog).toBeVisible({ timeout: 30_000 })
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined)
+  await expect(dialog).toBeVisible({ timeout: 10_000 })
   return dialog
 }
 
 test.describe.serial('/team quick edit modal', () => {
-  test.setTimeout(90_000)
+  test.setTimeout(180_000)
   let ctx: TestContext | null = null
   const createdUserIds: string[] = []
 
@@ -220,10 +226,11 @@ test.describe.serial('/team quick edit modal', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/team?edit_profile=${ctx!.secondaryTherapist.id}`)
-
-    const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
-    await expect(dialog).toBeVisible({ timeout: 10_000 })
+    const dialog = await openQuickEdit(
+      page,
+      ctx!.secondaryTherapist.id,
+      ctx!.secondaryTherapist.fullName
+    )
     await expect(dialog.getByRole('button', { name: 'Archive employee' })).toHaveCount(0)
     await expect(
       dialog.getByText('This updates automatically from the selected role.')

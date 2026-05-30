@@ -72,6 +72,7 @@ type ProfileRow = {
   role: string | null
   is_active: boolean | null
   archived_at: string | null
+  site_id: string | null
 }
 
 type ShiftSelectionRow = {
@@ -94,6 +95,13 @@ type ReviewPreflightPostRow = {
   visibility: 'team' | 'direct' | null
   recipient_response: string | null
   claimed_by: string | null
+  shift_id: string | null
+  swap_shift_id: string | null
+}
+
+type ReviewPreflightShiftRow = {
+  id: string
+  site_id: string | null
 }
 
 function asTrimmedString(value: unknown): string {
@@ -147,7 +155,7 @@ async function getActorProfile(userId: string): Promise<ProfileRow | null> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', userId)
     .maybeSingle()
 
@@ -157,16 +165,17 @@ async function getActorProfile(userId: string): Promise<ProfileRow | null> {
 async function validateReviewRequestBeforeRpc(params: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase query builders are structurally large; this preflight uses a narrow fluent subset.
   admin: any
+  actorSiteId: string
   requestId: string
   decision: 'approve' | 'deny'
   selectedInterestId: string
   swapPartnerId: string
 }): Promise<string | null> {
-  const { admin, requestId, decision, selectedInterestId, swapPartnerId } = params
+  const { admin, actorSiteId, requestId, decision, selectedInterestId, swapPartnerId } = params
 
   const { data: post, error: postError } = await admin
     .from('shift_posts')
-    .select('id, type, status, visibility, recipient_response, claimed_by')
+    .select('id, type, status, visibility, recipient_response, claimed_by, shift_id, swap_shift_id')
     .eq('id', requestId)
     .maybeSingle()
 
@@ -174,6 +183,21 @@ async function validateReviewRequestBeforeRpc(params: {
   if (!post) return `Shift post ${requestId} was not found.`
 
   const request = post as ReviewPreflightPostRow
+  const shiftIds = Array.from(new Set([request.shift_id, request.swap_shift_id].filter(Boolean)))
+  if (shiftIds.length === 0) return `Shift post ${requestId} was not found.`
+
+  const { data: shiftRows, error: shiftRowsError } = await admin
+    .from('shifts')
+    .select('id, site_id')
+    .in('id', shiftIds)
+
+  if (shiftRowsError) return shiftRowsError.message ?? 'Could not load request for review.'
+
+  const shifts = (shiftRows ?? []) as ReviewPreflightShiftRow[]
+  const allShiftsInActorSite =
+    shifts.length === shiftIds.length && shifts.every((shift) => shift.site_id === actorSiteId)
+  if (!allShiftsInActorSite) return `Shift post ${requestId} was not found.`
+
   const visibility = request.visibility ?? 'team'
   if (request.status !== 'pending') return 'Only pending shift posts can be reviewed.'
   if (decision === 'deny') return null
@@ -209,7 +233,12 @@ async function validateReviewRequestBeforeRpc(params: {
 }
 
 function isActiveShiftPostActor(profile: ProfileRow | null): boolean {
-  return Boolean(parseRole(profile?.role)) && profile?.is_active !== false && !profile?.archived_at
+  return (
+    Boolean(parseRole(profile?.role)) &&
+    profile?.is_active !== false &&
+    !profile?.archived_at &&
+    Boolean(profile?.site_id)
+  )
 }
 
 async function resolveSameCycleSwapShiftId(params: {
@@ -493,6 +522,7 @@ export async function POST(request: Request) {
 
       const preflightError = await validateReviewRequestBeforeRpc({
         admin,
+        actorSiteId: actorProfile?.site_id ?? '',
         requestId,
         decision,
         selectedInterestId,

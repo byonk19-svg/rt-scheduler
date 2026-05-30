@@ -99,7 +99,7 @@ function queueStatusLabel(row: CombinedRosterRow) {
 }
 
 function reminderButtonLabel(missingCount: number) {
-  return `Remind all missing submissions (${missingCount})`
+  return `Remind missing submissions across shifts (${missingCount})`
 }
 
 export function AvailabilityStatusSummary({

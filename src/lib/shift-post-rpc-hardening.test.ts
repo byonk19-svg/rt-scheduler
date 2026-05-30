@@ -7,6 +7,10 @@ const migrationSource = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260506121500_harden_pickup_interest_rpc.sql'),
   'utf8'
 )
+const shiftPostRouteSource = readFileSync(
+  resolve(process.cwd(), 'src/app/api/shift-posts/route.ts'),
+  'utf8'
+)
 
 describe('shift post RPC hardening migration', () => {
   it('removes direct authenticated inserts for shift posts and pickup interests', () => {
@@ -38,5 +42,16 @@ describe('shift post RPC hardening migration', () => {
     expect(migrationSource).toContain(
       'perform public.app_assert_pickup_claimant_eligible(locked_post.id, locked_post.claimed_by, true)'
     )
+  })
+
+  it('site-scopes manager review preflight before request state validation', () => {
+    expect(shiftPostRouteSource).toContain("select('role, is_active, archived_at, site_id')")
+    expect(shiftPostRouteSource).toContain('Boolean(profile?.site_id)')
+    expect(shiftPostRouteSource).toContain(
+      "select('id, type, status, visibility, recipient_response, claimed_by, shift_id, swap_shift_id')"
+    )
+    expect(shiftPostRouteSource).toContain("from('shifts')")
+    expect(shiftPostRouteSource).toContain("select('id, site_id')")
+    expect(shiftPostRouteSource).toContain('shift.site_id === actorSiteId')
   })
 })

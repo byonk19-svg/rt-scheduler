@@ -36,6 +36,7 @@ type QueryRecord = {
 function createReminderSupabaseMock({
   profileRows,
   submissionRows,
+  cycleSiteId = 'site-main',
 }: {
   profileRows: Array<{
     id: string
@@ -44,6 +45,7 @@ function createReminderSupabaseMock({
     notification_email_enabled: boolean | null
   }>
   submissionRows: Array<{ therapist_id: string }>
+  cycleSiteId?: string
 }) {
   const queries: QueryRecord[] = []
 
@@ -76,6 +78,7 @@ function createReminderSupabaseMock({
               data: {
                 start_date: '2026-03-22',
                 end_date: '2026-05-02',
+                site_id: cycleSiteId,
               },
               error: null,
             }
@@ -147,6 +150,7 @@ describe('sendAvailabilityRemindersAction', () => {
     getAuthenticatedUserWithRoleMock.mockResolvedValue({
       supabase,
       role: 'manager',
+      siteId: 'site-main',
       permissionContext: { isActive: true, archivedAt: null },
     })
 
@@ -170,11 +174,42 @@ describe('sendAvailabilityRemindersAction', () => {
         { method: 'eq', column: 'is_active', value: true },
         { method: 'is', column: 'archived_at', value: null },
         { method: 'eq', column: 'on_fmla', value: false },
+        { method: 'eq', column: 'site_id', value: 'site-main' },
       ])
     )
     expect(
       supabase.queries.find((query) => query.table === 'therapist_availability_submissions')
         ?.filters
     ).toContainEqual({ method: 'eq', column: 'schedule_cycle_id', value: 'cycle-1' })
+  })
+
+  it('does not send reminders for a Schedule Block outside the manager site', async () => {
+    const supabase = createReminderSupabaseMock({
+      cycleSiteId: 'site-other',
+      profileRows: [
+        {
+          id: 'missing-therapist',
+          full_name: 'Layne P.',
+          email: 'layne@example.com',
+          notification_email_enabled: true,
+        },
+      ],
+      submissionRows: [],
+    })
+    getAuthenticatedUserWithRoleMock.mockResolvedValue({
+      supabase,
+      role: 'manager',
+      siteId: 'site-main',
+      permissionContext: { isActive: true, archivedAt: null },
+    })
+
+    const result = await sendAvailabilityRemindersAction('cycle-1')
+
+    expect(result).toEqual({ sent: 0, skipped: 0, failed: 0, error: 'cycle_not_found' })
+    expect(sendReminderEmailsMock).not.toHaveBeenCalled()
+    expect(supabase.queries.some((query) => query.table === 'profiles')).toBe(false)
+    expect(
+      supabase.queries.some((query) => query.table === 'therapist_availability_submissions')
+    ).toBe(false)
   })
 })

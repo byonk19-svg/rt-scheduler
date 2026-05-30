@@ -185,6 +185,32 @@ describe('schedule lifecycle hardening', () => {
     expect(templateActionsSource).toContain('applyTemplateToCycle(templateData, cycle.start_date')
   })
 
+  it('keeps manager scheduling mutations scoped to the Schedule Block site', () => {
+    expect(cycleActionsSource).toContain(".eq('site_id', actorProfile.site_id)")
+    expect(templateActionsSource).toContain('archived_at, site_id')
+    expect(templateActionsSource).toContain(".eq('site_id', cycle.site_id)")
+    expect(publishActionsSource).toContain(".eq('site_id', cycle.site_id)")
+    expect(publishActionsSource).toContain(".eq('site_id', currentCycle.site_id)")
+    expect(shiftActionsSource).toContain("select('id, site_id, published, status, archived_at')")
+    expect(shiftActionsSource).toContain(".eq('site_id', cycle.site_id)")
+    expect(shiftActionsSource).toContain('is_active, archived_at, on_fmla')
+    expect(shiftActionsSource).toContain('therapist.on_fmla === true')
+    expect(shiftActionsSource).toContain('shift.cycle_id !== cycleId')
+    expect(shiftActionsSource).toContain(".delete().eq('id', shiftId).eq('cycle_id', cycleId)")
+    expect(dragDropRouteSource).toContain(
+      ".select('id, site_id, start_date, end_date, published, status, archived_at')"
+    )
+    expect(dragDropRouteSource).toContain('cycle.site_id !== managerSiteId')
+    expect(dragDropRouteSource).toContain('targetProfile.is_active === false')
+    expect(dragDropRouteSource).toContain('Boolean(targetProfile.archived_at)')
+    expect(dragDropRouteSource).toContain(".eq('cycle_id', payload.cycleId)")
+    expect(dragDropRouteSource).toContain(".eq('site_id', managerSiteId)")
+    expect(assignmentStatusRouteSource).toContain(
+      ".select('id, site_id, user_id, schedule_cycles(published, status, archived_at)')"
+    )
+    expect(assignmentStatusRouteSource).toContain('preflightShift.site_id !== actorProfile.site_id')
+  })
+
   it('models cycle lifecycle explicitly and allows final publish from draft or preliminary', () => {
     expect(preliminaryHardeningMigrationSource).toContain('schedule_cycle_status')
     expect(preliminaryHardeningMigrationSource).toContain(

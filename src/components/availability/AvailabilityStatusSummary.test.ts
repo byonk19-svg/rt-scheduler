@@ -121,7 +121,7 @@ describe('AvailabilityStatusSummary', () => {
     )
 
     expect(html).toContain('data-testid="send-reminders-trigger"')
-    expect(html).toContain('Remind all missing submissions (1)')
+    expect(html).toContain('Remind missing submissions across shifts (1)')
     expect(html).toContain('Requests: 0')
   })
 
@@ -145,8 +145,8 @@ describe('AvailabilityStatusSummary', () => {
       })
     )
 
-    expect(html).toContain('Remind all missing submissions (4)')
-    expect(html).not.toContain('Remind all missing submissions (1)')
+    expect(html).toContain('Remind missing submissions across shifts (4)')
+    expect(html).not.toContain('Remind missing submissions across shifts (1)')
   })
 
   it('still shows the reminder action when filters hide all missing rows', () => {
@@ -160,7 +160,7 @@ describe('AvailabilityStatusSummary', () => {
       })
     )
 
-    expect(html).toContain('Remind all missing submissions (2)')
+    expect(html).toContain('Remind missing submissions across shifts (2)')
     expect(html).toContain('No therapists match the current work queue view.')
   })
 

@@ -29,4 +29,15 @@ describe('schedule pre-flight route', () => {
 
     expect(source).toContain("therapistScope: 'active-non-fmla'")
   })
+
+  it('requires the requested cycle to be inside the manager site scope', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/api/schedule/pre-flight/route.ts'),
+      'utf8'
+    )
+
+    expect(source).toContain("select('role, is_active, archived_at, site_id')")
+    expect(source).toContain("select('id, start_date, end_date, published, site_id')")
+    expect(source).toContain('cycleRow.site_id !== actorProfile.site_id')
+  })
 })

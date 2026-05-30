@@ -204,7 +204,7 @@ export default async function AvailabilityIntakePage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -216,6 +216,9 @@ export default async function AvailabilityIntakePage({
   ) {
     redirect(`/therapist/availability${toSearchString(params)}`)
   }
+  if (!profile?.site_id) {
+    redirect(`/availability${toSearchString(params)}`)
+  }
 
   const today = new Date()
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -225,6 +228,7 @@ export default async function AvailabilityIntakePage({
       .from('schedule_cycles')
       .select('id, label, start_date, end_date, published, archived_at, availability_due_at')
       .is('archived_at', null)
+      .eq('site_id', profile.site_id)
       .gte('end_date', todayKey)
       .order('start_date', { ascending: true }),
     supabase
@@ -233,6 +237,7 @@ export default async function AvailabilityIntakePage({
       .in('role', ['therapist', 'lead'])
       .eq('is_active', true)
       .is('archived_at', null)
+      .eq('site_id', profile.site_id)
       .order('full_name', { ascending: true }),
     supabase
       .from('availability_email_intakes')

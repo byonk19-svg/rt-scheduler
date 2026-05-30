@@ -16,6 +16,14 @@ const ROOT_FILE_PATTERNS = [
   /\.tsbuildinfo$/i,
 ]
 
+function isWindowsDrivePath(value) {
+  return /^[a-zA-Z]:[\\/]/.test(String(value ?? ''))
+}
+
+function selectPathApi(...values) {
+  return values.some(isWindowsDrivePath) ? path.win32 : path
+}
+
 function normalizeForComparison(value) {
   return String(value ?? '')
     .replace(/\\/g, '/')
@@ -28,11 +36,12 @@ function resolveRepoLocalPath(repoRootPath, candidatePath) {
     return normalizeForComparison(candidatePath)
   }
 
-  if (path.isAbsolute(candidatePath)) {
+  const pathApi = selectPathApi(repoRootPath, candidatePath)
+  if (pathApi.isAbsolute(candidatePath)) {
     return normalizeForComparison(candidatePath)
   }
 
-  return normalizeForComparison(path.resolve(repoRootPath, candidatePath))
+  return normalizeForComparison(pathApi.resolve(repoRootPath, candidatePath))
 }
 
 export function buildLocalArtifactCleanupPlan({

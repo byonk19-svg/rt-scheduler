@@ -179,6 +179,18 @@ describe('ManagerSchedulingInputs', () => {
     expect(panelSource).toContain('data-availability-editor')
   })
 
+  it('keeps reminder counts aligned with the full reminder action scope', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain('reminderMissingCount={missingRows.length}')
+    expect(source).not.toContain(
+      'reminderMissingCount={filteredQueueRows.filter((row) => !row.submitted).length}'
+    )
+  })
+
   it('renders a setup message when no cycles exist', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerSchedulingInputs, {
@@ -211,6 +223,7 @@ describe('ManagerSchedulingInputs', () => {
     expect(source).toContain('usePathname()')
     expect(source).toContain('useSearchParams()')
     expect(source).toContain('router.replace(')
+    expect(source).toContain('window.history.replaceState')
     expect(source).toContain('{ scroll: false }')
     expect(source).not.toContain('window.location.assign')
   })

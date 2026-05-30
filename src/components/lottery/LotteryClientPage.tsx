@@ -85,6 +85,13 @@ function lotteryLoadErrorMessage(action: 'load' | 'refresh' | 'save' | 'history'
   return 'Could not save that Lottery change. Review the selected shift and try again.'
 }
 
+export function shouldLogLotteryMutationFailure(
+  status: number,
+  payloadError: string | null | undefined
+): boolean {
+  return status >= 500 || !payloadError
+}
+
 function sameActions(
   left: LotteryRecommendationActionView[],
   right: Array<{ therapistId: string; status: 'cancelled' | 'on_call' }>
@@ -213,15 +220,24 @@ export default function LotteryClientPage({
 
   async function postJson(url: string, body: Record<string, unknown>) {
     setError(null)
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    })
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    } catch (error) {
+      console.error('Lottery action request failed:', error)
+      setError(lotteryLoadErrorMessage('save'))
+      return false
+    }
     const payload = (await response.json().catch(() => null)) as { error?: string } | null
     if (!response.ok) {
-      if (payload?.error) console.error('Lottery action failed:', payload.error)
-      setError(lotteryLoadErrorMessage('save'))
+      if (shouldLogLotteryMutationFailure(response.status, payload?.error)) {
+        console.error('Lottery action failed:', payload?.error ?? response.statusText)
+      }
+      setError(payload?.error ?? lotteryLoadErrorMessage('save'))
       return false
     }
     await reloadSnapshot()

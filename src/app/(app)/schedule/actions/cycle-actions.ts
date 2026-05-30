@@ -251,6 +251,7 @@ export async function createCycleAction(formData: FormData) {
     .from('schedule_cycles')
     .select('id')
     .is('archived_at', null)
+    .eq('site_id', actorProfile.site_id)
     .lte('start_date', endDate)
     .gte('end_date', startDate)
 
@@ -287,6 +288,7 @@ export async function createCycleAction(formData: FormData) {
         .from('schedule_cycles')
         .select('id, start_date, end_date')
         .eq('published', true)
+        .eq('site_id', actorProfile.site_id)
         .neq('id', data.id)
         .order('end_date', { ascending: false })
         .order('start_date', { ascending: false })
@@ -337,6 +339,7 @@ export async function createCycleAction(formData: FormData) {
           .in('role', ['therapist', 'lead'])
           .eq('is_active', true)
           .eq('on_fmla', false)
+          .eq('site_id', actorProfile.site_id)
 
         if (eligibleProfilesError) {
           console.error(

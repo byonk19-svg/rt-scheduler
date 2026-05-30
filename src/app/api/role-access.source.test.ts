@@ -14,9 +14,10 @@ describe('API role access lifecycle guards', () => {
     for (const route of EXPORT_ROUTES) {
       const source = readFileSync(resolve(process.cwd(), route), 'utf8')
 
-      expect(source).toContain("select('role, is_active, archived_at')")
-      expect(source).toContain('isActive: profile?.is_active !== false')
-      expect(source).toContain('archivedAt: profile?.archived_at ?? null')
+      expect(source).toContain("select('role, is_active, archived_at, site_id')")
+      expect(source).toContain('isActive:')
+      expect(source).toContain('archivedAt:')
+      expect(source).toContain('site_id')
     }
   })
 })

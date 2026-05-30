@@ -54,6 +54,8 @@ type TestContext = {
   rpcWasRefresh?: boolean
   cycleStartDate?: string
   cycleEndDate?: string
+  cycleSiteId?: string
+  profileFilterSnapshots?: Array<Map<string, unknown>>
   shifts?: Array<{
     id: string
     cycle_id: string
@@ -97,6 +99,10 @@ function createSupabaseMock(context: TestContext) {
           filters.set(column, value)
           return builder
         },
+        is(column: string, value: unknown) {
+          filters.set(column, value)
+          return builder
+        },
         in(column: string, value: unknown[]) {
           filters.set(column, value)
           return builder
@@ -122,6 +128,7 @@ function createSupabaseMock(context: TestContext) {
                 end_date: context.cycleEndDate ?? '2026-04-30',
                 published: Boolean(context.cyclePublished),
                 status: context.cycleStatus ?? (context.cyclePublished ? 'final' : 'draft'),
+                site_id: context.cycleSiteId ?? 'site-1',
               },
               error: null,
             }
@@ -179,6 +186,7 @@ function createSupabaseMock(context: TestContext) {
             Array.isArray(filters.get('role')) &&
             filters.get('is_active') === true
           ) {
+            context.profileFilterSnapshots?.push(new Map(filters))
             return Promise.resolve(
               resolve({
                 data: [{ id: 'therapist-1' }, { id: 'lead-1' }],
@@ -235,10 +243,13 @@ describe('sendPreliminaryScheduleAction', () => {
   })
 
   it('lets a manager send a preliminary schedule for a draft cycle', async () => {
+    const profileFilterSnapshots: Array<Map<string, unknown>> = []
     const supabase = createSupabaseMock({
       userId: 'manager-1',
       role: 'manager',
       cyclePublished: false,
+      cycleSiteId: 'site-main',
+      profileFilterSnapshots,
     })
     const admin = createAdminMock({})
     createClientMock.mockResolvedValue(supabase)
@@ -258,6 +269,10 @@ describe('sendPreliminaryScheduleAction', () => {
         eventType: 'preliminary_sent',
       })
     )
+    expect(profileFilterSnapshots.some((filters) => filters.get('site_id') === 'site-main')).toBe(
+      true
+    )
+    expect(profileFilterSnapshots.some((filters) => filters.get('archived_at') === null)).toBe(true)
     expect(revalidatePathMock).toHaveBeenCalledWith('/preliminary')
   })
 

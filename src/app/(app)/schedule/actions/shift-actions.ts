@@ -26,12 +26,12 @@ import {
   countWorkingScheduledForSlot,
   getPanelParam,
   getRoleForUser,
-  getTherapistWeeklyLimit,
   getWeeklyLimitFromProfile,
 } from './helpers'
 
 type ShiftMutationCycle = {
   id: string
+  site_id: string | null
   published: boolean
   status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
   archived_at: string | null
@@ -92,11 +92,11 @@ export async function addShiftAction(formData: FormData) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, published, status, archived_at')
+    .select('id, site_id, published, status, archived_at')
     .eq('id', cycleId)
     .maybeSingle()
 
-  if (cycleError || !cycle) {
+  if (cycleError || !cycle?.site_id) {
     console.error('Failed to load cycle for shift add:', cycleError)
     redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'add_shift_failed' }))
   }
@@ -104,9 +104,33 @@ export async function addShiftAction(formData: FormData) {
     redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'cycle_read_only' }))
   }
 
+  const { data: therapist, error: therapistError } = await supabase
+    .from('profiles')
+    .select(
+      'id, role, site_id, is_active, archived_at, on_fmla, max_work_days_per_week, employment_type'
+    )
+    .eq('id', userId)
+    .eq('site_id', cycle.site_id)
+    .maybeSingle()
+
+  if (
+    therapistError ||
+    !therapist ||
+    (therapist.role !== 'therapist' && therapist.role !== 'lead') ||
+    therapist.is_active === false ||
+    Boolean(therapist.archived_at) ||
+    therapist.on_fmla === true
+  ) {
+    console.error('Failed to load same-site therapist for shift add:', therapistError)
+    redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'add_shift_failed' }))
+  }
+
   const therapistWeeklyLimit =
     countsTowardWeeklyLimit(status) && !overrideWeeklyRules
-      ? await getTherapistWeeklyLimit(supabase, userId)
+      ? getWeeklyLimitFromProfile({
+          max_work_days_per_week: therapist.max_work_days_per_week,
+          employment_type: therapist.employment_type,
+        })
       : MAX_WORK_DAYS_PER_WEEK
 
   if (countsTowardWeeklyLimit(status) && !overrideWeeklyRules) {
@@ -234,22 +258,22 @@ export async function deleteShiftAction(formData: FormData) {
 
   const { data: shift, error: shiftLoadError } = await supabase
     .from('shifts')
-    .select('id, user_id, date, shift_type')
+    .select('id, cycle_id, user_id, date, shift_type')
     .eq('id', shiftId)
     .maybeSingle()
 
-  if (shiftLoadError || !shift) {
+  if (shiftLoadError || !shift || shift.cycle_id !== cycleId) {
     console.error('Failed to load shift before delete:', shiftLoadError)
     redirect(buildScheduleUrl(cycleId, view, { error: 'delete_shift_failed' }))
   }
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, published, status, archived_at')
+    .select('id, site_id, published, status, archived_at')
     .eq('id', cycleId)
     .maybeSingle()
 
-  if (cycleError || !cycle) {
+  if (cycleError || !cycle?.site_id) {
     console.error('Failed to load cycle before delete:', cycleError)
     redirect(buildScheduleUrl(cycleId, view, { error: 'delete_shift_failed' }))
   }
@@ -263,7 +287,7 @@ export async function deleteShiftAction(formData: FormData) {
     'Schedule changed after this request was posted.'
   )
 
-  const { error } = await supabase.from('shifts').delete().eq('id', shiftId)
+  const { error } = await supabase.from('shifts').delete().eq('id', shiftId).eq('cycle_id', cycleId)
   if (error) {
     console.error('Failed to delete shift:', error)
     redirect(buildScheduleUrl(cycleId, view, { error: 'delete_shift_failed' }))
@@ -331,11 +355,11 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, published, status, archived_at')
+    .select('id, site_id, published, status, archived_at')
     .eq('id', cycleId)
     .maybeSingle()
 
-  if (cycleError || !cycle) {
+  if (cycleError || !cycle?.site_id) {
     console.error('Failed to load cycle for designated lead action:', cycleError)
     redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_failed' }))
   }
@@ -345,14 +369,20 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
   const { data: therapist, error: therapistError } = await supabase
     .from('profiles')
-    .select('id, role, is_lead_eligible, max_work_days_per_week, employment_type')
+    .select(
+      'id, role, site_id, is_active, archived_at, on_fmla, is_lead_eligible, max_work_days_per_week, employment_type'
+    )
     .eq('id', therapistId)
+    .eq('site_id', cycle.site_id)
     .maybeSingle()
 
   if (
     therapistError ||
     !therapist ||
     (therapist.role !== 'therapist' && therapist.role !== 'lead') ||
+    therapist.is_active === false ||
+    Boolean(therapist.archived_at) ||
+    therapist.on_fmla === true ||
     !therapist.is_lead_eligible
   ) {
     redirect(

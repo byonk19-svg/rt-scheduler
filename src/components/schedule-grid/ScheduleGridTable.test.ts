@@ -50,6 +50,7 @@ function makeDataset(overrides: Partial<GridDataset> = {}): GridDataset {
     cycleDates: ['2026-05-03', '2026-05-04', '2026-05-05'],
     cycleDateRangeLabel: 'May 3 - May 5, 2026',
     isPublished: false,
+    cycleStatus: 'draft',
     therapistRows: [
       {
         userId: 'u1',

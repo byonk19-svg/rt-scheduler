@@ -7,7 +7,9 @@ import { ScheduleGrid } from '@/components/schedule-grid/ScheduleGrid'
 import { Button } from '@/components/ui/button'
 import type { GridDataset } from '@/components/schedule-grid/schedule-grid-types'
 import { generateDraftScheduleAction } from '@/app/(app)/schedule/actions/draft-actions'
+import { sendPreliminaryScheduleAction } from '@/app/(app)/schedule/actions/preliminary-actions'
 import { toggleCyclePublishedAction } from '@/app/(app)/schedule/actions/publish-actions'
+import { getScheduleBlockLifecycleLabel } from '@/lib/schedule-block-state'
 
 import { loadScheduleGridData } from './schedule-grid-data'
 import { SetupCompleteBanner } from './SetupCompleteBanner'
@@ -54,9 +56,71 @@ function getScheduleSubtitle(dataset: GridDataset) {
   return 'Review your row and the live team schedule in one 42-day grid.'
 }
 
+function getScheduleStateLabel(dataset: GridDataset) {
+  return getScheduleBlockLifecycleLabel({
+    published: dataset.isPublished,
+    status: dataset.cycleStatus,
+  })
+}
+
 function getSetupParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
+}
+
+function getScheduleFeedback(params: Record<string, string | string[] | undefined>) {
+  const success = getSetupParam(params.success)
+  const error = getSetupParam(params.error)
+  const violations = getSetupParam(params.violations)
+  const under = getSetupParam(params.under)
+  const over = getSetupParam(params.over)
+  const missingAvailability = getSetupParam(params.missing_availability)
+
+  if (success === 'preliminary_sent') {
+    return {
+      tone: 'success' as const,
+      text: 'Preliminary schedule sent. Staff can review tentative assignments from Preliminary.',
+    }
+  }
+  if (success === 'preliminary_refreshed') {
+    return {
+      tone: 'success' as const,
+      text: 'Preliminary schedule refreshed with the latest draft assignments.',
+    }
+  }
+  if (success === 'cycle_published') {
+    return {
+      tone: 'success' as const,
+      text: 'Schedule Block published and publish email processing started.',
+    }
+  }
+  if (!error) return null
+
+  const copy: Record<string, string> = {
+    publish_weekly_rule_violation: `Publish blocked: ${violations ?? 'some'} weekly staffing rule ${
+      violations === '1' ? 'violation needs' : 'violations need'
+    } review (${under ?? '0'} under, ${over ?? '0'} over). Adjust assignments or use an approved override path before final publish.`,
+    publish_shift_rule_violation:
+      'Publish blocked: resolve coverage or lead staffing issues before final publish.',
+    publish_availability_rule_violation:
+      'Publish blocked: resolve Need Off or Need to Work conflicts before final publish.',
+    publish_missing_availability_warning: `Publish paused: ${missingAvailability ?? 'some'} staff ${
+      missingAvailability === '1' ? 'member is' : 'members are'
+    } missing availability. Review the gap, then use Publish with missing availability to continue.`,
+    publish_unresolved_preliminary_marks:
+      'Publish blocked: resolve preliminary schedule marks before final publish.',
+    publish_unresolved_preliminary_requests:
+      'Publish blocked: resolve preliminary requests before final publish.',
+    preliminary_send_failed:
+      'Could not send the preliminary schedule. Review the draft and try again.',
+    preliminary_cycle_archived: 'Archived Schedule Blocks cannot be sent to preliminary review.',
+    preliminary_cycle_published: 'Published Schedule Blocks cannot be sent to preliminary review.',
+  }
+
+  return {
+    tone: 'error' as const,
+    text: copy[error] ?? 'Schedule action failed. Refresh and try again.',
+  }
 }
 
 export default async function SchedulePage({ searchParams }: SchedulePageProps) {
@@ -114,6 +178,8 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     )
   }
 
+  const feedback = getScheduleFeedback(params)
+
   return (
     <div className="mx-auto max-w-[96rem] scroll-mt-24 space-y-4 px-4 pb-6 pt-2 md:px-6 md:pt-3">
       {showSetupCompleteBanner ? <SetupCompleteBanner /> : null}
@@ -123,15 +189,23 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         summary={
           <>
             <ScheduleHeaderChip label="Block" value={result.dataset.cycleDateRangeLabel} />
-            <ScheduleHeaderChip
-              label="State"
-              value={result.dataset.isPublished ? 'Published' : 'Draft'}
-            />
+            <ScheduleHeaderChip label="State" value={getScheduleStateLabel(result.dataset)} />
             <ScheduleHeaderChip label="Access" value={getScheduleAccessLabel(result.dataset)} />
           </>
         }
         compact
       />
+      {feedback ? (
+        <div
+          className={
+            feedback.tone === 'success'
+              ? 'rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-3 text-sm font-medium text-[var(--success-text)]'
+              : 'rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]'
+          }
+        >
+          {feedback.text}
+        </div>
+      ) : null}
       <ScheduleGrid
         key={`${result.dataset.cycleId}:${result.dataset.shiftType}`}
         initialDataset={result.dataset}
@@ -139,6 +213,11 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         autoDraftAction={
           result.dataset.interactionMode.canUseManagerToolbar
             ? generateDraftScheduleAction
+            : undefined
+        }
+        preliminaryAction={
+          result.dataset.interactionMode.canUseManagerToolbar
+            ? sendPreliminaryScheduleAction
             : undefined
         }
         publishAction={

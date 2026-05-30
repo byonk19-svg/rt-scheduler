@@ -24,6 +24,10 @@ vi.mock('@/app/(app)/schedule/actions/draft-actions', () => ({
   generateDraftScheduleAction: vi.fn(),
 }))
 
+vi.mock('@/app/(app)/schedule/actions/preliminary-actions', () => ({
+  sendPreliminaryScheduleAction: vi.fn(),
+}))
+
 vi.mock('@/app/(app)/schedule/actions/publish-actions', () => ({
   toggleCyclePublishedAction: vi.fn(),
 }))
@@ -32,16 +36,19 @@ vi.mock('@/components/schedule-grid/ScheduleGrid', () => ({
   ScheduleGrid: ({
     initialDataset,
     initialShiftTab,
+    preliminaryAction,
   }: {
     initialDataset: { cycleDateRangeLabel: string }
     initialShiftTab: 'Day' | 'Night'
+    preliminaryAction?: unknown
   }) =>
     createElement(
       'section',
       null,
       createElement('h2', null, 'Mock Schedule Grid'),
       createElement('p', null, initialDataset.cycleDateRangeLabel),
-      createElement('p', null, initialShiftTab)
+      createElement('p', null, initialShiftTab),
+      preliminaryAction ? createElement('p', null, 'Preliminary action wired') : null
     ),
 }))
 
@@ -68,6 +75,7 @@ function okDataset() {
     cycleDates: ['2026-05-03', '2026-05-04'],
     cycleDateRangeLabel: 'May 3 - Jun 13, 2026',
     isPublished: false,
+    cycleStatus: 'draft' as const,
     therapistRows: [],
     dailyTotals: {},
     viewerUserId: 'manager-1',
@@ -99,6 +107,51 @@ describe('schedule route', () => {
     expect(html).toContain('Draft staffing, coverage review, and live schedule visibility.')
     expect(html).toContain('Mock Schedule Grid')
     expect(html).toContain('May 3 - Jun 13, 2026')
+    expect(html).toContain('Preliminary action wired')
+  })
+
+  it('renders publish validation failures as visible manager feedback', async () => {
+    loadScheduleGridDataMock.mockResolvedValue({
+      status: 'ok',
+      dataset: okDataset(),
+      initialShiftTab: 'Day',
+      preFlightSummary: null,
+    })
+
+    const html = renderToStaticMarkup(
+      await SchedulePage({
+        searchParams: Promise.resolve({
+          error: 'publish_weekly_rule_violation',
+          violations: '1243',
+          under: '1243',
+          over: '0',
+        }),
+      })
+    )
+
+    expect(html).toContain('Publish blocked: 1243 weekly staffing rule violations need review')
+    expect(html).toContain('1243 under, 0 over')
+  })
+
+  it('renders missing availability publish warnings with the continuation action label', async () => {
+    loadScheduleGridDataMock.mockResolvedValue({
+      status: 'ok',
+      dataset: okDataset(),
+      initialShiftTab: 'Day',
+      preFlightSummary: null,
+    })
+
+    const html = renderToStaticMarkup(
+      await SchedulePage({
+        searchParams: Promise.resolve({
+          error: 'publish_missing_availability_warning',
+          missing_availability: '32',
+        }),
+      })
+    )
+
+    expect(html).toContain('Publish paused: 32 staff members are missing availability.')
+    expect(html).toContain('Publish with missing availability')
   })
 
   it('shows setup completion feedback on the schedule page', async () => {

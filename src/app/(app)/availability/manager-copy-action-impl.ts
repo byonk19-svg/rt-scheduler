@@ -5,15 +5,26 @@ import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
 import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildAvailabilityUrl,
   getAuthenticatedUserWithRole,
   type AvailabilityOverrideType,
   type AvailabilityShiftType,
 } from './_actions/shared'
+import { loadManagerAvailabilityPlannerTarget } from './manager-planner-target'
+
+function isAvailabilityShiftType(value: unknown): value is AvailabilityShiftType {
+  return value === 'day' || value === 'night' || value === 'both'
+}
+
+function isAvailabilityOverrideType(value: unknown): value is AvailabilityOverrideType {
+  return value === 'force_on' || value === 'force_off'
+}
 
 export async function copyAvailabilityFromPreviousCycleAction(formData: FormData) {
   const { supabase, user, role, permissionContext } = await getAuthenticatedUserWithRole()
+  const admin = createAdminClient()
 
   if (!can(role, 'access_manager_ui', permissionContext)) {
     redirect('/availability')
@@ -32,19 +43,20 @@ export async function copyAvailabilityFromPreviousCycleAction(formData: FormData
     therapist: therapistId,
   })
 
-  const { data: targetCycle } = await supabase
-    .from('schedule_cycles')
-    .select('start_date, end_date')
-    .eq('id', cycleId)
-    .maybeSingle()
+  const target = await loadManagerAvailabilityPlannerTarget({
+    admin,
+    managerId: user.id,
+    therapistId,
+    cycleId,
+  })
 
-  if (!targetCycle) {
+  if (!target) {
     redirect(noSourceUrl)
   }
 
   const { data: sourceCycleRows } = await supabase
     .from('availability_overrides')
-    .select('cycle_id, schedule_cycles(start_date, end_date)')
+    .select('cycle_id, schedule_cycles(start_date, end_date, site_id)')
     .eq('therapist_id', therapistId)
     .eq('source', 'manager')
     .neq('cycle_id', cycleId)
@@ -55,8 +67,8 @@ export async function copyAvailabilityFromPreviousCycleAction(formData: FormData
     | {
         cycle_id: string
         schedule_cycles:
-          | { start_date: string; end_date: string }
-          | Array<{ start_date: string; end_date: string }>
+          | { start_date: string; end_date: string; site_id: string | null }
+          | Array<{ start_date: string; end_date: string; site_id: string | null }>
           | null
       }
     | undefined
@@ -74,7 +86,7 @@ export async function copyAvailabilityFromPreviousCycleAction(formData: FormData
         }
       : null
 
-  if (!sourceRow) {
+  if (!sourceRow || sourceRow.schedule_cycles.site_id !== target.cycle.site_id) {
     redirect(noSourceUrl)
   }
 
@@ -96,17 +108,40 @@ export async function copyAvailabilityFromPreviousCycleAction(formData: FormData
     .eq('therapist_id', therapistId)
     .eq('source', 'manager')
 
-  const shifted = shiftOverridesToCycle({
-    sourceOverrides: sourceOverrides.map((row) => ({
+  const normalizedSourceOverrides: Array<{
+    date: string
+    override_type: AvailabilityOverrideType
+    shift_type: AvailabilityShiftType
+    note: string | null
+  }> = []
+
+  for (const row of sourceOverrides) {
+    const overrideType = row.override_type
+    const shiftType = row.shift_type ?? 'both'
+
+    if (!isAvailabilityOverrideType(overrideType) || !isAvailabilityShiftType(shiftType)) {
+      redirect(noSourceUrl)
+    }
+
+    normalizedSourceOverrides.push({
       date: String(row.date),
-      override_type: row.override_type as AvailabilityOverrideType,
-      shift_type: (row.shift_type ?? 'both') as AvailabilityShiftType,
+      override_type: overrideType,
+      shift_type: shiftType,
+      note: row.note ?? null,
+    })
+  }
+
+  const shifted = shiftOverridesToCycle({
+    sourceOverrides: normalizedSourceOverrides.map((row) => ({
+      date: String(row.date),
+      override_type: row.override_type,
+      shift_type: row.shift_type,
       note: row.note ?? null,
     })),
     sourceCycleStart: sourceRow.schedule_cycles.start_date,
     sourceCycleEnd: sourceRow.schedule_cycles.end_date,
-    targetCycleStart: targetCycle.start_date,
-    targetCycleEnd: targetCycle.end_date,
+    targetCycleStart: target.cycle.start_date,
+    targetCycleEnd: target.cycle.end_date,
     existingTargetDates: new Set((existingRows ?? []).map((row) => String(row.date))),
   })
 

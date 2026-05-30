@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
-  Building2,
   CalendarDays,
   CheckCircle2,
   FileCheck,
@@ -19,7 +18,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 const LOADING_LABEL = 'Loading...'
-const FACILITY_LABEL = 'Riverside Medical Center'
 
 type ManagerTriageDashboardProps = {
   todayCoverageCovered: number | '--'
@@ -41,7 +39,6 @@ type ManagerTriageDashboardProps = {
   nightShiftsFilled: number | '--'
   nightShiftsTotal: number | '--'
   approvalsHref: string
-  lotteryHref: string
   scheduleHref: string
   reviewHref: string
   activeCycleDateRange?: string
@@ -202,7 +199,6 @@ export function ManagerTriageDashboard({
   nightShiftsFilled,
   nightShiftsTotal,
   approvalsHref,
-  lotteryHref,
   scheduleHref,
   reviewHref,
   activeCycleDateRange,
@@ -371,9 +367,9 @@ export function ManagerTriageDashboard({
         aria-label="Schedule context"
       >
         <ContextCell
-          icon={<Building2 className="h-4 w-4" aria-hidden="true" />}
-          label="Facility"
-          value={FACILITY_LABEL}
+          icon={<Users className="h-4 w-4" aria-hidden="true" />}
+          label="Schedule scope"
+          value="Current site"
         />
         <ContextCell
           icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />}
@@ -490,9 +486,9 @@ export function ManagerTriageDashboard({
             ))}
             {openAssignmentCount !== '--' && openAssignmentCount > 0 ? (
               <ExceptionRow
-                label="Open Lottery"
-                detail="Review reduction decisions if overstaffing changes coverage."
-                href={lotteryHref}
+                label="Open assignments"
+                detail={`${pluralize(openAssignmentCount, 'open shift')} still need owners.`}
+                href={scheduleHref}
               />
             ) : null}
           </CardContent>
