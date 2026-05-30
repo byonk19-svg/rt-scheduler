@@ -126,4 +126,20 @@ describe('ScheduleGrid source invariants', () => {
     expect(code).toContain('Could not update this shift status. Refresh Schedule and try again.')
     expect(code).toContain('Could not set the lead for this shift. Refresh Schedule and try again.')
   })
+
+  it('renders pre-flight readiness issues from the shared helper output', () => {
+    const code = source()
+    const dataCode = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/schedule/schedule-grid-data.ts'),
+      'utf8'
+    )
+
+    expect(dataCode).toContain('buildReadinessIssues(preFlightResult)')
+    expect(code).toContain('MAX_VISIBLE_PREFLIGHT_ISSUES')
+    expect(code).toContain('Pre-flight readiness issues')
+    expect(code).toContain('data-readiness-issue-id')
+    expect(code).toContain('issue.recommendedAction')
+    expect(code).toContain('getReadinessTargetLabel')
+    expect(code).not.toContain('buildReadinessIssues(')
+  })
 })

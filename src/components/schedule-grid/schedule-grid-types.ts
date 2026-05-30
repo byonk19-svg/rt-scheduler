@@ -1,3 +1,5 @@
+import type { ReadinessIssue } from '@/lib/coverage/readiness-issues'
+
 export type GridCellStatus =
   | 'lead'
   | 'staff'
@@ -61,4 +63,5 @@ export type ScheduleGridPreFlightSummary = {
   missingLeadSlots: number
   forcedMustWorkMisses: number
   details: Array<{ date: string; shiftType: 'day' | 'night'; missingCount: number }>
+  readinessIssues: ReadinessIssue[]
 }

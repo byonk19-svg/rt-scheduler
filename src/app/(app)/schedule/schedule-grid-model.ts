@@ -234,6 +234,7 @@ export function shapePreFlightSummary(
     missingLeadSlots: summary.missingLeadSlots,
     forcedMustWorkMisses: summary.forcedMustWorkMisses,
     details: summary.details,
+    readinessIssues: summary.readinessIssues,
   }
 }
 

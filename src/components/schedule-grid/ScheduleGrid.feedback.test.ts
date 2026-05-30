@@ -23,6 +23,7 @@ type ScheduleGridFeedbackTestError = {
 
 type ScheduleGridFeedbackTestScenario = {
   cellStatus: 'off' | 'staff'
+  isPublished?: boolean
   errors: {
     assign?: ScheduleGridFeedbackTestError
     updateStatus?: ScheduleGridFeedbackTestError
@@ -106,8 +107,8 @@ const scheduleGridFeedbackEntry = String.raw`
     availableCycles: [{ id: 'cycle-1', label: 'May 4 - May 5, 2026' }],
     cycleDates: ['2026-05-04'],
     cycleDateRangeLabel: 'May 4 - May 5, 2026',
-    isPublished: true,
-    cycleStatus: 'final',
+    isPublished: scenario.isPublished ?? true,
+    cycleStatus: scenario.isPublished === false ? 'draft' : 'final',
     therapistRows: [
       {
         userId: 'therapist-1',
@@ -133,8 +134,55 @@ const scheduleGridFeedbackEntry = String.raw`
     canUpdateAssignmentStatus: true,
   }
 
+  const preFlightSummary = {
+    unfilledSlots: 1,
+    missingLeadSlots: 1,
+    forcedMustWorkMisses: 1,
+    details: [{ date: '2026-05-04', shiftType: 'day', missingCount: 1 }],
+    readinessIssues: [
+      {
+        id: 'unfilled-assignment:2026-05-04:day',
+        severity: 'blocking',
+        type: 'unfilled_assignment',
+        date: '2026-05-04',
+        shiftType: 'day',
+        role: 'staff',
+        title: 'Day shift is short 1 assignment',
+        detail: 'Day shift on 2026-05-04 is projected to miss minimum staffing by 1 assignment.',
+        recommendedAction: 'Assign eligible staff or adjust coverage targets before publishing.',
+        target: {
+          kind: 'slot',
+          date: '2026-05-04',
+          shiftType: 'day',
+          role: 'staff',
+        },
+      },
+      {
+        id: 'missing-lead:2026-05-04:day',
+        severity: 'blocking',
+        type: 'missing_lead',
+        date: '2026-05-04',
+        shiftType: 'day',
+        role: 'lead',
+        title: 'Day shift needs a lead',
+        detail: 'Day shift on 2026-05-04 has no lead assigned.',
+        recommendedAction: 'Designate an eligible lead for this shift.',
+        target: {
+          kind: 'slot',
+          date: '2026-05-04',
+          shiftType: 'day',
+          role: 'lead',
+        },
+      },
+    ],
+  }
+
   createRoot(document.getElementById('root')).render(
-    <ScheduleGrid initialDataset={dataset} initialShiftTab="Day" />
+    <ScheduleGrid
+      initialDataset={dataset}
+      initialShiftTab="Day"
+      preFlightSummary={preFlightSummary}
+    />
   )
 `
 
@@ -266,6 +314,35 @@ describe('ScheduleGrid feedback rendering', () => {
   afterAll(async () => {
     await browser.close()
   })
+
+  it(
+    'renders readiness issue rows in the pre-flight panel',
+    async () => {
+      const page = await browser.newPage()
+      try {
+        await renderScheduleGridFeedbackHarness(page, {
+          cellStatus: 'off',
+          isPublished: false,
+          errors: {},
+        })
+
+        await page.getByRole('button', { name: 'Pre-flight' }).click()
+
+        await page.getByText('Pre-flight summary').waitFor({ state: 'visible' })
+        await page.getByText('2 readiness issues').waitFor({ state: 'visible' })
+        await page.getByText('Day shift is short 1 assignment').waitFor({ state: 'visible' })
+        await page.getByText('Day shift needs a lead').waitFor({ state: 'visible' })
+        await page
+          .getByLabel('Pre-flight readiness issues')
+          .getByText('2026-05-04 day shift')
+          .first()
+          .waitFor({ state: 'visible' })
+      } finally {
+        await page.close()
+      }
+    },
+    PLAYWRIGHT_TEST_TIMEOUT
+  )
 
   it(
     'shows specific feedback when assignment fails on a known scheduling conflict',

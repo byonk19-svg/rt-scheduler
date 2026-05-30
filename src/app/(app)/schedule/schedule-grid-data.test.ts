@@ -28,7 +28,12 @@ vi.mock('@/lib/coverage/pre-flight', () => ({
     missingLeadSlots: 0,
     forcedMustWorkMisses: 0,
     details: [],
+    readinessIssues: [],
   })),
+}))
+
+vi.mock('@/lib/coverage/readiness-issues', () => ({
+  buildReadinessIssues: vi.fn(() => []),
 }))
 
 import { loadScheduleGridData } from './schedule-grid-data'
@@ -697,12 +702,37 @@ describe('schedule grid model helpers', () => {
         missingLeadSlots: 1,
         forcedMustWorkMisses: 2,
         details: [{ date: '2026-05-04', shiftType: 'day', missingCount: 1 }],
+        readinessIssues: [
+          {
+            id: 'unfilled-assignment:2026-05-04:day',
+            severity: 'blocking',
+            type: 'unfilled_assignment',
+            date: '2026-05-04',
+            shiftType: 'day',
+            role: 'staff',
+            title: 'Day shift is short 1 assignment',
+            detail:
+              'Day shift on 2026-05-04 is projected to miss minimum staffing by 1 assignment.',
+          },
+        ],
       })
     ).toEqual({
       unfilledSlots: 3,
       missingLeadSlots: 1,
       forcedMustWorkMisses: 2,
       details: [{ date: '2026-05-04', shiftType: 'day', missingCount: 1 }],
+      readinessIssues: [
+        {
+          id: 'unfilled-assignment:2026-05-04:day',
+          severity: 'blocking',
+          type: 'unfilled_assignment',
+          date: '2026-05-04',
+          shiftType: 'day',
+          role: 'staff',
+          title: 'Day shift is short 1 assignment',
+          detail: 'Day shift on 2026-05-04 is projected to miss minimum staffing by 1 assignment.',
+        },
+      ],
     })
   })
 })
