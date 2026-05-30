@@ -34,20 +34,30 @@ describe('analytics page source contract', () => {
       resolve(process.cwd(), 'src/components/analytics/AnalyticsSummaryStrip.tsx'),
       'utf8'
     )
+    const needToWorkMissTableSource = readFileSync(
+      resolve(process.cwd(), 'src/components/analytics/ForcedDateMissTable.tsx'),
+      'utf8'
+    )
     const visibleCopySource = [
       analyticsPageSource,
       fillRateChartSource,
       complianceTableSource,
       summaryStripSource,
+      needToWorkMissTableSource,
     ].join('\n')
 
     expect(visibleCopySource).toContain('Schedule Block fill rates')
     expect(visibleCopySource).toContain('No Schedule Blocks found.')
     expect(visibleCopySource).toContain('Therapist availability submissions per Schedule Block.')
     expect(visibleCopySource).toContain('Schedule Blocks fully submitted')
+    expect(visibleCopySource).toContain('Need to Work misses')
+    expect(visibleCopySource).toContain('Need to Work miss patterns')
+    expect(visibleCopySource).toContain('No Need to Work requests found.')
     expect(visibleCopySource).not.toContain('Cycle fill rates')
     expect(visibleCopySource).not.toContain('No cycles found.')
     expect(visibleCopySource).not.toContain('per cycle.')
     expect(visibleCopySource).not.toContain('cycles fully submitted')
+    expect(visibleCopySource).not.toContain('Force-on')
+    expect(visibleCopySource).not.toContain('force-on')
   })
 })

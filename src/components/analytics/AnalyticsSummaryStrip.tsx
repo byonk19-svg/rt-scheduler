@@ -62,7 +62,7 @@ export function AnalyticsSummaryStrip({
       ) : null}
       {requestCount > 0 ? (
         <Stat
-          label="Force-on misses"
+          label="Need to Work misses"
           value={`${missCount} / ${requestCount}`}
           detail="requested dates missed"
           valueClass={

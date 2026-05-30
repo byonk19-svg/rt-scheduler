@@ -63,7 +63,7 @@ export function ForcedDateMissTable({ rows }: Props) {
       <div className="flex items-baseline justify-between gap-4 border-b border-border px-5 py-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-            Force-on miss patterns
+            Need to Work miss patterns
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Requested dates that were not assigned in the draft.
@@ -136,7 +136,7 @@ export function ForcedDateMissTable({ rows }: Props) {
           {grouped.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
-                No force-on requests found.
+                No Need to Work requests found.
               </TableCell>
             </TableRow>
           ) : null}
