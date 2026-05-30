@@ -164,18 +164,24 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'availability'")
     expect(shellConfigSource).toContain("key: 'shift-board'")
     expect(shellConfigSource).toContain("key: 'access'")
+    expect(shellConfigSource).toContain("key: 'publish'")
+    expect(shellConfigSource).toContain("key: 'analytics'")
+    expect(shellConfigSource).toContain("key: 'audit'")
     expect(shellConfigSource).toContain("key: 'lottery'")
     expect(shellConfigSource).not.toContain("key: 'coverage'")
     expect(shellConfigSource).not.toContain("key: 'people'")
   })
 
-  it('puts Team Schedule, Availability, Shift Board, Access, and Lottery in manager top navigation', () => {
+  it('puts manager operational destinations in top navigation', () => {
     expect(buildManagerSections(0).map((section) => section.label)).toEqual([
       'Dashboard',
       'Team Schedule',
       'Availability',
       'Shift Board',
       'Access',
+      'Publish',
+      'Analytics',
+      'Audit',
       'Lottery',
     ])
     expect(shellConfigSource).toContain("label: 'Team Schedule'")
@@ -183,6 +189,9 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("label: 'Availability'")
     expect(shellConfigSource).toContain("label: 'Shift Board'")
     expect(shellConfigSource).toContain("label: 'Access'")
+    expect(shellConfigSource).toContain("label: 'Publish'")
+    expect(shellConfigSource).toContain("label: 'Analytics'")
+    expect(shellConfigSource).toContain("label: 'Audit'")
     expect(shellConfigSource).toContain("label: 'Lottery'")
   })
 
@@ -195,6 +204,12 @@ describe('AppShell navigation structure', () => {
       'const moreBadgeCount = canAccessManagerUi && pendingCount > 0'
     )
     expect(appShellSource).toContain('section.badgeCount')
+  })
+
+  it('keeps expanded manager desktop navigation from wrapping on narrow desktop widths', () => {
+    expect(appShellSource).toContain('overflow-x-auto md:flex')
+    expect(appShellSource).toContain('whitespace-nowrap')
+    expect(appShellSource).toContain('shrink-0')
   })
 
   it('allows the shared local section nav to scroll horizontally on narrow screens', () => {

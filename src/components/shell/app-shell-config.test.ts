@@ -45,6 +45,9 @@ describe('app-shell-config', () => {
       'availability',
       'shift-board',
       'access',
+      'publish',
+      'analytics',
+      'audit',
       'lottery',
     ])
     expect(sections.map((section) => section.label)).toEqual([
@@ -53,6 +56,9 @@ describe('app-shell-config', () => {
       'Availability',
       'Shift Board',
       'Access',
+      'Publish',
+      'Analytics',
+      'Audit',
       'Lottery',
     ])
   })
@@ -80,9 +86,9 @@ describe('app-shell-config', () => {
     expect(accessSection?.badgeCount).toBeUndefined()
   })
 
-  it('keeps supporting schedule routes active under Team Schedule', () => {
+  it('keeps planning and coverage routes active under Team Schedule', () => {
     const context = getShellContext({
-      pathname: '/analytics',
+      pathname: '/coverage',
       canAccessManagerUi: true,
       pendingCount: 0,
     })
@@ -96,6 +102,34 @@ describe('app-shell-config', () => {
       pendingCount: 0,
     })
     expect(planningContext.primaryKey).toBe('team-schedule')
+  })
+
+  it('promotes publish, analytics, and audit routes as manager navigation destinations', () => {
+    const sections = buildManagerSections(0)
+
+    expect(sections.find((section) => section.key === 'publish')?.href).toBe('/publish')
+    expect(sections.find((section) => section.key === 'analytics')?.href).toBe('/analytics')
+    expect(sections.find((section) => section.key === 'audit')?.href).toBe('/settings/audit-log')
+
+    expect(
+      getShellContext({ pathname: '/publish/abc', canAccessManagerUi: true, pendingCount: 0 })
+        .primaryKey
+    ).toBe('publish')
+    expect(
+      getShellContext({ pathname: '/preliminary', canAccessManagerUi: true, pendingCount: 0 })
+        .primaryKey
+    ).toBe('publish')
+    expect(
+      getShellContext({ pathname: '/analytics', canAccessManagerUi: true, pendingCount: 0 })
+        .primaryKey
+    ).toBe('analytics')
+    expect(
+      getShellContext({
+        pathname: '/settings/audit-log',
+        canAccessManagerUi: true,
+        pendingCount: 0,
+      }).primaryKey
+    ).toBe('audit')
   })
 
   it('routes Team Schedule to the unified schedule grid', () => {
@@ -172,6 +206,9 @@ describe('app-shell-config', () => {
     })
 
     expect(context.primaryItems.map((item) => item.label)).not.toContain('Access')
+    expect(context.primaryItems.map((item) => item.label)).not.toContain('Publish')
+    expect(context.primaryItems.map((item) => item.label)).not.toContain('Analytics')
+    expect(context.primaryItems.map((item) => item.label)).not.toContain('Audit')
     expect(context.primaryItems.some((item) => item.href === '/requests/user-access')).toBe(false)
   })
 
@@ -208,6 +245,35 @@ describe('app-shell-config', () => {
       permission: 'Manager edit',
     })
     expect(getWorkflowContext({ pathname: '/settings', canAccessManagerUi: true })).toBeNull()
+  })
+
+  it('returns manager workflow context for publish, analytics, and audit routes', () => {
+    expect(getWorkflowContext({ pathname: '/publish', canAccessManagerUi: true })).toEqual({
+      workflow: 'Publish',
+      context: 'Schedule Block history',
+      state: 'Queued, published, offline',
+      permission: 'Manager controlled',
+    })
+    expect(getWorkflowContext({ pathname: '/preliminary', canAccessManagerUi: true })).toEqual({
+      workflow: 'Publish',
+      context: 'Preliminary schedule handoff',
+      state: 'Review before final publish',
+      permission: 'Manager approval required',
+    })
+    expect(getWorkflowContext({ pathname: '/analytics', canAccessManagerUi: true })).toEqual({
+      workflow: 'Analytics',
+      context: 'Schedule and staffing trends',
+      state: 'Review metrics',
+      permission: 'Manager visibility',
+    })
+    expect(
+      getWorkflowContext({ pathname: '/settings/audit-log', canAccessManagerUi: true })
+    ).toEqual({
+      workflow: 'Audit',
+      context: 'Operational change history',
+      state: 'Review events',
+      permission: 'Manager visibility',
+    })
   })
 
   it('returns manager workflow context for availability', () => {
