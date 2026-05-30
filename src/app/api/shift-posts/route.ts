@@ -164,14 +164,14 @@ async function getActorProfile(userId: string): Promise<ProfileRow | null> {
   return (data ?? null) as ProfileRow | null
 }
 
-async function markShiftPostExpiredBeforeReview(params: {
+async function markShiftPostExpiredForMutation(params: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase query builders are structurally large; this preflight uses a narrow fluent subset.
   admin: any
   requestId: string
 }): Promise<string | null> {
   const expiredAt = new Date().toISOString()
 
-  const { error: postUpdateError } = await params.admin
+  const { data: expiredPost, error: postUpdateError } = await params.admin
     .from('shift_posts')
     .update({
       status: 'expired',
@@ -179,9 +179,15 @@ async function markShiftPostExpiredBeforeReview(params: {
     })
     .eq('id', params.requestId)
     .eq('status', 'pending')
+    .select('id')
+    .maybeSingle()
 
   if (postUpdateError) {
-    return postUpdateError.message ?? 'Could not expire stale request before review.'
+    return postUpdateError.message ?? 'Could not expire stale request before continuing.'
+  }
+
+  if (!expiredPost) {
+    return 'This request is no longer pending. Refresh the Shift Board.'
   }
 
   const { error: interestUpdateError } = await params.admin
@@ -198,6 +204,49 @@ async function markShiftPostExpiredBeforeReview(params: {
   }
 
   return null
+}
+
+async function reconcileExpiredShiftPostBeforeMutation(params: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase query builders are structurally large; this preflight uses a narrow fluent subset.
+  admin: any
+  actorSiteId: string
+  requestId: string
+}): Promise<string | null> {
+  const { admin, actorSiteId, requestId } = params
+
+  const { data: post, error: postError } = await admin
+    .from('shift_posts')
+    .select('id, status, created_at, shift_id, swap_shift_id')
+    .eq('id', requestId)
+    .maybeSingle()
+
+  if (postError) return postError.message ?? 'Could not load request before continuing.'
+  if (!post) return null
+
+  const request = post as Pick<
+    ReviewPreflightPostRow,
+    'id' | 'status' | 'created_at' | 'shift_id' | 'swap_shift_id'
+  >
+  if (!isRequestExpired(request.status, request.created_at)) return null
+
+  const shiftIds = Array.from(new Set([request.shift_id, request.swap_shift_id].filter(Boolean)))
+  if (shiftIds.length === 0) return null
+
+  const { data: shiftRows, error: shiftRowsError } = await admin
+    .from('shifts')
+    .select('id, site_id')
+    .in('id', shiftIds)
+
+  if (shiftRowsError) return shiftRowsError.message ?? 'Could not load request before continuing.'
+
+  const shifts = (shiftRows ?? []) as ReviewPreflightShiftRow[]
+  const allShiftsInActorSite =
+    shifts.length === shiftIds.length && shifts.every((shift) => shift.site_id === actorSiteId)
+  if (!allShiftsInActorSite) return null
+
+  const expirationError = await markShiftPostExpiredForMutation({ admin, requestId })
+  if (expirationError) return expirationError
+  return 'This request is no longer pending because it expired. Refresh the Shift Board.'
 }
 
 async function validateReviewRequestBeforeRpc(params: {
@@ -240,7 +289,7 @@ async function validateReviewRequestBeforeRpc(params: {
 
   const visibility = request.visibility ?? 'team'
   if (isRequestExpired(request.status, request.created_at)) {
-    const expirationError = await markShiftPostExpiredBeforeReview({ admin, requestId })
+    const expirationError = await markShiftPostExpiredForMutation({ admin, requestId })
     if (expirationError) return expirationError
     return 'This request is no longer pending because it expired. Refresh the Shift Board.'
   }
@@ -471,6 +520,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
       }
 
+      const expirationError = await reconcileExpiredShiftPostBeforeMutation({
+        admin,
+        actorSiteId: actorProfile?.site_id ?? '',
+        requestId,
+      })
+      if (expirationError) {
+        return toErrorResponse(expirationError)
+      }
+
       const { data, error } = await admin.rpc('app_respond_direct_shift_post', {
         p_actor_id: user.id,
         p_post_id: requestId,
@@ -488,6 +546,15 @@ export async function POST(request: Request) {
       const requestId = asTrimmedString(payload.requestId)
       if (!requestId) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+      }
+
+      const expirationError = await reconcileExpiredShiftPostBeforeMutation({
+        admin,
+        actorSiteId: actorProfile?.site_id ?? '',
+        requestId,
+      })
+      if (expirationError) {
+        return toErrorResponse(expirationError)
       }
 
       const { data, error } = await admin.rpc('app_withdraw_shift_post', {
@@ -524,6 +591,15 @@ export async function POST(request: Request) {
       const requestId = asTrimmedString(payload.requestId)
       if (!requestId) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+      }
+
+      const expirationError = await reconcileExpiredShiftPostBeforeMutation({
+        admin,
+        actorSiteId: actorProfile?.site_id ?? '',
+        requestId,
+      })
+      if (expirationError) {
+        return toErrorResponse(expirationError)
       }
 
       const { data, error } = await admin.rpc('app_express_shift_post_interest', {
@@ -608,6 +684,15 @@ export async function POST(request: Request) {
       const interestId = asTrimmedString(payload.interestId)
       if (!requestId || !interestId) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+      }
+
+      const expirationError = await reconcileExpiredShiftPostBeforeMutation({
+        admin,
+        actorSiteId: actorProfile?.site_id ?? '',
+        requestId,
+      })
+      if (expirationError) {
+        return toErrorResponse(expirationError)
       }
 
       const { data, error } = await admin.rpc('app_deny_pickup_claimant', {
