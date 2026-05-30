@@ -152,6 +152,8 @@ const SCHEDULE_LEGEND_ITEMS = [
   { label: 'Need Off', code: '*', className: 'text-foreground' },
 ] as const
 
+const MAX_VISIBLE_PREFLIGHT_ISSUES = 6
+
 function getScheduleInteractionHint(interactionMode: ScheduleInteractionMode): string {
   switch (interactionMode.kind) {
     case 'manager_edit':
@@ -163,6 +165,29 @@ function getScheduleInteractionHint(interactionMode: ScheduleInteractionMode): s
     case 'staff_view':
       return 'Read-only team schedule. Your row is highlighted for quick reference.'
   }
+}
+
+function getReadinessSeverityClass(
+  severity: ScheduleGridPreFlightSummary['readinessIssues'][number]['severity']
+) {
+  switch (severity) {
+    case 'blocking':
+      return 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
+    case 'warning':
+      return 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+    case 'info':
+      return 'border-border bg-muted text-muted-foreground'
+  }
+}
+
+function getReadinessTargetLabel(
+  issue: ScheduleGridPreFlightSummary['readinessIssues'][number]
+): string | null {
+  if (!issue.target) return null
+  if (issue.target.kind === 'slot') {
+    return `${issue.target.date} ${issue.target.shiftType} shift`
+  }
+  return `${issue.target.date} ${issue.target.shiftType} shift · ${issue.therapistName ?? 'Therapist'}`
 }
 
 export function ScheduleGrid({
@@ -395,6 +420,10 @@ export function ScheduleGrid({
     loadedShiftTab === 'Night' ? 'Respiratory Therapy Night Shift' : 'Respiratory Therapy Day Shift'
   const sheetDayCount = `${initialDataset.cycleDates.length} days`
   const interactionHint = getScheduleInteractionHint(interactionMode)
+  const visiblePreFlightIssues =
+    preFlightSummary?.readinessIssues.slice(0, MAX_VISIBLE_PREFLIGHT_ISSUES) ?? []
+  const hiddenPreFlightIssueCount =
+    (preFlightSummary?.readinessIssues.length ?? 0) - visiblePreFlightIssues.length
 
   return (
     <div className="rounded-xl border border-border/60 bg-[color-mix(in_srgb,var(--muted)_68%,var(--background))] p-3 shadow-inner sm:p-4 lg:p-5">
@@ -460,12 +489,75 @@ export function ScheduleGrid({
         />
         {showPreFlight && preFlightSummary ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-tw-2xs">
-            <p className="font-semibold">Pre-flight summary</p>
-            <p className="mt-1">
-              {preFlightSummary.unfilledSlots} unfilled assignments,{' '}
-              {preFlightSummary.missingLeadSlots} missing lead slots,{' '}
-              {preFlightSummary.forcedMustWorkMisses} need-to-work misses.
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold">Pre-flight summary</p>
+                <p className="mt-1">
+                  {preFlightSummary.unfilledSlots} unfilled assignments,{' '}
+                  {preFlightSummary.missingLeadSlots} missing lead slots,{' '}
+                  {preFlightSummary.forcedMustWorkMisses} need-to-work misses.
+                </p>
+              </div>
+              {preFlightSummary.readinessIssues.length > 0 ? (
+                <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-950">
+                  {preFlightSummary.readinessIssues.length} readiness issues
+                </span>
+              ) : (
+                <span className="rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2 py-0.5 text-xs font-bold text-[var(--success-text)]">
+                  No readiness issues
+                </span>
+              )}
+            </div>
+            {visiblePreFlightIssues.length > 0 ? (
+              <div
+                className="mt-3 divide-y divide-amber-200 overflow-hidden rounded-md border border-amber-200 bg-background/80"
+                aria-label="Pre-flight readiness issues"
+              >
+                {visiblePreFlightIssues.map((issue) => {
+                  const targetLabel = getReadinessTargetLabel(issue)
+                  return (
+                    <div
+                      key={issue.id}
+                      className="grid gap-2 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+                      data-readiness-issue-id={issue.id}
+                      data-readiness-issue-type={issue.type}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={cn(
+                              'inline-flex rounded-full border px-2 py-0.5 text-[11px] font-black uppercase',
+                              getReadinessSeverityClass(issue.severity)
+                            )}
+                          >
+                            {issue.severity}
+                          </span>
+                          <p className="font-semibold text-foreground">{issue.title}</p>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {issue.detail}
+                        </p>
+                        {issue.recommendedAction ? (
+                          <p className="mt-1 text-xs font-medium text-foreground">
+                            {issue.recommendedAction}
+                          </p>
+                        ) : null}
+                      </div>
+                      {targetLabel ? (
+                        <span className="self-start rounded border border-border bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                          {targetLabel}
+                        </span>
+                      ) : null}
+                    </div>
+                  )
+                })}
+                {hiddenPreFlightIssueCount > 0 ? (
+                  <p className="px-3 py-2 text-xs font-medium text-muted-foreground">
+                    {hiddenPreFlightIssueCount} more readiness issues not shown.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
         <article className="mx-auto max-w-[96rem] overflow-hidden rounded-[6px] border border-border/80 bg-[var(--print-paper)] text-[var(--print-ink)] shadow-[0_22px_54px_-38px_rgba(15,23,42,0.58)]">

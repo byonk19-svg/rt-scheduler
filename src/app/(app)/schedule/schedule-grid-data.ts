@@ -11,6 +11,7 @@ import {
 import { loadDraftInputsForCycle, toDraftInputSupabaseClient } from '@/lib/coverage/draft-inputs'
 import { generateDraftForCycle } from '@/lib/coverage/generate-draft'
 import { summarizePreFlight } from '@/lib/coverage/pre-flight'
+import { buildReadinessIssues } from '@/lib/coverage/readiness-issues'
 import { fetchActiveOperationalDetailMap } from '@/lib/operational-codes'
 import { createClient } from '@/lib/supabase/server'
 
@@ -226,6 +227,10 @@ export async function loadScheduleGridData(
       return null
     }
 
-    return shapePreFlightSummary(summarizePreFlight(generateDraftForCycle(draftInputs.data)))
+    const preFlightResult = generateDraftForCycle(draftInputs.data)
+    return shapePreFlightSummary({
+      ...summarizePreFlight(preFlightResult),
+      readinessIssues: buildReadinessIssues(preFlightResult),
+    })
   }
 }
