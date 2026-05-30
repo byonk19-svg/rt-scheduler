@@ -244,4 +244,28 @@ describe('AvailabilityStatusSummary', () => {
     expect(html).toContain('Requests: 2')
     expect(html).toContain('data-roster-filter="submitted_no_exceptions"')
   })
+
+  it('does not make manager-entered availability look therapist-submitted when submission is missing', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityStatusSummary, {
+        submittedRows: [],
+        missingRows: [
+          {
+            therapistId: 'manager-entered-missing-1',
+            therapistName: 'Layne P.',
+            overridesCount: 0,
+            managerEnteredCount: 2,
+            lastUpdatedAt: '2026-03-16T12:00:00.000Z',
+            shiftType: 'day',
+            employmentType: 'full_time',
+          },
+        ],
+        initialFilter: 'missing',
+      })
+    )
+
+    expect(html).toContain('Manager-entered; needs submission')
+    expect(html).toContain('Requests: 2')
+    expect(html).not.toContain('Submitted + manager-entered')
+  })
 })

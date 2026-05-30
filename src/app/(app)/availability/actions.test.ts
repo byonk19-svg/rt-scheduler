@@ -42,6 +42,7 @@ import {
   closeAvailabilityWindowAction,
   deleteAvailabilityEntryAction,
   deleteAvailabilityEmailIntakeAction,
+  deleteManagerAvailabilityRequestAction,
   deleteManagerPlannerDateAction,
   reparseAvailabilityEmailIntakeAction,
   reopenAvailabilityWindowAction,
@@ -867,7 +868,8 @@ describe('availability actions', () => {
       admin.state.inserts.some(
         (row: { table: string }) => row.table === 'therapist_availability_submissions'
       )
-    ).toBe(true)
+    ).toBe(false)
+    expect(admin.state.updates).toHaveLength(0)
   })
 
   it('blocks manager-entered therapist requests across sites', async () => {
@@ -917,6 +919,33 @@ describe('availability actions', () => {
       },
     ])
     expect(supabase.state.upsertPayloads).toHaveLength(0)
+  })
+
+  it('lets a manager delete a manager-entered therapist request without touching official submission state', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    createClientMock.mockResolvedValue(supabase)
+    const formData = new FormData()
+    formData.set('override_id', 'request-1')
+    formData.set('cycle_id', 'cycle-1')
+    formData.set('therapist_id', 'therapist-1')
+
+    await expect(deleteManagerAvailabilityRequestAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&success=manager_request_deleted'
+    )
+
+    expect(supabase.state.deletes).toEqual([
+      {
+        table: 'availability_overrides',
+        filters: {
+          id: 'request-1',
+          source: 'manager',
+          intent: ['therapist_need_off', 'therapist_wants_work'],
+        },
+      },
+    ])
+    const admin = createAdminClientMock.mock.results.at(-1)?.value
+    expect(admin.state.inserts).toHaveLength(0)
+    expect(admin.state.updates).toHaveLength(0)
   })
 
   it('lets a therapist save full-cycle availability with day-level notes', async () => {
