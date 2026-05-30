@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Bell } from 'lucide-react'
 
 import { Skeleton } from '@/components/ui/skeleton'
+import { resolveNotificationHref } from '@/lib/notification-routing'
 
 type NotificationItem = {
   id: string
@@ -37,28 +38,6 @@ function timeAgo(iso: string): string {
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d ago`
   return `${Math.floor(days / 7)}w ago`
-}
-
-export function resolveNotificationHref(
-  item: NotificationItem,
-  userRole: 'manager' | 'therapist' | 'lead' | null
-): string | null {
-  const isManager = userRole === 'manager'
-
-  if (item.event_type === 'preliminary_request_submitted') return '/approvals'
-  if (item.event_type.startsWith('preliminary_')) {
-    return item.target_type === 'shift' && item.target_id
-      ? `/preliminary?shift=${item.target_id}`
-      : '/preliminary'
-  }
-  if (item.event_type === 'call_in_help_available') {
-    return isManager ? '/requests' : '/therapist/swaps'
-  }
-  if (item.target_type === 'shift_post') return isManager ? '/requests' : '/therapist/swaps'
-  if (item.target_type === 'shift') return '/schedule'
-  if (item.target_type === 'schedule_cycle') return '/schedule'
-  if (item.event_type.includes('request')) return isManager ? '/requests' : '/therapist/swaps'
-  return null
 }
 
 export function NotificationBell({

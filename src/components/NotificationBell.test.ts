@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { resolveNotificationHref } from '@/components/NotificationBell'
+import { resolveNotificationHref } from '@/lib/notification-routing'
 
 const notificationBellSource = readFileSync(
   resolve(process.cwd(), 'src/components/NotificationBell.tsx'),

@@ -12,6 +12,7 @@ import {
   type ManagerActionShiftPostInterestRow,
   type ManagerActionShiftPostRow,
 } from '@/lib/manager-action-work'
+import { resolveNotificationHref } from '@/lib/notification-routing'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { availabilityDueDateKey } from '@/lib/schedule-block-planning'
 import { createClient } from '@/lib/supabase/server'
@@ -32,6 +33,7 @@ type NotificationRow = {
   event_type: string
   title: string | null
   target_type: 'schedule_cycle' | 'shift' | 'shift_post' | 'system' | null
+  target_id: string | null
   created_at?: string | null
 }
 
@@ -174,16 +176,6 @@ function toRelativeTime(value: string | null | undefined): string {
   return `${deltaDays} day${deltaDays === 1 ? '' : 's'} ago`
 }
 
-function getNotificationHref(item: NotificationRow): string {
-  if (item.event_type === 'preliminary_request_submitted') return '/approvals'
-  if (item.event_type.startsWith('preliminary_')) return '/preliminary'
-  if (item.target_type === 'shift_post') return '/requests'
-  if (item.target_type === 'shift') return '/schedule'
-  if (item.target_type === 'schedule_cycle') return '/schedule'
-  if (item.event_type.includes('request')) return '/requests'
-  return '/schedule'
-}
-
 function formatShiftLine(row: ShiftAssignmentRow): { label: string; detail: string } {
   const fullName = getOne(row.profiles)?.full_name ?? 'Unassigned therapist'
   const shiftLabel =
@@ -252,7 +244,7 @@ export default async function ManagerDashboardPage() {
         .eq('status', 'pending'),
       supabase
         .from('notifications')
-        .select('event_type, title, target_type, created_at')
+        .select('event_type, title, target_type, target_id, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5),
@@ -392,7 +384,7 @@ export default async function ManagerDashboardPage() {
   const recentActivity = activityRows.map((row) => ({
     title: getActivityTitle(row),
     timeLabel: toRelativeTime(row.created_at),
-    href: getNotificationHref(row),
+    href: resolveNotificationHref(row, 'manager', '/schedule') ?? '/schedule',
   }))
 
   const scheduleHref = buildCycleRoute('/schedule', activeCycle?.id ?? null)
