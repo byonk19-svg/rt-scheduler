@@ -27,6 +27,12 @@ describe('coverage pre-flight', () => {
         { date: '2026-04-07', shiftType: 'day', missingCount: 2 },
         { date: '2026-04-08', shiftType: 'night', missingCount: 1 },
       ],
+      missingLeadSlotDetails: [
+        { date: '2026-04-07', shiftType: 'day' },
+        { date: '2026-04-08', shiftType: 'night' },
+      ],
+      forcedMustWorkMissDetails: [],
+      needOffConflictDetails: [],
       unfilledSlots: 3,
       constraintsUnfilledSlots: 3,
       missingLeadSlots: 2,
