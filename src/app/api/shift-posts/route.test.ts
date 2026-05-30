@@ -148,11 +148,15 @@ function makeReviewAdminClient(params: {
             const builder = {
               eq(column: string, value: unknown) {
                 filters.push([column, value])
-                if (filters.length >= 2) {
-                  shiftPostUpdates.push({ payload, filters })
-                  return Promise.resolve({ error: null })
-                }
                 return builder
+              },
+              select() {
+                return {
+                  maybeSingle: async () => {
+                    shiftPostUpdates.push({ payload, filters })
+                    return { data: { id: 'post-1' }, error: null }
+                  },
+                }
               },
             }
             return builder
@@ -270,9 +274,7 @@ describe('shift-post mutation API', () => {
     createClientMock.mockResolvedValue(
       makeServerClient({ userId: 'therapist-1', role: 'therapist' })
     )
-    createAdminClientMock.mockReturnValue({
-      rpc: rpcMock,
-    })
+    createAdminClientMock.mockReturnValue(makeReviewAdminClient({ rpc: rpcMock }))
 
     const response = await POST(
       makeRequest({
@@ -286,6 +288,113 @@ describe('shift-post mutation API', () => {
       p_actor_id: 'therapist-1',
       p_post_id: 'post-1',
     })
+  })
+
+  it('expires stale pending requests before pickup interest reaches the interest RPC', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-04T12:00:00.000Z'))
+    const rpcMock = vi.fn()
+    const adminClient = makeReviewAdminClient({
+      rpc: rpcMock,
+      post: {
+        id: 'post-1',
+        status: 'pending',
+        created_at: '2026-05-02T11:59:59.000Z',
+        shift_id: 'shift-1',
+        swap_shift_id: null,
+      },
+    })
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'therapist-1', role: 'therapist', siteId: 'site-a' })
+    )
+    createAdminClientMock.mockReturnValue(adminClient)
+
+    try {
+      const response = await POST(
+        makeRequest({
+          action: 'express_interest',
+          requestId: 'post-1',
+        })
+      )
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body.error).toContain('expired')
+      expect(rpcMock).not.toHaveBeenCalled()
+      expect(adminClient.shiftPostUpdates).toEqual([
+        {
+          payload: {
+            status: 'expired',
+            expired_at: '2026-05-04T12:00:00.000Z',
+          },
+          filters: [
+            ['id', 'post-1'],
+            ['status', 'pending'],
+          ],
+        },
+      ])
+      expect(adminClient.shiftPostInterestUpdates).toEqual([
+        {
+          payload: {
+            status: 'declined',
+            responded_at: '2026-05-04T12:00:00.000Z',
+          },
+          eqFilters: [['shift_post_id', 'post-1']],
+          inFilters: [['status', ['pending', 'selected']]],
+        },
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('expires stale direct requests before recipient response reaches the response RPC', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-04T12:00:00.000Z'))
+    const rpcMock = vi.fn()
+    const adminClient = makeReviewAdminClient({
+      rpc: rpcMock,
+      post: {
+        id: 'post-1',
+        type: 'swap',
+        status: 'pending',
+        created_at: '2026-05-02T11:59:59.000Z',
+        visibility: 'direct',
+        recipient_response: 'pending',
+        claimed_by: 'therapist-1',
+        shift_id: 'shift-1',
+        swap_shift_id: 'swap-shift-1',
+      },
+      shifts: [
+        { id: 'shift-1', site_id: 'site-a' },
+        { id: 'swap-shift-1', site_id: 'site-a' },
+      ],
+    })
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'therapist-1', role: 'therapist', siteId: 'site-a' })
+    )
+    createAdminClientMock.mockReturnValue(adminClient)
+
+    try {
+      const response = await POST(
+        makeRequest({
+          action: 'respond_direct_request',
+          requestId: 'post-1',
+          decision: 'accepted',
+        })
+      )
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body.error).toContain('expired')
+      expect(rpcMock).not.toHaveBeenCalled()
+      expect(adminClient.shiftPostUpdates).toHaveLength(1)
+      expect(adminClient.shiftPostInterestUpdates).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('blocks inactive actors before shift-post workflow mutations', async () => {
@@ -802,9 +911,7 @@ describe('shift-post mutation API', () => {
     }))
 
     createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
-    createAdminClientMock.mockReturnValue({
-      rpc: rpcMock,
-    })
+    createAdminClientMock.mockReturnValue(makeReviewAdminClient({ rpc: rpcMock }))
 
     const response = await POST(
       makeRequest({
