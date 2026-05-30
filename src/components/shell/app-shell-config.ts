@@ -15,6 +15,7 @@ export type ShellSection = {
   label: string
   href: string
   isActive: (pathname: string) => boolean
+  badgeCount?: number
   subItems: ShellNavItem[]
 }
 
@@ -95,9 +96,7 @@ export function usesAppShell(pathname: string): boolean {
   return SHELL_ROUTES.some((route) => isRouteActive(pathname, route))
 }
 
-export function buildManagerSections(_pendingCount: number): readonly ShellSection[] {
-  void _pendingCount
-
+export function buildManagerSections(pendingCount: number): readonly ShellSection[] {
   return [
     {
       key: 'dashboard',
@@ -125,6 +124,14 @@ export function buildManagerSections(_pendingCount: number): readonly ShellSecti
       label: 'Shift Board',
       href: '/shift-board',
       isActive: (pathname) => pathname === '/shift-board' || pathname === '/swaps',
+      subItems: [],
+    },
+    {
+      key: 'access',
+      label: 'Access',
+      href: '/requests/user-access',
+      isActive: (pathname) => pathname.startsWith('/requests/user-access'),
+      badgeCount: pendingCount || undefined,
       subItems: [],
     },
     {
@@ -189,7 +196,7 @@ export function getShellContext(args: {
         href: section.href,
         label: section.label,
         active: section.isActive,
-        badgeCount: section.key === 'people' ? args.pendingCount || undefined : undefined,
+        badgeCount: section.badgeCount,
       })),
       localNav:
         activeSection && activeSection.subItems.length > 0
@@ -319,7 +326,8 @@ export function getWorkflowContext(args: {
       pathname !== '/availability' &&
       pathname !== '/lottery' &&
       pathname !== '/shift-board' &&
-      pathname !== '/swaps'
+      pathname !== '/swaps' &&
+      !pathname.startsWith('/requests/user-access')
     ) {
       return null
     }
@@ -366,6 +374,15 @@ export function getWorkflowContext(args: {
         context: 'Trade, coverage, and direct requests',
         state: 'Open, waiting, approved',
         permission: 'Manager final approval',
+      }
+    }
+
+    if (pathname.startsWith('/requests/user-access')) {
+      return {
+        workflow: 'Access',
+        context: 'Pending account requests',
+        state: 'Pending, approved, declined',
+        permission: 'Manager controlled',
       }
     }
 

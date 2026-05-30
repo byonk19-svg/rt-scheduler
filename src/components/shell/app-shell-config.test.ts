@@ -44,6 +44,7 @@ describe('app-shell-config', () => {
       'team-schedule',
       'availability',
       'shift-board',
+      'access',
       'lottery',
     ])
     expect(sections.map((section) => section.label)).toEqual([
@@ -51,8 +52,32 @@ describe('app-shell-config', () => {
       'Team Schedule',
       'Availability',
       'Shift Board',
+      'Access',
       'Lottery',
     ])
+  })
+
+  it('surfaces pending user access work as a manager Access navigation badge', () => {
+    const context = getShellContext({
+      pathname: '/requests/user-access',
+      canAccessManagerUi: true,
+      pendingCount: 4,
+    })
+
+    const accessItem = context.primaryItems.find((item) => item.label === 'Access')
+    expect(context.primaryKey).toBe('access')
+    expect(accessItem?.href).toBe('/requests/user-access')
+    expect(accessItem?.badgeCount).toBe(4)
+    expect(accessItem?.active('/requests/user-access')).toBe(true)
+  })
+
+  it('keeps zero pending user access work visible without a badge', () => {
+    const sections = buildManagerSections(0)
+    const accessSection = sections.find((section) => section.key === 'access')
+
+    expect(accessSection?.label).toBe('Access')
+    expect(accessSection?.href).toBe('/requests/user-access')
+    expect(accessSection?.badgeCount).toBeUndefined()
   })
 
   it('keeps supporting schedule routes active under Team Schedule', () => {
@@ -136,6 +161,29 @@ describe('app-shell-config', () => {
       '/availability',
       '/shift-board',
     ])
+    expect(items.map((item) => item.label)).not.toContain('Access')
+  })
+
+  it('does not expose manager Access navigation to staff shell context', () => {
+    const context = getShellContext({
+      pathname: '/therapist/schedule',
+      canAccessManagerUi: false,
+      pendingCount: 5,
+    })
+
+    expect(context.primaryItems.map((item) => item.label)).not.toContain('Access')
+    expect(context.primaryItems.some((item) => item.href === '/requests/user-access')).toBe(false)
+  })
+
+  it('returns manager workflow context for user access routes', () => {
+    expect(
+      getWorkflowContext({ pathname: '/requests/user-access', canAccessManagerUi: true })
+    ).toEqual({
+      workflow: 'Access',
+      context: 'Pending account requests',
+      state: 'Pending, approved, declined',
+      permission: 'Manager controlled',
+    })
   })
 
   it('returns manager workflow context for schedule routes', () => {
