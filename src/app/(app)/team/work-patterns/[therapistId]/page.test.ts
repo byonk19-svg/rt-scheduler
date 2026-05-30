@@ -16,4 +16,9 @@ describe('manager advanced work-pattern route', () => {
     expect(source).toContain('isMissingRequiredWeeklyWeekdays(normalized)')
     expect(source).toContain('/team/work-patterns')
   })
+
+  it('keeps manager action denials on the work-pattern route so the denied state can explain access', () => {
+    expect(source).toContain('redirect(`/team/work-patterns/${therapistId}`)')
+    expect(source).not.toContain("redirect('/dashboard/staff')")
+  })
 })

@@ -93,14 +93,14 @@ async function getManagerWorkPatternContext() {
   return { supabase, access }
 }
 
-async function requireManager() {
+async function requireManager(therapistId: string) {
   const context = await getManagerWorkPatternContext()
 
   if (context.access === 'inactive') {
     redirect('/login?error=account_inactive')
   }
   if (context.access === 'forbidden') {
-    redirect('/dashboard/staff')
+    redirect(`/team/work-patterns/${therapistId}`)
   }
 
   return { supabase: context.supabase }
@@ -109,7 +109,7 @@ async function requireManager() {
 async function saveManagerRecurringPatternAction(therapistId: string, formData: FormData) {
   'use server'
 
-  const { supabase } = await requireManager()
+  const { supabase } = await requireManager(therapistId)
 
   const patternType = String(
     formData.get('pattern_type') ?? 'weekly_fixed'

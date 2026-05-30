@@ -301,7 +301,25 @@ describe('replaceTherapistRosterAction', () => {
     createClientMock.mockResolvedValue(supabase)
 
     await expect(replaceTherapistRosterAction(makeReplaceFormData())).rejects.toThrow(
-      'REDIRECT:/dashboard/staff'
+      'REDIRECT:/team'
+    )
+
+    expect(parseTherapistRosterSourceMock).not.toHaveBeenCalled()
+    expect(supabase.state.upserts).toEqual([])
+    expect(supabase.state.deletes).toEqual([])
+    expect(supabase.state.updates).toEqual([])
+  })
+
+  it('sends inactive managers to the inactive-account sign-in state', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'inactive-manager-1',
+      role: 'manager',
+      isActive: false,
+    })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(replaceTherapistRosterAction(makeReplaceFormData())).rejects.toThrow(
+      'REDIRECT:/login?error=account_inactive'
     )
 
     expect(parseTherapistRosterSourceMock).not.toHaveBeenCalled()

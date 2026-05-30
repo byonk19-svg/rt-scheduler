@@ -2,10 +2,9 @@
 
 import { redirect } from 'next/navigation'
 
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { normalizeRosterFullName } from '@/lib/employee-roster-bulk'
 import { createClient } from '@/lib/supabase/server'
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
 
 type ManagedRole = 'manager' | 'therapist' | 'lead'
 type ShiftType = 'day' | 'night'
@@ -36,14 +35,9 @@ async function requireManager() {
     .eq('id', user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profile?.role), 'manage_directory', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard/staff')
-  }
+  const access = resolveManagerToolAccess(profile, 'manage_directory')
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') redirect('/team/import')
 
   return { supabase, userId: user.id }
 }
