@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import {
@@ -7,8 +6,6 @@ import {
 } from '@/app/(app)/onboarding/actions'
 import { OnboardingScheduleSetup } from '@/app/(app)/onboarding/OnboardingScheduleSetup'
 import { FeedbackToast } from '@/components/feedback-toast'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
 import type { PreferredWorkDaysMode } from '@/lib/staff-onboarding'
 
@@ -105,24 +102,6 @@ function getOnboardingFeedback(
   return null
 }
 
-function CompletionScreen() {
-  return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <Card className="border-primary/25 shadow-tw-md">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold tracking-tight">{"You're all set"}</CardTitle>
-          <CardDescription>Your work pattern and preferences have been saved.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <Button asChild>
-            <Link href="/schedule">Go to schedule</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
 export default async function OnboardingPage({
   searchParams,
 }: {
@@ -134,12 +113,7 @@ export default async function OnboardingPage({
   const success = getSearchParam(params?.success)
 
   if (success === 'setup_complete') {
-    return (
-      <div className="space-y-6">
-        {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
-        <CompletionScreen />
-      </div>
-    )
+    redirect('/schedule?setup=complete')
   }
 
   if (!context.status.isRequired) {
