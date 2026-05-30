@@ -64,13 +64,24 @@ describe('ScheduleGrid source invariants', () => {
   it('uses real Schedule Block lifecycle labels and plain schedule terminology', () => {
     const code = source()
     const toolbarCode = toolbarSource()
+    const assignPopoverCode = readFileSync(
+      resolve(process.cwd(), 'src/components/schedule-grid/AssignCellPopover.tsx'),
+      'utf8'
+    )
+    const statusPopoverCode = readFileSync(
+      resolve(process.cwd(), 'src/components/schedule-grid/StatusCellPopover.tsx'),
+      'utf8'
+    )
+    const visibleScheduleCopy = [code, assignPopoverCode, statusPopoverCode].join('\n')
 
     expect(toolbarCode).toContain('getScheduleBlockLifecycleLabel')
     expect(toolbarCode).toContain('scheduleBlockStateLabel')
     expect(toolbarCode).not.toContain("isPublished ? 'Published' : 'Draft'")
     expect(code).toContain("label: 'Need Off'")
     expect(code).toContain("label: 'Lead', code: 'L'")
-    expect(code).not.toContain("label: 'Requested off'")
+    expect(visibleScheduleCopy).toContain('Need Off is marked for this date.')
+    expect(visibleScheduleCopy).not.toContain("label: 'Requested off'")
+    expect(visibleScheduleCopy).not.toContain('Requested this day off.')
   })
 
   it('makes missing-availability publish acknowledgement an explicit second submit state', () => {
