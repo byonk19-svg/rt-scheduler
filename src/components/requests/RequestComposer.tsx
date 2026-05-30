@@ -32,6 +32,7 @@ type RequestComposerProps = {
   selectedShift: string | null
   selectedShiftData: MyShift | null
   selectedShiftRequiresLeadEligibleReplacement: boolean
+  showAllShifts: boolean
   step: 1 | 2 | 3
   submitting: boolean
   swapPath: SwapRequestPath
@@ -44,9 +45,30 @@ type RequestComposerProps = {
   onRequestVisibilityChange: (value: RequestVisibility) => void
   onSearchChange: (value: string) => void
   onSelectedShiftChange: (value: string | null) => void
+  onShowAllShiftsChange: (value: boolean) => void
   onSubmit: () => Promise<void>
   onSwapPathChange: (value: SwapRequestPath) => void
   onSwapWithChange: (value: string | null) => void
+}
+
+export const MAX_VISIBLE_SHIFT_CHOICES = 10
+
+export function getVisibleShiftChoices(
+  myShifts: MyShift[],
+  selectedShift: string | null,
+  showAllShifts: boolean
+): MyShift[] {
+  if (showAllShifts || myShifts.length <= MAX_VISIBLE_SHIFT_CHOICES) return myShifts
+
+  const firstChoices = myShifts.slice(0, MAX_VISIBLE_SHIFT_CHOICES)
+  if (!selectedShift || firstChoices.some((shift) => shift.id === selectedShift)) {
+    return firstChoices
+  }
+
+  const selectedChoice = myShifts.find((shift) => shift.id === selectedShift)
+  return selectedChoice
+    ? [...firstChoices.slice(0, MAX_VISIBLE_SHIFT_CHOICES - 1), selectedChoice]
+    : firstChoices
 }
 
 function verdictMeta(verdict: TeamMember['verdict']) {
@@ -93,6 +115,7 @@ export function RequestComposer({
   selectedShift,
   selectedShiftData,
   selectedShiftRequiresLeadEligibleReplacement,
+  showAllShifts,
   step,
   submitting,
   swapPath,
@@ -104,6 +127,7 @@ export function RequestComposer({
   onRequestVisibilityChange,
   onSearchChange,
   onSelectedShiftChange,
+  onShowAllShiftsChange,
   onSubmit,
   onSwapPathChange,
   onSwapWithChange,
@@ -137,7 +161,8 @@ export function RequestComposer({
   const selectedVerdict = verdictMeta(selectedMember?.verdict)
   const filteredCount = eligibleMembers.length
   const messageCount = message.length
-  const visibleShiftChoices = myShifts.slice(0, 10)
+  const visibleShiftChoices = getVisibleShiftChoices(myShifts, selectedShift, showAllShifts)
+  const hiddenShiftCount = Math.max(myShifts.length - visibleShiftChoices.length, 0)
 
   const title = isSwap ? 'Trade shift' : 'Need coverage'
   const subtitle = isSwap
@@ -249,17 +274,26 @@ export function RequestComposer({
               ))}
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="inline-flex rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--success-text)]">
-                All upcoming
-              </span>
-              <span className="inline-flex rounded-lg border border-border bg-muted/20 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                Lead shifts
-              </span>
-              <span className="inline-flex rounded-lg border border-border bg-muted/20 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                Weekends
-              </span>
-            </div>
+            {myShifts.length > MAX_VISIBLE_SHIFT_CHOICES ? (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {showAllShifts
+                    ? `Showing all ${myShifts.length} upcoming shifts.`
+                    : `Showing ${visibleShiftChoices.length} of ${myShifts.length} upcoming shifts.`}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-expanded={showAllShifts}
+                  onClick={() => onShowAllShiftsChange(!showAllShifts)}
+                >
+                  {showAllShifts
+                    ? 'Show fewer shifts'
+                    : `Show all shifts (${hiddenShiftCount} more)`}
+                </Button>
+              </div>
+            ) : null}
 
             <div className="mt-4 max-w-md space-y-2 md:hidden">
               {myShifts.length === 1 && selectedShiftData ? (
@@ -323,7 +357,7 @@ export function RequestComposer({
                 </div>
               </div>
 
-              <div className="grid gap-3 border-b border-border px-5 py-4 lg:grid-cols-[minmax(220px,1fr)_180px_180px_170px]">
+              <div className="grid gap-3 border-b border-border px-5 py-4 lg:grid-cols-[minmax(220px,1fr)_auto] lg:items-center">
                 <label className="relative block">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
@@ -333,9 +367,9 @@ export function RequestComposer({
                     className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 placeholder:text-muted-foreground"
                   />
                 </label>
-                <FilterPill label="Any shift type" />
-                <FilterPill label="Coverage-safe first" />
-                <FilterPill label="Sort: Best match" />
+                <p className="text-sm font-medium text-muted-foreground">
+                  {filteredCount} {filteredCount === 1 ? 'teammate' : 'teammates'} available
+                </p>
               </div>
 
               <div className="px-5 py-4">
@@ -558,14 +592,6 @@ function ShiftChoiceCard({
         ) : null}
       </div>
     </button>
-  )
-}
-
-function FilterPill({ label }: { label: string }) {
-  return (
-    <div className="flex h-10 items-center rounded-lg border border-border bg-muted/20 px-3 text-sm font-medium text-muted-foreground">
-      {label}
-    </div>
   )
 }
 
@@ -840,17 +866,6 @@ function RequestPreview({
             <span>{messageNeedsReview ? 'You changed teammates. Recheck this message.' : ' '}</span>
             <span>{messageCount}/250</span>
           </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          {['Friendly', 'Flexible', 'Grateful', 'Professional'].map((tone) => (
-            <span
-              key={tone}
-              className="rounded-full border border-border bg-muted/30 px-3 py-1 text-xs font-semibold text-muted-foreground"
-            >
-              {tone}
-            </span>
-          ))}
         </div>
 
         <div className="mt-5 space-y-2">

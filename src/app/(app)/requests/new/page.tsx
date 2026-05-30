@@ -36,6 +36,7 @@ function SwapRequestPageContent() {
   const [message, setMessage] = useState('')
   const [messageNeedsReview, setMessageNeedsReview] = useState(false)
   const [search, setSearch] = useState('')
+  const [showAllShifts, setShowAllShifts] = useState(false)
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [requestVisibility, setRequestVisibility] = useState<RequestVisibility>('direct')
   const [swapPath, setSwapPath] = useState<SwapRequestPath>('direct')
@@ -285,6 +286,7 @@ function SwapRequestPageContent() {
     setSwapWith(null)
     setMessage('')
     setSearch('')
+    setShowAllShifts(false)
     setMessageNeedsReview(false)
     setError(null)
   }
@@ -421,6 +423,7 @@ function SwapRequestPageContent() {
       selectedShift={selectedShift}
       selectedShiftData={selectedShiftData}
       selectedShiftRequiresLeadEligibleReplacement={selectedShiftRequiresLeadEligibleReplacement}
+      showAllShifts={showAllShifts}
       step={step}
       submitting={submitting}
       swapPath={swapPath}
@@ -446,6 +449,7 @@ function SwapRequestPageContent() {
       }}
       onSearchChange={setSearch}
       onSelectedShiftChange={setSelectedShift}
+      onShowAllShiftsChange={setShowAllShifts}
       onSubmit={handleSubmit}
       onSwapPathChange={(value) => {
         setSwapPath(value)

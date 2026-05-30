@@ -381,8 +381,8 @@ export default function ShiftBoardClientPage({
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             {canReview
-              ? 'Approve post-publish trade and coverage requests.'
-              : 'Post trade requests or coverage requests for the published schedule only. Team board and direct requests both live here.'}
+              ? 'Review trade requests, coverage requests, and responder offers before the schedule changes.'
+              : 'Use Need coverage when someone should cover your shift, or Trade shift when you want to exchange assignments. Managers approve final schedule changes here.'}
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[29rem]">
