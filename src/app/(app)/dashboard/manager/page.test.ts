@@ -40,4 +40,10 @@ describe('manager dashboard Schedule Block Planning cues', () => {
     expect(accessCheckIndex).toBeLessThan(managerQueueIndex)
     expect(source).toContain('ManagerToolAccessDenied')
   })
+
+  it('uses the shared notification route resolver for recent activity links', () => {
+    expect(source).toContain('resolveNotificationHref(row,')
+    expect(source).toContain('target_id, created_at')
+    expect(source).not.toContain('function getNotificationHref')
+  })
 })
