@@ -5,7 +5,7 @@ import type {
   ShiftLimitRow,
   Therapist,
 } from '@/app/schedule/types'
-import { countViolatedForceOnOverrides } from '@/lib/availability-override-model'
+import { classifyOverrideOutcome } from '@/lib/availability-override-model'
 import { fillCoverageSlot, NO_ELIGIBLE_CANDIDATES_REASON } from '@/lib/coverage/generator-slot'
 import { getAutoDraftCoveragePolicy } from '@/lib/coverage/auto-draft-policy'
 import {
@@ -47,6 +47,19 @@ export type GenerateDraftResult = {
   draftShiftsToInsert: DraftShiftInsert[]
   pendingLeadUpdates: Array<{ date: string; shiftType: 'day' | 'night'; therapistId: string }>
   unfilledConstraintSlots: Array<{ date: string; shiftType: 'day' | 'night'; missingCount: number }>
+  missingLeadSlotDetails: Array<{ date: string; shiftType: 'day' | 'night' }>
+  forcedMustWorkMissDetails: Array<{
+    therapistId: string
+    therapistName: string | null
+    date: string
+    shiftType: 'day' | 'night' | 'both'
+  }>
+  needOffConflictDetails: Array<{
+    therapistId: string
+    therapistName: string | null
+    date: string
+    shiftType: 'day' | 'night' | 'both'
+  }>
   unfilledSlots: number
   constraintsUnfilledSlots: number
   missingLeadSlots: number
@@ -147,6 +160,7 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
   let missingLeadSlots = 0
   const pendingLeadUpdates: GenerateDraftResult['pendingLeadUpdates'] = []
   const unfilledConstraintSlots: GenerateDraftResult['unfilledConstraintSlots'] = []
+  const missingLeadSlotDetails: GenerateDraftResult['missingLeadSlotDetails'] = []
 
   const draftShiftsToInsert: DraftShiftInsert[] = []
 
@@ -269,6 +283,7 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
 
     if (!dayHasLead) {
       missingLeadSlots += 1
+      missingLeadSlotDetails.push({ date, shiftType: 'day' })
     }
 
     const nightSlotKey = coverageSlotKey(date, 'night')
@@ -386,21 +401,44 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
 
     if (!nightHasLead) {
       missingLeadSlots += 1
+      missingLeadSlotDetails.push({ date, shiftType: 'night' })
     }
   }
 
-  const forcedMustWorkMisses = countViolatedForceOnOverrides({
-    overrides: allAvailabilityOverrides,
-    scheduledShifts: [...existingShifts, ...draftShiftsToInsert],
-  })
+  const scheduledShifts = [...existingShifts, ...draftShiftsToInsert]
+  const forcedMustWorkMissDetails: GenerateDraftResult['forcedMustWorkMissDetails'] = []
+  const needOffConflictDetails: GenerateDraftResult['needOffConflictDetails'] = []
+
+  for (const override of allAvailabilityOverrides) {
+    const outcome = classifyOverrideOutcome({ override, scheduledShifts })
+    if (outcome.kind !== 'violated') continue
+
+    const therapist = therapistById.get(override.therapist_id)
+    const detail = {
+      therapistId: override.therapist_id,
+      therapistName: therapist?.full_name?.trim() || null,
+      date: override.date,
+      shiftType: override.shift_type,
+    }
+
+    if (outcome.reason === 'force_on_not_scheduled') {
+      forcedMustWorkMissDetails.push(detail)
+    }
+    if (outcome.reason === 'force_off_scheduled') {
+      needOffConflictDetails.push(detail)
+    }
+  }
 
   return {
     draftShiftsToInsert,
     pendingLeadUpdates,
     unfilledConstraintSlots,
+    missingLeadSlotDetails,
+    forcedMustWorkMissDetails,
+    needOffConflictDetails,
     unfilledSlots,
     constraintsUnfilledSlots,
     missingLeadSlots,
-    forcedMustWorkMisses,
+    forcedMustWorkMisses: forcedMustWorkMissDetails.length,
   }
 }

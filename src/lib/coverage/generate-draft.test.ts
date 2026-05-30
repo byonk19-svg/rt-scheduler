@@ -67,6 +67,71 @@ describe('generateDraftForCycle', () => {
       allAvailabilityOverrides: [override],
     })
     expect(result.forcedMustWorkMisses).toBe(1)
+    expect(result.forcedMustWorkMissDetails).toEqual([
+      {
+        therapistId: 'nobody',
+        therapistName: null,
+        date: '2026-04-07',
+        shiftType: 'day',
+      },
+    ])
+  })
+
+  it('reports missing lead and Need Off conflict details without changing existing counts', () => {
+    const therapist: Therapist = {
+      id: 'staff-1',
+      full_name: 'Staff One',
+      shift_type: 'day',
+      is_lead_eligible: false,
+      employment_type: 'full_time',
+      max_work_days_per_week: 5,
+      works_dow: [0, 1, 2, 3, 4, 5, 6],
+      offs_dow: [],
+      weekend_rotation: 'none',
+      weekend_anchor_date: null,
+      works_dow_mode: 'hard',
+      shift_preference: 'day',
+      on_fmla: false,
+      fmla_return_date: null,
+      is_active: true,
+    }
+    const result = generateDraftForCycle({
+      ...BASE_INPUT,
+      therapists: [therapist],
+      existingShifts: [
+        {
+          user_id: 'staff-1',
+          date: '2026-04-07',
+          shift_type: 'day',
+          status: 'scheduled',
+          role: 'staff',
+        },
+      ],
+      allAvailabilityOverrides: [
+        {
+          therapist_id: 'staff-1',
+          cycle_id: 'cycle-1',
+          date: '2026-04-07',
+          shift_type: 'day',
+          override_type: 'force_off',
+          source: 'therapist',
+        },
+      ],
+    })
+
+    expect(result.missingLeadSlots).toBeGreaterThan(0)
+    expect(result.missingLeadSlotDetails).toContainEqual({
+      date: '2026-04-07',
+      shiftType: 'day',
+    })
+    expect(result.needOffConflictDetails).toEqual([
+      {
+        therapistId: 'staff-1',
+        therapistName: 'Staff One',
+        date: '2026-04-07',
+        shiftType: 'day',
+      },
+    ])
   })
 
   it('respects repeating-cycle off segments through therapist.pattern', () => {
