@@ -220,4 +220,28 @@ describe('AvailabilityStatusSummary', () => {
 
     expect(html).toContain('aria-current="true"')
   })
+
+  it('labels manager-entered availability separately from therapist-submitted requests', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityStatusSummary, {
+        submittedRows: [
+          {
+            therapistId: 'manager-entered-1',
+            therapistName: 'Rosa V.',
+            overridesCount: 0,
+            managerEnteredCount: 2,
+            lastUpdatedAt: '2026-03-16T12:00:00.000Z',
+            shiftType: 'day',
+            employmentType: 'full_time',
+          },
+        ],
+        missingRows: [],
+        initialFilter: 'submitted_with_exceptions',
+      })
+    )
+
+    expect(html).toContain('Manager-entered')
+    expect(html).toContain('Requests: 2')
+    expect(html).toContain('data-roster-filter="submitted_no_exceptions"')
+  })
 })

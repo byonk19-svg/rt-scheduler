@@ -191,6 +191,20 @@ describe('ManagerSchedulingInputs', () => {
     )
   })
 
+  it('passes manager-entered availability provenance into the therapist detail panel', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
+      'utf8'
+    )
+    const panelSource = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/therapist-context-panel.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain('managerEnteredCount: rosterRow.managerEnteredCount ?? 0')
+    expect(panelSource).toContain('Manager-entered')
+  })
+
   it('renders a setup message when no cycles exist', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerSchedulingInputs, {

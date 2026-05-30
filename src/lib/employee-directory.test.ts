@@ -329,6 +329,36 @@ describe('employee directory helpers', () => {
     const row = new Map(rows.map((r) => [r.therapistId, r])).get('1')
     expect(row?.submitted).toBe(true)
     expect(row?.overridesCount).toBe(0)
+    expect(row?.managerEnteredCount).toBe(0)
+  })
+
+  it('distinguishes manager-entered therapist availability from therapist-submitted requests', () => {
+    const rows = buildMissingAvailabilityRows(
+      sampleEmployees,
+      [
+        {
+          id: 'ov-manager-entered',
+          therapist_id: '1',
+          cycle_id: 'cycle-a',
+          date: '2026-03-02',
+          shift_type: 'both',
+          override_type: 'force_off',
+          note: null,
+          created_at: '2026-02-28T12:00:00.000Z',
+          updated_at: '2026-03-01T12:00:00.000Z',
+          source: 'manager',
+          intent: 'therapist_need_off',
+        },
+      ],
+      'cycle-a',
+      { officialSubmissionTherapistIds: new Set(['1']) }
+    )
+
+    const row = new Map(rows.map((r) => [r.therapistId, r])).get('1')
+    expect(row?.submitted).toBe(true)
+    expect(row?.overridesCount).toBe(0)
+    expect(row?.managerEnteredCount).toBe(1)
+    expect(row?.lastUpdatedAt).toBe('2026-03-01T12:00:00.000Z')
   })
 })
 

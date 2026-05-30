@@ -20,6 +20,7 @@ export type AvailabilityStatusSummaryRow = {
   therapistId: string
   therapistName: string
   overridesCount: number
+  managerEnteredCount?: number
   lastUpdatedAt: string | null
   shiftType?: 'day' | 'night'
   employmentType?: 'full_time' | 'part_time' | 'prn'
@@ -95,7 +96,19 @@ function statusBadgeClass(submitted: boolean) {
 
 function queueStatusLabel(row: CombinedRosterRow) {
   if (!row.submitted) return 'Needs submission'
+  if ((row.managerEnteredCount ?? 0) > 0 && row.overridesCount > 0) {
+    return 'Submitted + manager-entered'
+  }
+  if ((row.managerEnteredCount ?? 0) > 0) return 'Manager-entered'
   return row.overridesCount > 0 ? 'Submitted with requests' : 'Submitted no requests'
+}
+
+function rowRequestCount(row: CombinedRosterRow) {
+  return row.overridesCount + (row.managerEnteredCount ?? 0)
+}
+
+function rowHasRequests(row: CombinedRosterRow) {
+  return row.submitted && rowRequestCount(row) > 0
 }
 
 function reminderButtonLabel(missingCount: number) {
@@ -201,25 +214,21 @@ export function AvailabilityStatusSummary({
   const filteredRows = useMemo(() => {
     if (resolvedActiveFilter === 'missing') return visibleRows.filter((row) => !row.submitted)
     if (resolvedActiveFilter === 'submitted') return visibleRows.filter((row) => row.submitted)
-    if (resolvedActiveFilter === 'has_requests') {
-      return visibleRows.filter((row) => row.submitted && row.overridesCount > 0)
-    }
+    if (resolvedActiveFilter === 'has_requests') return visibleRows.filter(rowHasRequests)
     if (resolvedActiveFilter === 'submitted_with_exceptions') {
-      return visibleRows.filter((row) => row.submitted && row.overridesCount > 0)
+      return visibleRows.filter(rowHasRequests)
     }
     if (resolvedActiveFilter === 'submitted_no_exceptions') {
-      return visibleRows.filter((row) => row.submitted && row.overridesCount === 0)
+      return visibleRows.filter((row) => row.submitted && !rowHasRequests(row))
     }
     return visibleRows
   }, [resolvedActiveFilter, visibleRows])
 
   const missingCount = visibleRows.filter((row) => !row.submitted).length
   const reminderScopeMissingCount = reminderMissingCount ?? missingRows.length
-  const submittedWithExceptionsCount = visibleRows.filter(
-    (row) => row.submitted && row.overridesCount > 0
-  ).length
+  const submittedWithExceptionsCount = visibleRows.filter((row) => rowHasRequests(row)).length
   const submittedNoExceptionsCount = visibleRows.filter(
-    (row) => row.submitted && row.overridesCount === 0
+    (row) => row.submitted && !rowHasRequests(row)
   ).length
   const displayedRows = filteredRows.slice(0, visibleCount)
   const canLoadMore = filteredRows.length > visibleCount
@@ -372,7 +381,7 @@ export function AvailabilityStatusSummary({
                     </div>
 
                     <div className="text-[12px] font-medium text-muted-foreground">
-                      Requests: {row.overridesCount}
+                      Requests: {rowRequestCount(row)}
                     </div>
 
                     <div className="whitespace-nowrap text-[12px] text-muted-foreground">

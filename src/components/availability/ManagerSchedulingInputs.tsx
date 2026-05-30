@@ -346,6 +346,7 @@ export function ManagerSchedulingInputs({
     ? {
         submitted: rosterRow.submitted,
         overridesCount: rosterRow.overridesCount,
+        managerEnteredCount: rosterRow.managerEnteredCount ?? 0,
         lastUpdatedAt: rosterRow.lastUpdatedAt,
       }
     : null
