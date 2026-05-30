@@ -600,7 +600,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     await notifyUsers(supabase, {
       userIds: therapistIds,
       eventType: 'cycle_published',
-      title: 'Cycle published',
+      title: 'Schedule Block published',
       message: `${cycleLabel} (${cycleRange}) is now published.`,
       targetType: 'schedule_cycle',
       targetId: cycleId,
