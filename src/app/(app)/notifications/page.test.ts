@@ -48,4 +48,11 @@ describe('notifications page copy guardrails', () => {
     expect(notificationsPageSource).toContain('<article')
     expect(notificationsPageSource).toContain('line-clamp-2')
   })
+
+  it('uses shared notification routing metadata for actionable notification rows', () => {
+    expect(notificationsPageSource).toContain('resolveNotificationHref(item, userRole)')
+    expect(notificationsPageSource).toContain('target_type, target_id')
+    expect(notificationsPageSource).toContain('href={item.href}')
+    expect(notificationsPageSource).toContain("select('role')")
+  })
 })

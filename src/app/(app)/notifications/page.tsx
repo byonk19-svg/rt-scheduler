@@ -7,6 +7,8 @@ import { Bell, CheckCheck, CheckCircle2, Filter, Inbox } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { parseRole } from '@/lib/auth/roles'
+import { resolveNotificationHref } from '@/lib/notification-routing'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 
@@ -20,8 +22,14 @@ type NotificationRow = {
   title: string
   message: string
   event_type: string
+  target_type: 'schedule_cycle' | 'shift' | 'shift_post' | 'system' | null
+  target_id: string | null
   created_at: string
   read_at: string | null
+}
+
+type NotificationDisplayRow = NotificationRow & {
+  href: string | null
 }
 
 type NotificationFilter = 'all' | 'unread' | 'schedule' | 'requests' | 'preliminary'
@@ -127,12 +135,23 @@ export default async function NotificationsPage({
 
   const { data: notificationsData } = await supabase
     .from('notifications')
-    .select('id, title, message, event_type, created_at, read_at')
+    .select('id, title, message, event_type, target_type, target_id, created_at, read_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(50)
 
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const userRole = parseRole((profileData as { role?: string | null } | null)?.role)
   const notifications = (notificationsData ?? []) as NotificationRow[]
+  const notificationRows: NotificationDisplayRow[] = notifications.map((item) => ({
+    ...item,
+    href: resolveNotificationHref(item, userRole),
+  }))
   const rawFilter = getSearchParam(params?.filter)
   const filter: NotificationFilter =
     rawFilter === 'unread' ||
@@ -141,10 +160,10 @@ export default async function NotificationsPage({
     rawFilter === 'preliminary'
       ? rawFilter
       : 'all'
-  const unreadCount = notifications.filter((item) => item.read_at === null).length
-  const filtered = notifications.filter((item) => includesFilter(item, filter))
+  const unreadCount = notificationRows.filter((item) => item.read_at === null).length
+  const filtered = notificationRows.filter((item) => includesFilter(item, filter))
 
-  const grouped = new Map<string, NotificationRow[]>()
+  const grouped = new Map<string, NotificationDisplayRow[]>()
   for (const item of filtered) {
     const key = toDayKey(item.created_at)
     const existing = grouped.get(key) ?? []
@@ -163,24 +182,24 @@ export default async function NotificationsPage({
     count: number
     icon: ComponentType<{ className?: string }>
   }> = [
-    { id: 'all', label: 'All', count: notifications.length, icon: Inbox },
+    { id: 'all', label: 'All', count: notificationRows.length, icon: Inbox },
     { id: 'unread', label: 'Unread', count: unreadCount, icon: Bell },
     {
       id: 'schedule',
       label: 'Schedule',
-      count: notifications.filter((item) => includesFilter(item, 'schedule')).length,
+      count: notificationRows.filter((item) => includesFilter(item, 'schedule')).length,
       icon: Filter,
     },
     {
       id: 'requests',
       label: 'Requests',
-      count: notifications.filter((item) => includesFilter(item, 'requests')).length,
+      count: notificationRows.filter((item) => includesFilter(item, 'requests')).length,
       icon: Filter,
     },
     {
       id: 'preliminary',
       label: 'Preliminary',
-      count: notifications.filter((item) => includesFilter(item, 'preliminary')).length,
+      count: notificationRows.filter((item) => includesFilter(item, 'preliminary')).length,
       icon: Filter,
     },
   ]
@@ -264,37 +283,52 @@ export default async function NotificationsPage({
                 {group.label}
               </p>
               <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-tw-sm">
-                {group.items.map((item) => (
-                  <article
-                    key={item.id}
-                    className={cn(
-                      'grid gap-2 px-4 py-3 transition-colors sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start',
-                      item.read_at ? 'bg-card' : 'bg-[var(--info-subtle)]/35'
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-2">
-                        {item.read_at === null ? (
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
-                        ) : null}
-                        <h2 className="truncate text-sm font-semibold text-foreground">
-                          {item.title}
-                        </h2>
+                {group.items.map((item) => {
+                  const rowClassName = cn(
+                    'grid gap-2 px-4 py-3 transition-colors sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start',
+                    item.href ? 'hover:bg-muted/45' : undefined,
+                    item.read_at ? 'bg-card' : 'bg-[var(--info-subtle)]/35'
+                  )
+                  const rowContent = (
+                    <>
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-center gap-2">
+                          {item.read_at === null ? (
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
+                          ) : null}
+                          <h2 className="truncate text-sm font-semibold text-foreground">
+                            {item.title}
+                          </h2>
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-sm leading-5 text-foreground/80">
+                          {item.message}
+                        </p>
                       </div>
-                      <p className="mt-1 line-clamp-2 text-sm leading-5 text-foreground/80">
-                        {item.message}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {getEventTypeLabel(item.event_type)}
-                      </span>
-                      <time className="text-xs text-muted-foreground" dateTime={item.created_at}>
-                        {formatTime(item.created_at)}
-                      </time>
-                    </div>
-                  </article>
-                ))}
+                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                        <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {getEventTypeLabel(item.event_type)}
+                        </span>
+                        <time className="text-xs text-muted-foreground" dateTime={item.created_at}>
+                          {formatTime(item.created_at)}
+                        </time>
+                      </div>
+                    </>
+                  )
+
+                  return item.href ? (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      className={cn(rowClassName, 'text-inherit no-underline')}
+                    >
+                      {rowContent}
+                    </Link>
+                  ) : (
+                    <article key={item.id} className={rowClassName}>
+                      {rowContent}
+                    </article>
+                  )
+                })}
               </div>
             </div>
           ))}
