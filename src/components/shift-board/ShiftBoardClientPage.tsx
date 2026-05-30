@@ -163,8 +163,9 @@ export default function ShiftBoardClientPage({
   ).length
   const needsActionCount = requests.filter(isReadyForManagerDecision).length
   const waitingCount = requests.filter(isWaitingOnTeammate).length
-  const approvedCount = requests.filter((request) => request.status === 'approved').length
-  const deniedCount = requests.filter((request) => request.status === 'denied').length
+  const historyCount = requests.filter((request) =>
+    HISTORY_STATUSES.includes(request.status)
+  ).length
   const needsCoverageAttention = canReview && (metrics.unfilled > 0 || metrics.missingLead > 0)
   const scheduleBlockLabel = useMemo(() => formatScheduleBlockRange(requests), [requests])
   const tabCounts = useMemo(
@@ -173,9 +174,9 @@ export default function ShiftBoardClientPage({
         'needs-action': needsActionCount,
         'open-shifts': openPostCount,
         waiting: waitingCount,
-        history: approvedCount + deniedCount,
+        history: historyCount,
       }) satisfies Record<ShiftBoardSection, number>,
-    [approvedCount, deniedCount, needsActionCount, openPostCount, waitingCount]
+    [historyCount, needsActionCount, openPostCount, waitingCount]
   )
 
   const filtered = useMemo(() => {
@@ -542,6 +543,8 @@ export default function ShiftBoardClientPage({
             ['no-responders', 'No responders yet'],
             ['approved', 'Approved'],
             ['denied', 'Denied'],
+            ['expired', 'Expired'],
+            ['withdrawn', 'Withdrawn'],
           ]}
         />
       </div>

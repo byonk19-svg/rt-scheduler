@@ -91,6 +91,8 @@ export type StatusFilter =
   | 'no-responders'
   | 'approved'
   | 'denied'
+  | 'expired'
+  | 'withdrawn'
 
 export const BOARD_SECTIONS: Array<{ id: ShiftBoardSection; label: string }> = [
   { id: 'needs-action', label: 'Needs Action' },
