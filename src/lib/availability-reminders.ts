@@ -29,17 +29,17 @@ function buildReminderEmailPayload(params: {
   fromEmail: string
 }) {
   const greeting = params.recipient.name ? `Hi ${params.recipient.name},` : 'Hi there,'
-  const subject = `Action needed: submit your availability for ${params.cycleDateRange}`
+  const subject = `Action needed: submit your availability for Schedule Block ${params.cycleDateRange}`
   const text = [
     greeting,
     '',
-    `Please submit your availability for the upcoming cycle (${params.cycleDateRange}).`,
+    `Please submit your availability for Schedule Block ${params.cycleDateRange}.`,
     '',
     `Submit here: ${params.availabilityUrl}`,
     '',
     '- Teamwise',
   ].join('\n')
-  const html = `<p>${greeting}</p><p>Please submit your availability for the upcoming cycle (${params.cycleDateRange}).</p><p><a href="${params.availabilityUrl}">Submit your availability</a></p><p>- Teamwise</p>`
+  const html = `<p>${greeting}</p><p>Please submit your availability for Schedule Block ${params.cycleDateRange}.</p><p><a href="${params.availabilityUrl}">Submit your availability</a></p><p>- Teamwise</p>`
 
   return {
     from: params.fromEmail,
