@@ -6,6 +6,7 @@ import {
   formatRequestShiftLabel,
   isRequestVisibleInHistoryView,
   isRequestVisibleInOpenView,
+  isRequestExpired,
   mutateShiftPost,
   requestInitials,
   requestSlotKey,
@@ -25,6 +26,9 @@ describe('request workflow helpers', () => {
   })
 
   it('expires old pending requests while keeping other statuses intact', () => {
+    expect(isRequestExpired('pending', '2026-04-26T11:59:59.000Z')).toBe(true)
+    expect(isRequestExpired('pending', '2026-04-27T18:00:00.000Z')).toBe(false)
+    expect(isRequestExpired('approved', '2026-04-20T12:00:00.000Z')).toBe(false)
     expect(toRequestUiStatus('pending', '2026-04-26T11:59:59.000Z')).toBe('expired')
     expect(toRequestUiStatus('pending', '2026-04-27T18:00:00.000Z')).toBe('pending')
     expect(toRequestUiStatus('approved', '2026-04-20T12:00:00.000Z')).toBe('approved')

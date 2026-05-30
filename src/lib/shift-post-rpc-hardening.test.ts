@@ -48,7 +48,7 @@ describe('shift post RPC hardening migration', () => {
     expect(shiftPostRouteSource).toContain("select('role, is_active, archived_at, site_id')")
     expect(shiftPostRouteSource).toContain('Boolean(profile?.site_id)')
     expect(shiftPostRouteSource).toContain(
-      "select('id, type, status, visibility, recipient_response, claimed_by, shift_id, swap_shift_id')"
+      "select(\n      'id, type, status, created_at, visibility, recipient_response, claimed_by, shift_id, swap_shift_id'\n    )"
     )
     expect(shiftPostRouteSource).toContain("from('shifts')")
     expect(shiftPostRouteSource).toContain("select('id, site_id')")

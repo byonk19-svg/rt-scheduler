@@ -82,11 +82,15 @@ function isRequestOlderThanHours(value: string, hours: number): boolean {
   return Date.now() - parsed.getTime() >= hours * 60 * 60 * 1000
 }
 
+export function isRequestExpired(status: PersistedRequestStatus, createdAt: string): boolean {
+  return status === 'pending' && isRequestOlderThanHours(createdAt, REQUEST_EXPIRATION_HOURS)
+}
+
 export function toRequestUiStatus(
   status: PersistedRequestStatus,
   createdAt: string
 ): RequestStatus {
-  if (status === 'pending' && isRequestOlderThanHours(createdAt, REQUEST_EXPIRATION_HOURS)) {
+  if (isRequestExpired(status, createdAt)) {
     return 'expired'
   }
   return status
