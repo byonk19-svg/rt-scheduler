@@ -67,6 +67,7 @@ type Profile = {
   site_id: string
   full_name?: string
   on_fmla?: boolean
+  is_lead_eligible?: boolean | null
   max_work_days_per_week?: number
 }
 
@@ -122,6 +123,7 @@ const therapistRows: Profile[] = [
     full_name: 'Day Therapist',
     employment_type: 'full_time',
     on_fmla: false,
+    is_lead_eligible: false,
     max_work_days_per_week: 3,
   },
 ]
@@ -368,7 +370,7 @@ describe('loadScheduleGridData visibility', () => {
     ['schedule cycles', { cycles: { message: 'cycle read failed' } }],
     ['therapist roster', { therapists: { message: 'therapist read failed' } }],
     ['shift assignments', { shifts: { message: 'shift read failed' } }],
-    ['requested-off overrides', { forceOff: { message: 'force-off read failed' } }],
+    ['Need Off overrides', { forceOff: { message: 'force-off read failed' } }],
   ] satisfies Array<[string, ScheduleGridReadFailures]>)(
     'surfaces %s read failures instead of returning empty schedule data',
     async (_label, failures) => {
@@ -409,6 +411,7 @@ describe('loadScheduleGridData visibility', () => {
     expect(result.status).toBe('ok')
     if (result.status !== 'ok') return
     expect(result.dataset.therapistRows[0]?.employmentType).toBe('full_time')
+    expect(result.dataset.therapistRows[0]?.isLeadEligible).toBe(false)
   })
 
   it('hides inactive unarchived therapists from draft schedule planning when they have no assignments', async () => {
@@ -503,6 +506,7 @@ describe('loadScheduleGridData visibility', () => {
     expect(inactiveRow?.cells['2026-05-05']).toMatchObject({
       status: 'off',
       isIneligible: true,
+      ineligibleReason: 'inactive',
     })
   })
 
@@ -660,7 +664,7 @@ describe('schedule grid model helpers', () => {
     expect(result.selectedCycle?.id).toBe('draft-cycle')
   })
 
-  it('marks requested-off force-off days on matching shift tabs', () => {
+  it('marks Need Off force-off days on matching shift tabs', () => {
     const [row] = buildTherapistGridRows({
       therapists: [
         {
@@ -688,6 +692,35 @@ describe('schedule grid model helpers', () => {
 
     expect(row?.cells['2026-05-04']?.hasNeedsOff).toBe(true)
     expect(row?.cells['2026-05-05']?.hasNeedsOff).toBe(true)
+  })
+
+  it('marks FMLA off days ineligible with an explicit reason', () => {
+    const [row] = buildTherapistGridRows({
+      therapists: [
+        {
+          id: 'therapist-1',
+          full_name: 'FMLA Therapist',
+          shift_type: 'day',
+          employment_type: 'full_time',
+          on_fmla: true,
+          is_active: true,
+          archived_at: null,
+          role: 'therapist',
+          max_work_days_per_week: null,
+        },
+      ],
+      cycleDates: ['2026-05-04'],
+      shiftType: 'day',
+      shifts: [],
+      forceOffOverrides: [],
+      activeOperationalDetails: new Map(),
+    })
+
+    expect(row?.cells['2026-05-04']).toMatchObject({
+      status: 'off',
+      isIneligible: true,
+      ineligibleReason: 'fmla',
+    })
   })
 
   it('maps shift and assignment status combinations to the current grid cell status', () => {
@@ -868,6 +901,7 @@ describe('schedule grid model helpers', () => {
     expect(row?.cells['2026-05-06']).toMatchObject({
       status: 'off',
       isIneligible: true,
+      ineligibleReason: 'weekly_limit',
     })
   })
 

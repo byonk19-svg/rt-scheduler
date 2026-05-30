@@ -87,6 +87,7 @@ type StatusCellPopoverProps = {
   canUnassign: boolean
   canDesignateLead: boolean
   isCurrentlyLead: boolean
+  isLeadEligible?: boolean
   onStatusChange: (
     status: ScheduleGridAssignmentStatus,
     change?: AssignmentStatusChange
@@ -108,6 +109,7 @@ export function StatusCellPopover({
   canUnassign,
   canDesignateLead,
   isCurrentlyLead,
+  isLeadEligible,
   onStatusChange,
   onUnassign,
   onDesignateLead,
@@ -126,6 +128,8 @@ export function StatusCellPopover({
     Boolean(pendingStatus) &&
     !isPending &&
     (!pendingCopy?.requiresTime || Boolean(normalizedLeftEarlyTime))
+  const showLeadControl = canDesignateLead && !isCurrentlyLead
+  const canUseLeadControl = showLeadControl && isLeadEligible !== false
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -224,17 +228,30 @@ export function StatusCellPopover({
             Choose a status, then confirm before the schedule is changed.
           </p>
         ) : null}
-        {canUnassign || (canDesignateLead && !isCurrentlyLead) ? (
+        {canUnassign || showLeadControl ? (
           <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
-            {canDesignateLead && !isCurrentlyLead ? (
-              <button
-                type="button"
-                className="rounded-md px-2 py-1.5 text-left text-sm font-medium text-primary hover:bg-muted"
-                disabled={isPending}
-                onClick={onDesignateLead}
-              >
-                Designate as lead
-              </button>
+            {showLeadControl ? (
+              <>
+                {isLeadEligible === false ? (
+                  <p className="rounded-md bg-muted px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+                    Not lead eligible. Update Team before designating this therapist as lead.
+                  </p>
+                ) : isLeadEligible === true ? (
+                  <p className="px-2 pt-1 text-xs font-medium text-muted-foreground">
+                    Lead eligible
+                  </p>
+                ) : null}
+                {canUseLeadControl ? (
+                  <button
+                    type="button"
+                    className="rounded-md px-2 py-1.5 text-left text-sm font-medium text-primary hover:bg-muted"
+                    disabled={isPending}
+                    onClick={onDesignateLead}
+                  >
+                    Designate as lead
+                  </button>
+                ) : null}
+              </>
             ) : null}
             {canUnassign ? (
               <button

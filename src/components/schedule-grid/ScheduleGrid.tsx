@@ -28,6 +28,7 @@ type CellTarget = {
   date: string
   cell: GridCell
   therapistName: string
+  isLeadEligible?: boolean
   anchorEl: HTMLElement
 }
 
@@ -281,7 +282,14 @@ export function ScheduleGrid({
       ) {
         return
       }
-      setActiveCellTarget({ userId, date, cell, therapistName: row.name, anchorEl })
+      setActiveCellTarget({
+        userId,
+        date,
+        cell,
+        therapistName: row.name,
+        isLeadEligible: row.isLeadEligible,
+        anchorEl,
+      })
     },
     [cellsLocked, initialDataset, interactionMode]
   )
@@ -630,6 +638,7 @@ export function ScheduleGrid({
           canUnassign={interactionMode.canUnassignShifts}
           canDesignateLead={interactionMode.canDesignateLead}
           isCurrentlyLead={activeCellTarget.cell.status === 'lead'}
+          isLeadEligible={activeCellTarget.isLeadEligible}
           onStatusChange={handleStatusChange}
           onUnassign={handleUnassign}
           onDesignateLead={handleDesignateLead}

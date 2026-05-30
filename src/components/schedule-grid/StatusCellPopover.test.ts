@@ -27,10 +27,12 @@ function renderPopover({
   allowStatusChange,
   canUnassign,
   canDesignateLead,
+  isLeadEligible = true,
 }: {
   allowStatusChange: boolean
   canUnassign: boolean
   canDesignateLead: boolean
+  isLeadEligible?: boolean
 }) {
   return renderToStaticMarkup(
     createElement(StatusCellPopover, {
@@ -44,6 +46,7 @@ function renderPopover({
       canUnassign,
       canDesignateLead,
       isCurrentlyLead: false,
+      isLeadEligible,
       onStatusChange: vi.fn(),
       onUnassign: vi.fn(),
       onDesignateLead: vi.fn(),
@@ -92,7 +95,22 @@ describe('StatusCellPopover', () => {
     })
 
     expect(html).toContain('On call')
+    expect(html).toContain('Lead eligible')
     expect(html).toContain('Designate as lead')
+    expect(html).toContain('Unassign')
+  })
+
+  it('explains non-lead-eligible assignments instead of offering lead designation', () => {
+    const html = renderPopover({
+      allowStatusChange: true,
+      canUnassign: true,
+      canDesignateLead: true,
+      isLeadEligible: false,
+    })
+
+    expect(html).toContain('Not lead eligible')
+    expect(html).toContain('Update Team before designating this therapist as lead.')
+    expect(html).not.toContain('Designate as lead')
     expect(html).toContain('Unassign')
   })
 

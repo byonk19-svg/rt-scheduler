@@ -14,6 +14,7 @@ export type GridCell = {
   status: GridCellStatus
   hasNeedsOff: boolean
   isIneligible: boolean
+  ineligibleReason?: 'inactive' | 'fmla' | 'weekly_limit'
 }
 
 export type TherapistGridRow = {
@@ -21,6 +22,7 @@ export type TherapistGridRow = {
   name: string
   isOnFmla: boolean
   isActive: boolean
+  isLeadEligible?: boolean
   employmentType: 'full_time' | 'part_time' | 'prn'
   shiftType: 'day' | 'night'
   cells: Record<string, GridCell>

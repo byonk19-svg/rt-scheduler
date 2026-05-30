@@ -273,6 +273,11 @@ function TherapistRow({
         {row.isOnFmla ? (
           <span className="text-[7px] font-black uppercase text-muted-foreground">FMLA</span>
         ) : null}
+        {!row.isActive ? (
+          <span className="ml-1 text-[7px] font-black uppercase text-muted-foreground">
+            Inactive
+          </span>
+        ) : null}
       </th>
       {cycleDates.map((date) => {
         const cell = row.cells[date] ?? {

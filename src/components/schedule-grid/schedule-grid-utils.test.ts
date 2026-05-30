@@ -19,7 +19,7 @@ describe('getCellDisplay', () => {
 
     const display = getCellDisplay(cell)
 
-    expect(display.code).toBe('1')
+    expect(display.code).toBe('L')
     expect(display.colorClass).toContain('bg-yellow')
     expect(display.colorClass).toContain('border-yellow')
     expect(display.asterisk).toBe(false)
@@ -208,7 +208,7 @@ describe('buildScheduleCellAccessibleLabel', () => {
     }
   })
 
-  it('includes requested-off and ineligible context without changing the visual code', () => {
+  it('includes Need Off and default ineligible context without changing the visual code', () => {
     expect(
       buildScheduleCellAccessibleLabel({
         therapistName: 'Alice Johnson',
@@ -223,7 +223,43 @@ describe('buildScheduleCellAccessibleLabel', () => {
         canOpenActions: false,
       })
     ).toBe(
-      'Alice Johnson, Tue, May 5, 2026, day shift, not scheduled, requested off, not eligible, read-only'
+      'Alice Johnson, Tue, May 5, 2026, day shift, not scheduled, Need Off, not eligible, read-only'
     )
+  })
+
+  it('explains why an off cell is not eligible when a reason is available', () => {
+    expect(
+      buildScheduleCellAccessibleLabel({
+        therapistName: 'Alice Johnson',
+        date: '2026-05-05',
+        shiftType: 'day',
+        cell: {
+          shiftId: null,
+          status: 'off',
+          hasNeedsOff: false,
+          isIneligible: true,
+          ineligibleReason: 'fmla',
+        },
+        canOpenActions: false,
+      })
+    ).toBe(
+      'Alice Johnson, Tue, May 5, 2026, day shift, not scheduled, not eligible: FMLA, read-only'
+    )
+
+    expect(
+      buildScheduleCellAccessibleLabel({
+        therapistName: 'Alice Johnson',
+        date: '2026-05-06',
+        shiftType: 'day',
+        cell: {
+          shiftId: null,
+          status: 'off',
+          hasNeedsOff: false,
+          isIneligible: true,
+          ineligibleReason: 'weekly_limit',
+        },
+        canOpenActions: false,
+      })
+    ).toContain('not eligible: weekly work limit reached')
   })
 })
