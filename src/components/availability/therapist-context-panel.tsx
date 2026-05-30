@@ -30,6 +30,7 @@ type AvailabilityEntryRow = {
 type SubmissionStatus = {
   submitted: boolean
   overridesCount: number
+  managerEnteredCount?: number
   lastUpdatedAt: string | null
 }
 
@@ -98,6 +99,10 @@ function initialsForName(name: string): string {
 
 function submissionLabel(status: SubmissionStatus | null) {
   if (!status?.submitted) return 'Not submitted'
+  if ((status.managerEnteredCount ?? 0) > 0 && status.overridesCount > 0) {
+    return 'Submitted + manager-entered'
+  }
+  if ((status.managerEnteredCount ?? 0) > 0) return 'Manager-entered'
   return status.overridesCount > 0 ? 'Submitted with requests' : 'Submitted no requests'
 }
 

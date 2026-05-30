@@ -54,6 +54,7 @@ export type MissingAvailabilityRow = {
   therapistId: string
   therapistName: string
   overridesCount: number
+  managerEnteredCount: number
   lastUpdatedAt: string | null
   /** True when therapist has officially submitted for this cycle (therapist_availability_submissions), when that set is supplied. */
   submitted: boolean
@@ -117,6 +118,13 @@ function intentForManagerOverride(
   return overrideType === 'force_off' ? 'manager_block' : 'manager_force'
 }
 
+function isManagerEnteredTherapistAvailability(row: EmployeeAvailabilityOverride): boolean {
+  return (
+    row.source === 'manager' &&
+    (row.intent === 'therapist_need_off' || row.intent === 'therapist_wants_work')
+  )
+}
+
 export function canTherapistMutateOverride(
   override: EmployeeAvailabilityOverride,
   therapistId: string
@@ -147,10 +155,14 @@ export function buildMissingAvailabilityRows(
       const rows = byTherapist.get(therapist.id) ?? []
       const metricsRows =
         officialIds !== undefined ? rows.filter((row) => row.source === 'therapist') : rows
+      const managerEnteredRows =
+        officialIds !== undefined ? rows.filter(isManagerEnteredTherapistAvailability) : []
+      const activityRows =
+        officialIds !== undefined ? [...metricsRows, ...managerEnteredRows] : metricsRows
       const lastUpdatedAt =
-        metricsRows.length === 0
+        activityRows.length === 0
           ? null
-          : (metricsRows
+          : (activityRows
               .map((row) => row.updated_at || row.created_at)
               .sort((a, b) => b.localeCompare(a))[0] ?? null)
       const submitted = officialIds !== undefined ? officialIds.has(therapist.id) : rows.length > 0
@@ -158,6 +170,7 @@ export function buildMissingAvailabilityRows(
         therapistId: therapist.id,
         therapistName: therapist.full_name,
         overridesCount: metricsRows.length,
+        managerEnteredCount: managerEnteredRows.length,
         lastUpdatedAt,
         submitted,
       }
