@@ -9,7 +9,7 @@ const BASE_PERMISSIONS = ['View schedule', 'Submit availability', 'View team ros
 
 const LEAD_EXTRA_PERMISSIONS = ['Update assignment status'] as const
 const MANAGER_EXTRA_PERMISSIONS = [
-  'Approve swaps',
+  'Approve trade requests',
   'Publish schedule',
   'Manage team',
   'Edit staffing',

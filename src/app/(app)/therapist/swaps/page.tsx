@@ -5,8 +5,8 @@ import RequestsWorkspacePage from '@/app/(app)/requests/new/page'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
-  title: 'Shift Swaps & Pickups',
-  description: 'Create and track your shift swap and pickup requests.',
+  title: 'Trade & Coverage Requests',
+  description: 'Create and track your trade and coverage requests.',
 }
 
 export default async function TherapistSwapsPage() {

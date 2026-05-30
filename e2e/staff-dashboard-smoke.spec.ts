@@ -92,7 +92,9 @@ test.describe.serial('staff dashboard smoke', () => {
     await expect(primaryLinks.first()).toBeVisible()
     await expect(page.getByText('Need something else?')).toBeVisible()
     await expect(page.getByRole('link', { name: 'View schedule' }).first()).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Shift Swaps & Pickups' }).first()).toBeVisible()
+    await expect(
+      page.getByRole('link', { name: 'Trade & Coverage Requests' }).first()
+    ).toBeVisible()
     await expect(page.getByRole('link', { name: 'View history' }).first()).toBeVisible()
   })
 })

@@ -232,7 +232,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
           }}
         >
           Schedule Block taken offline. Assignments were preserved, staff live views are hidden, and
-          new swaps or pickups stay paused until you republish.
+          new trade or coverage requests stay paused until you republish.
         </div>
       )}
 

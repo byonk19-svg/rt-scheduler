@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
   title: 'Requests',
-  description: 'Manage shift swap, pickup, and user access requests.',
+  description: 'Manage trade, coverage, and user access requests.',
 }
 
 export default async function RequestsPage() {
@@ -46,7 +46,7 @@ export default async function RequestsPage() {
     <div className="space-y-5">
       <ManagerWorkspaceHeader
         title="Requests"
-        subtitle="Manage open shift requests and user access requests."
+        subtitle="Manage open coverage requests and user access requests."
         summary={
           <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 text-sm font-medium text-foreground">
             {totalPending} pending access requests
@@ -61,14 +61,14 @@ export default async function RequestsPage() {
               <Repeat className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">Shift Swaps & Pickups</p>
+              <p className="text-sm font-semibold text-foreground">Trade & Coverage Requests</p>
               <p className="mt-1 text-sm text-foreground/80">
-                Review and manage the shared shift-swaps-and-pickups workflow.
+                Review and manage the shared trade-and-coverage workflow.
               </p>
             </div>
           </div>
           <Button asChild variant="outline" size="sm" className="mt-4">
-            <Link href="/shift-board">Shift Swaps & Pickups</Link>
+            <Link href="/shift-board">Trade & Coverage Requests</Link>
           </Button>
         </article>
 

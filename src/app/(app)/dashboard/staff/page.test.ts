@@ -34,7 +34,7 @@ describe('staff dashboard therapist action-center copy', () => {
     expect(staffDashboardSource).toContain('Next step')
     expect(staffDashboardSource).toContain('StaffAttentionCard')
     expect(staffDashboardSource).toContain('My Schedule')
-    expect(staffDashboardSource).toContain('Shift Swaps &amp; Pickups')
+    expect(staffDashboardSource).toContain('Trade &amp; Coverage Requests')
     expect(staffDashboardSource).toContain('Past requests and outcomes')
     expect(staffDashboardSource).toContain('resolveTherapistWorkflow')
   })

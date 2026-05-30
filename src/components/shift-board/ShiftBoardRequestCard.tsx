@@ -184,7 +184,7 @@ export function ManagerRequestCard({
             </p>
             <p className="mt-1 break-words text-sm text-muted-foreground">
               {req.type === 'swap'
-                ? `${req.poster}${swapPartnerName ? ` swaps with ${swapPartnerName}` : ' needs a partner'}`
+                ? `${req.poster}${swapPartnerName ? ` trades with ${swapPartnerName}` : ' needs a partner'}`
                 : `Requested by ${req.poster}`}{' '}
               - {req.status === 'pending' ? 'Posted' : 'Updated'} {req.posted}
             </p>
@@ -221,7 +221,7 @@ export function ManagerRequestCard({
           {showsPartnerPicker ? (
             <div className="mt-3">
               <label className="mb-1 block text-xs font-semibold text-muted-foreground">
-                {req.swapWithId ? 'Review swap partner' : 'Choose swap partner'}
+                {req.swapWithId ? 'Review trade partner' : 'Choose trade partner'}
               </label>
               {needsLeadPartner ? (
                 <p className="mb-2 text-xs text-[var(--warning-text)]">
@@ -445,7 +445,7 @@ function RequestHistorySummary({
             </p>
           ) : null}
           {req.type === 'swap' && req.swapWithName ? (
-            <p className="mt-0.5">Swap partner: {req.swapWithName}</p>
+            <p className="mt-0.5">Trade partner: {req.swapWithName}</p>
           ) : null}
         </div>
       ) : null}
@@ -659,13 +659,13 @@ function getActionNote(req: ShiftBoardRequest, selectedResponderName: string | n
     return 'Choose the teammate before manager approval is available.'
   }
   if (isPickupWithoutResponders(req)) {
-    return 'No responder has volunteered yet; fill the shift manually or keep watching.'
+    return 'No responder has offered to pick up this shift yet; fill it manually or keep watching.'
   }
   if (req.type === 'swap') {
     return 'Ready because staffing remains safe after the exchange.'
   }
   if (req.type === 'pickup') {
-    return `Ready because ${selectedResponderName ?? 'the selected responder'} is selected and coverage remains safe.`
+    return `Ready because ${selectedResponderName ?? 'the selected responder'} can pick up the shift and coverage remains safe.`
   }
   return `Ready because ${selectedResponderName ?? 'the selected responder'} is selected for this shift.`
 }
@@ -722,7 +722,7 @@ function RequestActionColumn({
             disabled={!interactiveEnabled}
             onClick={onPickupInterest}
           >
-            {req.hasMyInterest ? 'Withdraw interest' : 'Respond'}
+            {req.hasMyInterest ? 'Withdraw offer' : 'Pick up shift'}
           </Button>
         ) : null}
         <Button size="sm" variant="outline" onClick={onViewShift}>
@@ -771,7 +771,7 @@ function RequestActionColumn({
       <div className="flex flex-col gap-2 p-2.5 lg:sticky lg:top-20 lg:self-start">
         <DecisionSummary>{actionNote}</DecisionSummary>
         <Button size="sm" onClick={onViewShift}>
-          View open post
+          View coverage request
         </Button>
         <Button size="sm" variant="outline" onClick={onViewShift}>
           Add coverage manually
@@ -790,7 +790,11 @@ function RequestActionColumn({
           onClick={onApprove}
           className="whitespace-normal leading-tight"
         >
-          {saving ? 'Saving...' : req.type === 'swap' ? 'Approve swap' : 'Approve pickup'}
+          {saving
+            ? 'Saving...'
+            : req.type === 'swap'
+              ? 'Approve trade request'
+              : 'Approve coverage request'}
         </Button>
       ) : null}
       {req.type === 'pickup' && hasBackupResponder ? (

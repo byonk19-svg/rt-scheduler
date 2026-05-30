@@ -139,10 +139,10 @@ export function RequestComposer({
   const messageCount = message.length
   const visibleShiftChoices = myShifts.slice(0, 10)
 
-  const title = isSwap ? 'Trade shift' : 'Give up shift'
+  const title = isSwap ? 'Trade shift' : 'Need coverage'
   const subtitle = isSwap
-    ? 'Pick the shift you want to trade and choose whether to ask a specific teammate or post to Open Shifts.'
-    : 'Pick the shift you need covered, ask a specific teammate or post to Open Shifts, and send it for review.'
+    ? 'Pick the shift you want to trade and choose whether to ask a specific teammate or post it for manager review.'
+    : 'Pick the shift you need covered, ask a specific teammate or post an open coverage request, and send it for review.'
 
   return (
     <div className="relative left-1/2 w-[min(calc(100vw-5rem),1760px)] -translate-x-1/2 space-y-6 max-lg:left-auto max-lg:w-full max-lg:translate-x-0">
@@ -190,7 +190,7 @@ export function RequestComposer({
                   selected={requestType === 'pickup'}
                   onClick={() => onRequestTypeChange('pickup')}
                 >
-                  Give up shift
+                  Need coverage
                 </SegmentButton>
               </div>
             </div>
@@ -212,11 +212,11 @@ export function RequestComposer({
                   Suggest teammate
                 </PathButton>
                 <PathButton
-                  ariaLabel="Post an open swap instead"
+                  ariaLabel="Post an open trade request instead"
                   selected={swapPath === 'team_open'}
                   onClick={() => onSwapPathChange('team_open')}
                 >
-                  Open Shifts
+                  Open trade request
                 </PathButton>
               </div>
             ) : (
@@ -229,11 +229,11 @@ export function RequestComposer({
                   Ask a specific teammate
                 </PathButton>
                 <PathButton
-                  ariaLabel="Post to the board"
+                  ariaLabel="Post an open coverage request"
                   selected={requestVisibility === 'team'}
                   onClick={() => onRequestVisibilityChange('team')}
                 >
-                  Open Shifts
+                  Open coverage request
                 </PathButton>
               </div>
             )}
@@ -359,7 +359,7 @@ export function RequestComposer({
                           members={safeCandidates}
                           selectedId={swapWith}
                           onSelect={onSwapWithChange}
-                          emptyText="No strong direct swap options for this shift right now."
+                          emptyText="No strong direct trade options for this shift right now."
                         />
                         {reviewCandidates.length > 0 ? (
                           <TeammateSection
@@ -371,7 +371,7 @@ export function RequestComposer({
                         ) : null}
                         {hiddenCandidates.length > 0 ? (
                           <TeammateSection
-                            title="Pickup only"
+                            title="Coverage only"
                             members={hiddenCandidates}
                             selectedId={swapWith}
                             onSelect={onSwapWithChange}
@@ -392,8 +392,8 @@ export function RequestComposer({
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {isOpenTeamSwap
-                  ? 'This open swap goes to the team board for manager review.'
-                  : 'This pickup request goes to the team board so available teammates can respond.'}
+                  ? 'This open trade request goes to the team board for manager review.'
+                  : 'This coverage request goes to the team board so available teammates can respond.'}
               </p>
             </section>
           ) : null}
@@ -755,7 +755,9 @@ function RequestPreview({
             </div>
             <PreviewShiftCard
               eyebrow={isOpenTeamSwap ? 'Manager finds' : 'You ask'}
-              name={selectedMember?.name ?? (isOpenTeamSwap ? 'Open swap' : 'Choose teammate')}
+              name={
+                selectedMember?.name ?? (isOpenTeamSwap ? 'Open trade request' : 'Choose teammate')
+              }
               shiftLabel={
                 selectedMember?.currentShiftLabel ?? selectedMember?.shift ?? 'Pick a teammate'
               }
@@ -765,8 +767,8 @@ function RequestPreview({
         ) : (
           <div className="mt-5">
             <PreviewShiftCard
-              eyebrow="You give up"
-              name="Pickup coverage"
+              eyebrow="You need covered"
+              name="Coverage request"
               shiftLabel={
                 selectedShiftData
                   ? `${selectedShiftData.date} - ${selectedShiftData.type}`
@@ -794,9 +796,9 @@ function RequestPreview({
             complete={Boolean(selectedMember) || isOpenTeamSwap || requestType === 'pickup'}
             label={
               isOpenTeamSwap
-                ? 'Open team-board swap'
+                ? 'Open trade request'
                 : requestType === 'pickup'
-                  ? 'Pickup path selected'
+                  ? 'Coverage path selected'
                   : 'Selected teammate'
             }
           />
@@ -876,7 +878,7 @@ function RequestPreview({
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
             {isDirectSwap
-              ? 'After your teammate accepts, your manager will review the swap.'
+              ? 'After your teammate accepts, your manager will review the trade request.'
               : isTeamSuggestedSwap
                 ? 'Your suggested partner goes to manager review with the request.'
                 : 'A manager reviews board requests before the schedule changes.'}
@@ -955,19 +957,19 @@ function getPreviewPathLabel({
   requestType: RequestType
 }) {
   if (requestType === 'pickup') {
-    return 'Ask a specific teammate or post to Open Shifts for pickup coverage.'
+    return 'Ask a specific teammate or post an open coverage request.'
   }
 
   if (isDirectSwap) {
-    return 'Ask a specific teammate, then send the accepted swap to manager review.'
+    return 'Ask a specific teammate, then send the accepted trade request to manager review.'
   }
 
   if (isTeamSuggestedSwap) {
-    return 'Post to Open Shifts with a suggested teammate.'
+    return 'Post to the board with a suggested teammate.'
   }
 
   if (isOpenTeamSwap) {
-    return 'Post an open trade to Open Shifts for manager review.'
+    return 'Post an open trade request for manager review.'
   }
 
   return 'Review and send this request.'

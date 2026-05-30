@@ -42,10 +42,10 @@ export function RequestsHistoryView({
   return (
     <div className="space-y-3">
       <ManagerWorkspaceHeader
-        title={isTherapistSwapsSurface ? 'Shift Swaps & Pickups' : 'My Requests'}
+        title={isTherapistSwapsSurface ? 'Trade & Coverage Requests' : 'My Requests'}
         subtitle={
           isTherapistSwapsSurface
-            ? 'Track swap requests, teammate responses, and manager review for your published shifts.'
+            ? 'Track trade requests, coverage requests, teammate responses, and manager review for your published shifts.'
             : 'Track what is waiting on you, your teammate, or the manager.'
         }
         summary={
@@ -80,7 +80,7 @@ export function RequestsHistoryView({
         <p className="text-xs font-semibold text-foreground">How requests work</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {isTherapistSwapsSurface
-            ? 'Direct swaps wait for your teammate first. Team-board swaps wait for manager review. Each card shows the next step first.'
+            ? 'Direct trade requests wait for your teammate first. Team-board trade requests wait for manager review. Each card shows the next step first.'
             : 'Direct requests wait for teammate response first. Board requests wait for manager review. Each card shows the next step first.'}
         </p>
       </div>
@@ -99,8 +99,8 @@ export function RequestsHistoryView({
           <p className="mb-1 text-sm font-bold text-foreground">No requests yet</p>
           <p className="mb-4 text-xs text-muted-foreground">
             {isTherapistSwapsSurface
-              ? 'Create a shift swap or pickup request to track it here.'
-              : 'Create a swap, pickup, or direct request to track it here.'}
+              ? 'Create a trade request or coverage request to track it here.'
+              : 'Create a trade, coverage, or direct request to track it here.'}
           </p>
           <Button size="sm" onClick={onNewRequest}>
             New request
@@ -181,7 +181,7 @@ export function RequestsHistoryView({
                     <TimelineEntry
                       title="Request created"
                       timeLabel={formatRequestRelativeTime(request.createdAt)}
-                      detail="The swap request was created and entered the workflow."
+                      detail="The request was created and entered the workflow."
                     />
                     {request.recipientRespondedAt && request.recipientResponse ? (
                       <TimelineEntry
@@ -289,7 +289,9 @@ export function RequestsHistoryView({
                     variant="outline"
                     onClick={() => void onWithdrawInterest(request.id)}
                   >
-                    {request.status === 'selected' ? 'Withdraw primary claim' : 'Withdraw interest'}
+                    {request.status === 'selected'
+                      ? 'Withdraw first-responder spot'
+                      : 'Withdraw offer'}
                   </Button>
                 </div>
               ) : null}
@@ -307,7 +309,7 @@ function getRequestPartnerLabel(request: OpenRequest) {
   }
 
   if (request.involvement === 'received_direct') {
-    return request.type === 'swap' ? 'Swap requested by' : 'Pickup requested by'
+    return request.type === 'swap' ? 'Trade requested by' : 'Coverage requested by'
   }
 
   if (request.involvement === 'claimed') {
@@ -315,18 +317,18 @@ function getRequestPartnerLabel(request: OpenRequest) {
   }
 
   if (request.type === 'pickup') {
-    return request.visibility === 'direct' ? 'Asked teammate' : 'Claimed by'
+    return request.visibility === 'direct' ? 'Asked teammate' : 'Picked up by'
   }
 
-  return 'Swap with'
+  return 'Trade with'
 }
 
 function getRequestTypeLabel(request: OpenRequest) {
   if (request.requestKind === 'call_in') {
-    return 'Call-in request'
+    return 'Call-in coverage request'
   }
 
-  return request.type === 'swap' ? 'Swap request' : 'Pickup request'
+  return request.type === 'swap' ? 'Trade request' : 'Coverage request'
 }
 
 function getRequestPathLabel(request: OpenRequest) {
@@ -334,7 +336,7 @@ function getRequestPathLabel(request: OpenRequest) {
     return request.involvement === 'received_direct' ? 'Direct to you' : 'Direct teammate request'
   }
 
-  return 'Open Shifts'
+  return 'Open coverage requests'
 }
 
 function getRequestRoleLabel(request: OpenRequest, interestRoleLabel?: string) {

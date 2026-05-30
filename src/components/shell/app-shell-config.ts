@@ -363,7 +363,7 @@ export function getWorkflowContext(args: {
     if (pathname === '/shift-board' || pathname === '/swaps') {
       return {
         workflow: 'Shift Board',
-        context: 'Swaps, pickups, and direct requests',
+        context: 'Trade, coverage, and direct requests',
         state: 'Open, waiting, approved',
         permission: 'Manager final approval',
       }
@@ -410,7 +410,7 @@ export function getWorkflowContext(args: {
     if (pathname === '/shift-board' || pathname === '/therapist/swaps') {
       return {
         workflow: 'Shift Board',
-        context: 'Swaps, pickups, and call-in help',
+        context: 'Trade, coverage, and call-in help',
         state: 'Open, waiting, approved',
         permission: 'Lead visibility; manager approval',
       }
@@ -451,7 +451,7 @@ export function getWorkflowContext(args: {
   ) {
     return {
       workflow: 'Shift Board',
-      context: 'Swaps, pickups, and direct requests',
+      context: 'Trade, coverage, and direct requests',
       state: 'Needs your action or waiting',
       permission: 'Manager approves final changes',
     }

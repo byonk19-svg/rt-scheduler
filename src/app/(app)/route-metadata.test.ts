@@ -26,10 +26,10 @@ const routes = [
   ['src/app/(app)/settings/audit-log/page.tsx', "title: 'Audit Log'"],
   ['src/app/(app)/therapist/schedule/page.tsx', "title: 'Schedule'"],
   ['src/app/(app)/therapist/availability/page.tsx', "title: 'Future Availability'"],
-  ['src/app/(app)/therapist/swaps/page.tsx', "title: 'Shift Swaps & Pickups'"],
+  ['src/app/(app)/therapist/swaps/page.tsx', "title: 'Trade & Coverage Requests'"],
   ['src/app/(app)/staff/my-schedule/page.tsx', "title: 'Schedule'"],
   ['src/app/(app)/staff/schedule/page.tsx', "title: 'Schedule'"],
-  ['src/app/(app)/staff/history/page.tsx', "title: 'Shift Swaps & Pickups History'"],
+  ['src/app/(app)/staff/history/page.tsx', "title: 'Trade & Coverage History'"],
   ['src/app/(app)/shift-board/page.tsx', "title: 'Shift Board'"],
 ] as const
 
@@ -65,11 +65,11 @@ describe('route title consistency', () => {
     expect(staffMySchedule).not.toContain('"My Shifts"')
   })
 
-  it('/shift-board is the canonical board while /therapist/swaps keeps legacy therapist wording', () => {
+  it('/shift-board is the canonical board while /therapist/swaps uses request vocabulary', () => {
     const shiftBoard = read('src/app/(app)/shift-board/page.tsx')
     const therapistSwaps = read('src/app/(app)/therapist/swaps/page.tsx')
     expect(shiftBoard).toContain("title: 'Shift Board'")
-    expect(therapistSwaps).toContain("title: 'Shift Swaps & Pickups'")
+    expect(therapistSwaps).toContain("title: 'Trade & Coverage Requests'")
   })
 
   it('/coverage redirects into the canonical Schedule surface', () => {

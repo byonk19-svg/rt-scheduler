@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 export const metadata: Metadata = {
   title: 'My Requests',
-  description: 'Create and track your swap, pickup, and direct requests.',
+  description: 'Create and track your trade, coverage, and direct requests.',
 }
 
 export default function RequestsComposerLayout({ children }: { children: ReactNode }) {

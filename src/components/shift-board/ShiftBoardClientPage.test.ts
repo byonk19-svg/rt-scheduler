@@ -112,7 +112,7 @@ describe('manager Shift Board action model', () => {
       hasBackupResponder: true,
     })
 
-    expect(model.primary).toBe('Approve pickup')
+    expect(model.primary).toBe('Approve coverage request')
     expect(model.secondary).toContain('Change responder')
     expect(model.showsApprove).toBe(true)
   })
@@ -125,7 +125,7 @@ describe('manager Shift Board action model', () => {
       hasBackupResponder: false,
     })
 
-    expect(model.primary).toBe('View open post')
+    expect(model.primary).toBe('View coverage request')
     expect(model.secondary).toContain('Add coverage manually')
     expect(model.showsApprove).toBe(false)
   })
@@ -143,12 +143,12 @@ describe('manager Shift Board action model', () => {
       hasBackupResponder: false,
     })
 
-    expect(model.primary).toBe('Approve pickup')
+    expect(model.primary).toBe('Approve coverage request')
     expect(model.secondary).toContain('View shift')
     expect(model.showsApprove).toBe(true)
   })
 
-  it('shows Choose partner for an open swap without a selected partner', () => {
+  it('shows Choose partner for an open trade request without a selected partner', () => {
     const model = getRequestActionModel({
       req: request({ type: 'swap', visibility: 'team', swapWithId: null }),
       canReview: true,
@@ -160,7 +160,7 @@ describe('manager Shift Board action model', () => {
     expect(model.showsApprove).toBe(false)
   })
 
-  it('approves a ready swap with a selected partner', () => {
+  it('approves a ready trade request with a selected partner', () => {
     const model = getRequestActionModel({
       req: request({ type: 'swap', visibility: 'team', swapWithId: 'layne' }),
       canReview: true,
@@ -168,7 +168,7 @@ describe('manager Shift Board action model', () => {
       hasBackupResponder: false,
     })
 
-    expect(model.primary).toBe('Approve swap')
+    expect(model.primary).toBe('Approve trade request')
     expect(model.secondary).toContain('View shifts')
     expect(model.showsApprove).toBe(true)
   })
@@ -200,9 +200,11 @@ describe('manager Shift Board action model', () => {
     expect(html).toContain('First responder')
     expect(html).not.toContain('Selected replacement')
     expect(html).toContain('backup responder')
-    expect(html).toContain('Approve pickup')
+    expect(html).toContain('Approve coverage request')
     expect(html).not.toContain('Selected responder:')
-    expect(html).toContain('Ready because Audbriana is selected and coverage remains safe.')
+    expect(html).toContain(
+      'Ready because Audbriana can pick up the shift and coverage remains safe.'
+    )
     expect(html).toContain('Audbriana will be added to Sun, May 10 - Night.')
     expect(html).toContain('The original call-in remains on the schedule.')
     expect(html).toContain('scheduled / target')
@@ -228,9 +230,11 @@ describe('manager Shift Board action model', () => {
 
     expect(html).toContain('Ready for decision')
     expect(html).toContain('Off Day Partner will be added to Sun, May 10 - Night.')
-    expect(html).toContain('Ready because Off Day Partner is selected and coverage remains safe.')
-    expect(html).toContain('Approve pickup')
-    expect(html).not.toContain('View open post')
+    expect(html).toContain(
+      'Ready because Off Day Partner can pick up the shift and coverage remains safe.'
+    )
+    expect(html).toContain('Approve coverage request')
+    expect(html).not.toContain('View coverage request')
   })
 
   it('keeps long responder and requester names readable inside the card', () => {
@@ -254,7 +258,7 @@ describe('manager Shift Board action model', () => {
     expect(html).not.toContain('truncate')
   })
 
-  it('renders ready swap impact and approve swap without old queue language', () => {
+  it('renders ready trade impact and approve request without old queue language', () => {
     const html = renderManagerCard({
       type: 'swap',
       visibility: 'team',
@@ -280,11 +284,11 @@ describe('manager Shift Board action model', () => {
     )
     expect(html).toContain('Staffing unchanged')
     expect(html).toContain('No coverage risk')
-    expect(html).toContain('Approve swap')
+    expect(html).toContain('Approve trade request')
     expect(html).toContain('Ready because staffing remains safe after the exchange.')
   })
 
-  it('renders waiting direct swaps without approve copy', () => {
+  it('renders waiting direct trades without approve copy', () => {
     const html = renderManagerCard({
       type: 'swap',
       visibility: 'direct',
@@ -298,7 +302,7 @@ describe('manager Shift Board action model', () => {
     expect(html).toContain('Manager approval will be available after Layne responds.')
     expect(html).toContain('Approval unlocks after Layne responds.')
     expect(html).toContain('View request')
-    expect(html).not.toContain('Approve swap')
+    expect(html).not.toContain('Approve trade request')
   })
 
   it('renders a useful Needs Action empty state with next queue links', () => {
@@ -314,13 +318,13 @@ describe('manager Shift Board action model', () => {
     )
 
     expect(html).toContain('No manager decisions right now')
-    expect(html).toContain('Open Shifts - 5')
+    expect(html).toContain('Open coverage requests - 5')
     expect(html).toContain('Waiting - 2')
     expect(html).toContain('Review posts that still need a responder.')
     expect(html).toContain('Check requests blocked by teammate response.')
   })
 
-  it('renders open swaps without a selected partner as Choose partner only', () => {
+  it('renders open trade requests without a selected partner as Choose partner only', () => {
     const html = renderManagerCard({
       type: 'swap',
       visibility: 'team',
@@ -328,10 +332,10 @@ describe('manager Shift Board action model', () => {
       swapWithName: null,
     })
 
-    expect(html).toContain('Needs swap partner')
+    expect(html).toContain('Needs trade partner')
     expect(html).toContain('Choose partner')
     expect(html).toContain('Choose the teammate before manager approval is available.')
-    expect(html).not.toContain('Approve swap')
+    expect(html).not.toContain('Approve trade request')
   })
 
   it('renders a compact waiting preview outside the Needs Action queue', () => {
@@ -355,6 +359,6 @@ describe('manager Shift Board action model', () => {
     expect(html).toContain('Wed, May 20 - Day')
     expect(html).toContain('Layne has not responded')
     expect(html).toContain('View Waiting')
-    expect(html).not.toContain('Approve swap')
+    expect(html).not.toContain('Approve trade request')
   })
 })

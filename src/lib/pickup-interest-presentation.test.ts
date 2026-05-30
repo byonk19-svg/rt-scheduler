@@ -97,14 +97,14 @@ describe('getPickupInterestTherapistCopy', () => {
   it('uses consistent therapist-facing wording for the current first responder', () => {
     expect(getPickupInterestTherapistCopy('selected')).toEqual({
       roleLabel: 'First responder',
-      helperText: 'You are currently first in line for this pickup request.',
+      helperText: 'You are currently first in line for this coverage request.',
     })
   })
 
   it('uses consistent therapist-facing wording for backup responders', () => {
     expect(getPickupInterestTherapistCopy('pending')).toEqual({
       roleLabel: 'Backup responder',
-      helperText: 'You are still interested and listed as a backup for this pickup request.',
+      helperText: 'You are still interested and listed as a backup for this coverage request.',
     })
   })
 })
