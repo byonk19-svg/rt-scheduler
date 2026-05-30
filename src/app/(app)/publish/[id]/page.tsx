@@ -11,8 +11,8 @@ import {
   Mail,
 } from 'lucide-react'
 
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
@@ -227,14 +227,9 @@ export default async function PublishEventDetailPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profile?.role), 'manage_publish', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard')
-  }
+  const access = resolveManagerToolAccess(profile, 'manage_publish')
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') return <ManagerToolAccessDenied toolName="Publish Details" />
 
   const { data: eventData, error: eventError } = await supabase
     .from('publish_events')

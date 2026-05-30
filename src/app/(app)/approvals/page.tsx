@@ -25,11 +25,11 @@ import {
   approvePreliminaryRequestAction,
   denyPreliminaryRequestAction,
 } from '@/app/approvals/actions'
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { ASSIGNED_ROWS_TARGET } from '@/lib/coverage/selectors'
 import { toManagerPreliminaryQueue } from '@/lib/preliminary-schedule/selectors'
 import type {
@@ -251,14 +251,9 @@ export default async function ApprovalsPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profile?.role), 'manage_schedule', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard')
-  }
+  const access = resolveManagerToolAccess(profile, 'manage_schedule')
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') return <ManagerToolAccessDenied toolName="Approvals" />
 
   const { data: requestsData, error: requestsError } = await supabase
     .from('preliminary_requests')

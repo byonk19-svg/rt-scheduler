@@ -10,8 +10,9 @@ describe('Schedule Block Planning page source contract', () => {
   it('uses the manager-only scheduling action boundary', () => {
     expect(source).toContain('createScheduleBlockPlanningAction')
     expect(source).toContain('updateScheduleBlockPlanningAction')
-    expect(source).toContain("can(parseRole(profile?.role), 'manage_schedule'")
-    expect(source).toContain("redirect('/dashboard/staff')")
+    expect(source).toContain("resolveManagerToolAccess(profile, 'manage_schedule')")
+    expect(source).toContain('ManagerToolAccessDenied')
+    expect(source).toContain("redirect('/login?error=account_inactive')")
   })
 
   it('collects date-only planning fields without asking for times', () => {

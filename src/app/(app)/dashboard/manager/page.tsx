@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import type { Cycle } from '@/app/schedule/types'
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import { ManagerTriageDashboard } from '@/components/manager/ManagerTriageDashboard'
-import { can } from '@/lib/auth/can'
-import { resolveUserRole } from '@/lib/auth/role-source'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { buildCycleRoute } from '@/lib/cycle-route'
 import {
   buildManagerReviewSummary,
@@ -217,45 +217,47 @@ export default async function ManagerDashboardPage() {
   const today = new Date()
   const todayKey = toIsoDate(today)
 
-  const [
-    profileResult,
-    cyclesResult,
-    pendingApprovalsResult,
-    pendingShiftPostsResult,
-    recentActivityResult,
-  ] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('role, is_active, archived_at')
-      .eq('id', user.id)
-      .maybeSingle(),
-    supabase
-      .from('schedule_cycles')
-      .select(
-        'id, label, start_date, end_date, published, status, archived_at, availability_due_at, preliminary_target_date, final_publish_target_date'
-      )
-      .is('archived_at', null)
-      .gte('end_date', todayKey)
-      .order('start_date', { ascending: true }),
-    supabase
-      .from('preliminary_requests')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending'),
-    supabase
-      .from('shift_posts')
-      .select('id, type, status, created_at, claimed_by, visibility, recipient_response')
-      .eq('status', 'pending'),
-    supabase
-      .from('notifications')
-      .select('event_type, title, target_type, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5),
-  ])
+  const profileResult = await supabase
+    .from('profiles')
+    .select('role, is_active, archived_at')
+    .eq('id', user.id)
+    .maybeSingle()
 
   if (profileResult.error) {
     console.error('Failed to load manager profile for dashboard:', profileResult.error)
   }
+
+  const profile = (profileResult.data ?? null) as ManagerProfileRow | null
+  const access = resolveManagerToolAccess(profile)
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') return <ManagerToolAccessDenied toolName="Manager Dashboard" />
+
+  const [cyclesResult, pendingApprovalsResult, pendingShiftPostsResult, recentActivityResult] =
+    await Promise.all([
+      supabase
+        .from('schedule_cycles')
+        .select(
+          'id, label, start_date, end_date, published, status, archived_at, availability_due_at, preliminary_target_date, final_publish_target_date'
+        )
+        .is('archived_at', null)
+        .gte('end_date', todayKey)
+        .order('start_date', { ascending: true }),
+      supabase
+        .from('preliminary_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending'),
+      supabase
+        .from('shift_posts')
+        .select('id, type, status, created_at, claimed_by, visibility, recipient_response')
+        .eq('status', 'pending'),
+      supabase
+        .from('notifications')
+        .select('event_type, title, target_type, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5),
+    ])
+
   if (cyclesResult.error) {
     console.error('Failed to load cycles for manager dashboard:', cyclesResult.error)
   }
@@ -267,16 +269,6 @@ export default async function ManagerDashboardPage() {
   }
   if (recentActivityResult.error) {
     console.error('Failed to load recent manager activity:', recentActivityResult.error)
-  }
-
-  const profile = (profileResult.data ?? null) as ManagerProfileRow | null
-  if (
-    !can(resolveUserRole(profile?.role), 'access_manager_ui', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard/staff')
   }
 
   const cycles = (cyclesResult.data ?? []) as DashboardCycle[]

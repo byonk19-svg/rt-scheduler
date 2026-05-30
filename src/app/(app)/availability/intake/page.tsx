@@ -14,13 +14,13 @@ import {
   type EmailIntakePanelRow,
 } from '@/components/availability/EmailIntakePanel'
 import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { PrintMenuItem } from '@/components/print-menu-item'
 import { Button } from '@/components/ui/button'
-import { can } from '@/lib/auth/can'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
-import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 
@@ -208,13 +208,10 @@ export default async function AvailabilityIntakePage({
     .eq('id', user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profile?.role), 'access_manager_ui', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
-    redirect(`/therapist/availability${toSearchString(params)}`)
+  const access = resolveManagerToolAccess(profile)
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') {
+    return <ManagerToolAccessDenied toolName="Availability Intake" />
   }
   if (!profile?.site_id) {
     redirect(`/availability${toSearchString(params)}`)

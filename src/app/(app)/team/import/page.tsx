@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation'
 
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import { ImportWizard } from '@/components/team/ImportWizard'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { createClient } from '@/lib/supabase/server'
 
 import { bulkImportRosterAction } from './actions'
@@ -22,14 +22,9 @@ export default async function TeamImportPage() {
     .eq('id', user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profileData?.role), 'access_manager_ui', {
-      isActive: profileData?.is_active !== false,
-      archivedAt: profileData?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard/staff')
-  }
+  const access = resolveManagerToolAccess(profileData)
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') return <ManagerToolAccessDenied toolName="Import roster" />
 
   return (
     <div className="max-w-5xl space-y-6 py-6">

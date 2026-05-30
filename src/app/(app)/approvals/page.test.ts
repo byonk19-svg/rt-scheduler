@@ -407,7 +407,7 @@ describe('approvals preliminary queue', () => {
     expect(html).toContain('Approve only if that exception is intentional for this date.')
   })
 
-  it('redirects non-managers away from approvals', async () => {
+  it('explains manager-only approval access to active non-managers', async () => {
     createClientMock.mockResolvedValue(
       createSupabaseMock({
         userId: 'therapist-1',
@@ -415,9 +415,11 @@ describe('approvals preliminary queue', () => {
       })
     )
 
-    await expect(ApprovalsPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
-      'REDIRECT:/dashboard'
-    )
+    const html = renderToStaticMarkup(await ApprovalsPage({ searchParams: Promise.resolve({}) }))
+
+    expect(html).toContain('Manager access required')
+    expect(html).toContain('You do not have access to this manager tool.')
+    expect(html).toContain('Approvals is restricted to active managers.')
   })
 
   it('renders a compact empty state with a schedule CTA when the queue is clear', async () => {

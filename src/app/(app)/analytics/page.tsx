@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { AnalyticsSummaryStrip } from '@/components/analytics/AnalyticsSummaryStrip'
 import { CycleFillRateChart } from '@/components/analytics/CycleFillRateChart'
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 
 export const metadata: Metadata = {
   title: 'Analytics',
@@ -11,13 +12,12 @@ export const metadata: Metadata = {
 import { ForcedDateMissTable } from '@/components/analytics/ForcedDateMissTable'
 import { SubmissionComplianceTable } from '@/components/analytics/SubmissionComplianceTable'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
-import { can } from '@/lib/auth/can'
 import {
   getCycleFillRates,
   getForcedDateMisses,
   getSubmissionCompliance,
 } from '@/lib/analytics-queries'
-import { parseRole } from '@/lib/auth/roles'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { getAutoDraftCoveragePolicy } from '@/lib/coverage/auto-draft-policy'
 import { createClient } from '@/lib/supabase/server'
 
@@ -37,14 +37,9 @@ export default async function AnalyticsPage() {
     .eq('id', user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profile?.role), 'access_manager_ui', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard/staff')
-  }
+  const access = resolveManagerToolAccess(profile)
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') return <ManagerToolAccessDenied toolName="Analytics" />
 
   const { idealCoveragePerShift } = getAutoDraftCoveragePolicy()
   const [fillRates, submissionCompliance, forcedDateMisses] = await Promise.all([

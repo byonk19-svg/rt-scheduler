@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { WorkPatternCard } from '@/components/team/WorkPatternCard'
 import type { WorkPatternRecord } from '@/components/team/team-directory-model'
 import { Button } from '@/components/ui/button'
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { createClient } from '@/lib/supabase/server'
 
 type SearchParams = {
@@ -142,14 +142,9 @@ export default async function WorkPatternsPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profileData?.role), 'manage_directory', {
-      isActive: profileData?.is_active !== false,
-      archivedAt: profileData?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard/staff')
-  }
+  const access = resolveManagerToolAccess(profileData, 'manage_directory')
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') return <ManagerToolAccessDenied toolName="Work patterns" />
 
   const { data: profiles } = await supabase
     .from('profiles')
