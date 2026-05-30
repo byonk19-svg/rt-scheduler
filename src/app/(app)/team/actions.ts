@@ -3,8 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-import { can } from '@/lib/auth/can'
-import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
+import { MANAGED_TEAM_ROLE_VALUES } from '@/lib/auth/roles'
 import { writeAuditLog } from '@/lib/audit-log'
 import { normalizeRosterFullName, parseBulkEmployeeRosterText } from '@/lib/employee-roster-bulk'
 import { parseTeamQuickEditFormData } from '@/lib/team-quick-edit'
@@ -83,14 +83,9 @@ async function requireManager() {
     .eq('id', user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profile?.role), 'manage_directory', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard/staff')
-  }
+  const access = resolveManagerToolAccess(profile, 'manage_directory')
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') redirect('/team')
 
   return { supabase, userId: user.id }
 }

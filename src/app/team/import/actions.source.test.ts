@@ -12,6 +12,9 @@ describe('team import actions source contract', () => {
 
     expect(source).toContain('export async function bulkImportRosterAction')
     expect(source).toContain('requireManager')
+    expect(source).toContain('resolveManagerToolAccess')
+    expect(source).toContain("redirect('/login?error=account_inactive')")
+    expect(source).toContain("redirect('/team/import')")
     expect(source).toContain('normalizeRosterFullName')
     expect(source).toContain("from('employee_roster')")
     expect(source).toContain('success=imported')
