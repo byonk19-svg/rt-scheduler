@@ -30,4 +30,14 @@ describe('manager dashboard Schedule Block Planning cues', () => {
     expect(source).toContain('reviewHref={reviewHref}')
     expect(source).not.toContain('MANAGER_ACTIONABLE_REVIEW_EVENTS')
   })
+
+  it('checks manager access before loading manager dashboard work queues', () => {
+    const accessCheckIndex = source.indexOf('resolveManagerToolAccess(profile)')
+    const managerQueueIndex = source.indexOf(".from('preliminary_requests')")
+
+    expect(accessCheckIndex).toBeGreaterThan(-1)
+    expect(managerQueueIndex).toBeGreaterThan(-1)
+    expect(accessCheckIndex).toBeLessThan(managerQueueIndex)
+    expect(source).toContain('ManagerToolAccessDenied')
+  })
 })

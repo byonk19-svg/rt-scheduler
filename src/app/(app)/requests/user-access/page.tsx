@@ -6,10 +6,10 @@ import {
   UserAccessRequestsList,
   type PendingAccessRequest,
 } from '@/app/requests/user-access/UserAccessRequestsList'
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { Button } from '@/components/ui/button'
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -59,14 +59,9 @@ export default async function UserAccessRequestsPage({
     .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
-  if (
-    !can(parseRole(profile?.role), 'access_manager_ui', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard')
-  }
+  const access = resolveManagerToolAccess(profile)
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') return <ManagerToolAccessDenied toolName="User Access Requests" />
 
   const { data: pendingRows, error: pendingError } = await supabase
     .from('profiles')

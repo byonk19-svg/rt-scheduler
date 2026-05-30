@@ -2,11 +2,11 @@ import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import { RecurringPatternEditor } from '@/components/availability/RecurringPatternEditor'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import {
   isMissingRequiredWeeklyWeekdays,
   normalizeWorkPattern,
@@ -75,7 +75,7 @@ function parseDowValues(values: FormDataEntryValue[]): number[] {
   ).sort((left, right) => left - right)
 }
 
-async function requireManager() {
+async function getManagerWorkPatternContext() {
   const supabase = await createClient()
   const {
     data: { user },
@@ -89,16 +89,21 @@ async function requireManager() {
     .eq('id', user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profile?.role), 'manage_directory', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
+  const access = resolveManagerToolAccess(profile, 'manage_directory')
+  return { supabase, access }
+}
+
+async function requireManager() {
+  const context = await getManagerWorkPatternContext()
+
+  if (context.access === 'inactive') {
+    redirect('/login?error=account_inactive')
+  }
+  if (context.access === 'forbidden') {
     redirect('/dashboard/staff')
   }
 
-  return { supabase }
+  return { supabase: context.supabase }
 }
 
 async function saveManagerRecurringPatternAction(therapistId: string, formData: FormData) {
@@ -193,7 +198,12 @@ export default async function TeamWorkPatternDetailPage({
   params: Promise<{ therapistId: string }>
   searchParams?: Promise<SearchParams>
 }) {
-  const { supabase } = await requireManager()
+  const managerContext = await getManagerWorkPatternContext()
+  if (managerContext.access === 'inactive') redirect('/login?error=account_inactive')
+  if (managerContext.access === 'forbidden') {
+    return <ManagerToolAccessDenied toolName="Work pattern editor" />
+  }
+  const { supabase } = managerContext
   const routeParams = await params
   const query = searchParams ? await searchParams : undefined
   const feedback = getFeedback(query)

@@ -18,8 +18,8 @@ import {
   takeScheduleBlockOfflineAction,
 } from '@/app/publish/actions'
 import { deleteCycleAction, toggleCyclePublishedAction } from '@/app/schedule/actions'
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { formatDateLabel } from '@/lib/calendar-utils'
 import { fetchScheduleCyclesForCoverage } from '@/lib/coverage/fetch-schedule-cycles'
 import { Button } from '@/components/ui/button'
@@ -135,14 +135,9 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
     .eq('id', user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profile?.role), 'manage_publish', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard')
-  }
+  const access = resolveManagerToolAccess(profile, 'manage_publish')
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') return <ManagerToolAccessDenied toolName="Publish History" />
 
   const activeCyclesPromise = fetchScheduleCyclesForCoverage(supabase)
   const eventsResult = await supabase

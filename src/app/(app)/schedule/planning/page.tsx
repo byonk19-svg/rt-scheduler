@@ -16,10 +16,10 @@ import {
   createScheduleBlockPlanningAction,
   updateScheduleBlockPlanningAction,
 } from '@/app/schedule/actions'
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { Button } from '@/components/ui/button'
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import {
   addDays,
   dateFromKey,
@@ -639,14 +639,9 @@ export default async function ScheduleBlockPlanningPage({
     .maybeSingle()
   const profile = (profileData ?? null) as ProfileRow | null
 
-  if (
-    !can(parseRole(profile?.role), 'manage_schedule', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard/staff')
-  }
+  const access = resolveManagerToolAccess(profile, 'manage_schedule')
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') return <ManagerToolAccessDenied toolName="Schedule Block Planning" />
 
   let cyclesQuery = supabase
     .from('schedule_cycles')

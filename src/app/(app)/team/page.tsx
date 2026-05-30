@@ -10,12 +10,13 @@ import {
   saveTeamQuickEditAction,
   upsertEmployeeRosterEntryAction,
 } from '@/app/team/actions'
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import TeamWorkspaceClient from '@/components/team/TeamWorkspaceClient'
 import type { WorkPatternRecord } from '@/components/team/team-directory-model'
-import { can } from '@/lib/auth/can'
-import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
+import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
+import { MANAGED_TEAM_ROLE_VALUES } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import { getTeamFeedbackMessage, isTeamErrorCode, isTeamSuccessCode } from '@/lib/team-feedback'
 import { getInitialTeamTab, getSearchParam } from './team-page-tabs'
@@ -244,14 +245,9 @@ export default async function TeamPage({
     .eq('id', authData.user.id)
     .maybeSingle()
 
-  if (
-    !can(parseRole(profileData?.role), 'access_manager_ui', {
-      isActive: profileData?.is_active !== false,
-      archivedAt: profileData?.archived_at ?? null,
-    })
-  ) {
-    redirect('/dashboard/staff')
-  }
+  const access = resolveManagerToolAccess(profileData)
+  if (access === 'inactive') redirect('/login?error=account_inactive')
+  if (access === 'forbidden') return <ManagerToolAccessDenied toolName="Team" />
 
   const [profilesResult, patternRowsResult, rosterRowsResult] = await Promise.all([
     supabase
