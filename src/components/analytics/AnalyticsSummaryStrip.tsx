@@ -36,7 +36,7 @@ export function AnalyticsSummaryStrip({
         <Stat
           label="Avg fill rate"
           value={`${avgFill}%`}
-          detail={`across ${fillRates.length} ${fillRates.length === 1 ? 'cycle' : 'cycles'}`}
+          detail={`across ${fillRates.length} Schedule ${fillRates.length === 1 ? 'Block' : 'Blocks'}`}
           valueClass={
             avgFill >= 80
               ? 'text-[var(--success-text)]'
@@ -50,7 +50,7 @@ export function AnalyticsSummaryStrip({
         <Stat
           label="Submission compliance"
           value={`${completeCycles} / ${totalCycles}`}
-          detail="cycles fully submitted"
+          detail="Schedule Blocks fully submitted"
           valueClass={
             completeCycles === totalCycles
               ? 'text-[var(--success-text)]'

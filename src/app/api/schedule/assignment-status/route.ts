@@ -204,14 +204,14 @@ export async function POST(request: Request) {
 
   if (isIncidentAssignmentStatus(status) && !preflightCycle?.published) {
     return NextResponse.json(
-      { error: 'Incident statuses can only be applied after the Schedule Block is published.' },
+      { error: 'Operational statuses can only be applied after the Schedule Block is published.' },
       { status: 409 }
     )
   }
 
   if (isIncidentAssignmentStatus(status) && !preflightShift.user_id) {
     return NextResponse.json(
-      { error: 'Incident statuses require an assigned therapist.' },
+      { error: 'Operational statuses require an assigned therapist.' },
       { status: 409 }
     )
   }

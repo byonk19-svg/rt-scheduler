@@ -505,7 +505,7 @@ describe('assignment status API', () => {
     expect(createAdminClientMock).not.toHaveBeenCalled()
   })
 
-  it('blocks incident statuses before the Schedule Block is published', async () => {
+  it('blocks operational statuses before the Schedule Block is published', async () => {
     const supabase = makeSupabaseMock({
       role: 'manager',
       userId: 'manager-1',
@@ -533,7 +533,7 @@ describe('assignment status API', () => {
 
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toMatchObject({
-      error: 'Incident statuses can only be applied after the Schedule Block is published.',
+      error: 'Operational statuses can only be applied after the Schedule Block is published.',
     })
     expect(createAdminClientMock).not.toHaveBeenCalled()
   })
@@ -573,7 +573,7 @@ describe('assignment status API', () => {
     expect(updateAssignmentStatusWithLotteryMock).not.toHaveBeenCalled()
   })
 
-  it('blocks incident statuses on unassigned shift rows', async () => {
+  it('blocks operational statuses on unassigned shift rows', async () => {
     const supabase = makeSupabaseMock({
       role: 'manager',
       userId: 'manager-1',
@@ -601,7 +601,7 @@ describe('assignment status API', () => {
 
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toMatchObject({
-      error: 'Incident statuses require an assigned therapist.',
+      error: 'Operational statuses require an assigned therapist.',
     })
     expect(createAdminClientMock).not.toHaveBeenCalled()
   })

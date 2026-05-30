@@ -58,8 +58,8 @@ type ScheduleGridMutationAction = keyof typeof SCHEDULE_GRID_MUTATION_ERROR_MESS
 const SAFE_MUTATION_ERROR_MESSAGES = [
   'A designated lead already exists for that shift.',
   'Date is outside this Schedule Block',
-  'Incident statuses can only be applied after the Schedule Block is published.',
-  'Incident statuses require an assigned therapist.',
+  'Operational statuses can only be applied after the Schedule Block is published.',
+  'Operational statuses require an assigned therapist.',
   'Left early status requires the time the shift ended.',
   'Left early time can only be set with left early status.',
   'Left early time must be HH:MM or HH:MM:SS.',

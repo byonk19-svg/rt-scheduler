@@ -127,6 +127,23 @@ describe('ScheduleGrid source invariants', () => {
     expect(code).toContain('Could not set the lead for this shift. Refresh Schedule and try again.')
   })
 
+  it('uses operational status terminology for visible schedule status errors', () => {
+    const code = source()
+    const routeCode = readFileSync(
+      resolve(process.cwd(), 'src/app/api/schedule/assignment-status/route.ts'),
+      'utf8'
+    )
+    const visibleStatusErrorSource = [code, routeCode].join('\n')
+
+    expect(visibleStatusErrorSource).toContain(
+      'Operational statuses can only be applied after the Schedule Block is published.'
+    )
+    expect(visibleStatusErrorSource).toContain(
+      'Operational statuses require an assigned therapist.'
+    )
+    expect(visibleStatusErrorSource).not.toContain('Incident statuses')
+  })
+
   it('renders pre-flight readiness issues from the shared helper output', () => {
     const code = source()
     const dataCode = readFileSync(

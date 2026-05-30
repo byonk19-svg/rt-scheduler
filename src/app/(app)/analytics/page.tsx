@@ -6,7 +6,7 @@ import { CycleFillRateChart } from '@/components/analytics/CycleFillRateChart'
 
 export const metadata: Metadata = {
   title: 'Analytics',
-  description: 'Cycle fill rates, submission compliance, and forced-date miss patterns.',
+  description: 'Schedule Block fill rates, submission compliance, and forced-date miss patterns.',
 }
 import { ForcedDateMissTable } from '@/components/analytics/ForcedDateMissTable'
 import { SubmissionComplianceTable } from '@/components/analytics/SubmissionComplianceTable'
@@ -57,7 +57,7 @@ export default async function AnalyticsPage() {
     <div className="space-y-6">
       <ManagerWorkspaceHeader
         title="Analytics"
-        subtitle="Cycle fill rates, submission compliance, and forced-date miss patterns."
+        subtitle="Schedule Block fill rates, submission compliance, and forced-date miss patterns."
       />
 
       <AnalyticsSummaryStrip
