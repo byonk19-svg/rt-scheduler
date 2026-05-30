@@ -30,6 +30,7 @@ type LotteryPageTestDeps = {
     loadLotterySnapshot: typeof loadLotterySnapshotMock
   }
   createElement: typeof createElement
+  ManagerToolAccessDenied: ({ toolName }: { toolName?: string }) => ReturnType<typeof createElement>
   LotteryClientPage: ({
     initialSnapshot,
   }: {
@@ -79,6 +80,12 @@ async function loadLotteryPage() {
   )
   source = replaceOrThrow(
     source,
+    'ManagerToolAccessDenied import',
+    /import \{ ManagerToolAccessDenied \} from '@\/components\/auth\/ManagerToolAccessDenied'\r?\n/,
+    'const { ManagerToolAccessDenied } = globalThis.__lotteryPageTestDeps\n'
+  )
+  source = replaceOrThrow(
+    source,
     'LotteryClientPage import',
     /import LotteryClientPage from '@\/components\/lottery\/LotteryClientPage'\r?\n/,
     'const LotteryClientPage = globalThis.__lotteryPageTestDeps.LotteryClientPage\n'
@@ -112,6 +119,8 @@ async function loadLotteryPage() {
       loadLotterySnapshot: loadLotterySnapshotMock,
     },
     createElement,
+    ManagerToolAccessDenied: ({ toolName = 'this manager tool' }: { toolName?: string }) =>
+      createElement('section', null, `${toolName} is restricted to active managers.`),
     LotteryClientPage: ({
       initialSnapshot,
     }: {
@@ -188,7 +197,7 @@ describe('lottery page', () => {
     expect(html).toContain('Lottery for manager-1 (night)')
   })
 
-  it('redirects to /dashboard/staff when loadLotteryActor returns null', async () => {
+  it('shows an access-denied state when loadLotteryActor returns null', async () => {
     createClientMock.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -204,7 +213,10 @@ describe('lottery page', () => {
 
     const { default: LotteryPage } = await loadLotteryPage()
 
-    await expect(LotteryPage({})).rejects.toThrow('REDIRECT:/dashboard/staff')
+    const html = renderToStaticMarkup(await LotteryPage({}))
+
+    expect(html).toContain('Lottery is restricted to active managers.')
+    expect(loadLotterySnapshotMock).not.toHaveBeenCalled()
   })
 
   it('redirects unauthenticated users to /login', async () => {

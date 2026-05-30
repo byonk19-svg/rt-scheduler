@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
+import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import LotteryClientPage from '@/components/lottery/LotteryClientPage'
 import { loadLotteryActor, loadLotterySnapshot } from '@/lib/lottery/service'
 import { createClient } from '@/lib/supabase/server'
@@ -36,7 +37,7 @@ export default async function LotteryPage({
 
   const actor = await loadLotteryActor(user.id)
   if (!actor) {
-    redirect('/dashboard/staff')
+    return <ManagerToolAccessDenied toolName="Lottery" />
   }
 
   const params = (await searchParams) ?? {}
