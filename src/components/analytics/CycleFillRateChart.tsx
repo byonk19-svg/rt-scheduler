@@ -42,7 +42,7 @@ export function CycleFillRateChart({ rows, idealCoveragePerShift }: Props) {
       <div className="flex items-baseline justify-between gap-4 border-b border-border px-5 py-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-            Cycle fill rates
+            Schedule Block fill rates
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Target: {idealCoveragePerShift} therapists per shift slot.
@@ -88,7 +88,7 @@ export function CycleFillRateChart({ rows, idealCoveragePerShift }: Props) {
           </div>
         ))}
         {rows.length === 0 ? (
-          <p className="py-2 text-sm text-muted-foreground">No cycles found.</p>
+          <p className="py-2 text-sm text-muted-foreground">No Schedule Blocks found.</p>
         ) : null}
       </div>
     </section>

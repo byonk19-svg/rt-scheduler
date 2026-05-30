@@ -16,4 +16,38 @@ describe('analytics page source contract', () => {
     expect(source).toContain('SubmissionComplianceTable')
     expect(source).toContain('ForcedDateMissTable')
   })
+
+  it('uses Schedule Block terminology for visible analytics copy', () => {
+    const analyticsPageSource = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/analytics/page.tsx'),
+      'utf8'
+    )
+    const fillRateChartSource = readFileSync(
+      resolve(process.cwd(), 'src/components/analytics/CycleFillRateChart.tsx'),
+      'utf8'
+    )
+    const complianceTableSource = readFileSync(
+      resolve(process.cwd(), 'src/components/analytics/SubmissionComplianceTable.tsx'),
+      'utf8'
+    )
+    const summaryStripSource = readFileSync(
+      resolve(process.cwd(), 'src/components/analytics/AnalyticsSummaryStrip.tsx'),
+      'utf8'
+    )
+    const visibleCopySource = [
+      analyticsPageSource,
+      fillRateChartSource,
+      complianceTableSource,
+      summaryStripSource,
+    ].join('\n')
+
+    expect(visibleCopySource).toContain('Schedule Block fill rates')
+    expect(visibleCopySource).toContain('No Schedule Blocks found.')
+    expect(visibleCopySource).toContain('Therapist availability submissions per Schedule Block.')
+    expect(visibleCopySource).toContain('Schedule Blocks fully submitted')
+    expect(visibleCopySource).not.toContain('Cycle fill rates')
+    expect(visibleCopySource).not.toContain('No cycles found.')
+    expect(visibleCopySource).not.toContain('per cycle.')
+    expect(visibleCopySource).not.toContain('cycles fully submitted')
+  })
 })

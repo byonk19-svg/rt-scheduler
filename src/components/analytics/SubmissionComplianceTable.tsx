@@ -29,13 +29,13 @@ export function SubmissionComplianceTable({ rows }: Props) {
           Submission compliance
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Therapist availability submissions per cycle.
+          Therapist availability submissions per Schedule Block.
         </p>
       </div>
       <Table>
         <TableHeader>
           <TableRow className="bg-muted text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            <TableHead>Cycle</TableHead>
+            <TableHead>Schedule Block</TableHead>
             <TableHead className="text-right">Submitted</TableHead>
             <TableHead>Rate</TableHead>
             <TableHead>Status</TableHead>
