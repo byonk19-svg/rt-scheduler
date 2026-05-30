@@ -47,7 +47,7 @@ export function AssignCellPopover({
         </p>
         {cell.hasNeedsOff ? (
           <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-            <p className="text-xs font-medium text-amber-800">Requested this day off.</p>
+            <p className="text-xs font-medium text-amber-800">Need Off is marked for this date.</p>
           </div>
         ) : null}
         <div className="mt-3 flex flex-col gap-1.5">
