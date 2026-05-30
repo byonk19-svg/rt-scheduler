@@ -63,15 +63,24 @@ function isRouteActive(pathname: string, href: string): boolean {
 }
 
 function isManagerScheduleRoute(pathname: string): boolean {
+  return pathname === '/schedule' || pathname === '/coverage' || pathname === '/schedule/planning'
+}
+
+function isManagerPublishRoute(pathname: string): boolean {
   return (
-    pathname === '/schedule' ||
-    pathname === '/coverage' ||
-    pathname === '/schedule/planning' ||
-    pathname === '/analytics' ||
     pathname === '/publish' ||
     pathname.startsWith('/publish/') ||
+    pathname === '/preliminary' ||
     pathname === '/approvals'
   )
+}
+
+function isManagerAnalyticsRoute(pathname: string): boolean {
+  return pathname === '/analytics'
+}
+
+function isManagerAuditRoute(pathname: string): boolean {
+  return pathname === '/settings/audit-log'
 }
 
 function isStaffScheduleRoute(pathname: string): boolean {
@@ -132,6 +141,27 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
       href: '/requests/user-access',
       isActive: (pathname) => pathname.startsWith('/requests/user-access'),
       badgeCount: pendingCount || undefined,
+      subItems: [],
+    },
+    {
+      key: 'publish',
+      label: 'Publish',
+      href: '/publish',
+      isActive: (pathname) => isManagerPublishRoute(pathname),
+      subItems: [],
+    },
+    {
+      key: 'analytics',
+      label: 'Analytics',
+      href: '/analytics',
+      isActive: (pathname) => isManagerAnalyticsRoute(pathname),
+      subItems: [],
+    },
+    {
+      key: 'audit',
+      label: 'Audit',
+      href: '/settings/audit-log',
+      isActive: (pathname) => isManagerAuditRoute(pathname),
       subItems: [],
     },
     {
@@ -323,6 +353,9 @@ export function getWorkflowContext(args: {
   if (canAccessManagerUi) {
     if (
       !isManagerScheduleRoute(pathname) &&
+      !isManagerPublishRoute(pathname) &&
+      !isManagerAnalyticsRoute(pathname) &&
+      !isManagerAuditRoute(pathname) &&
       pathname !== '/availability' &&
       pathname !== '/lottery' &&
       pathname !== '/shift-board' &&
@@ -386,21 +419,39 @@ export function getWorkflowContext(args: {
       }
     }
 
-    if (pathname === '/preliminary' || pathname === '/approvals') {
-      return {
-        workflow: 'Schedule approval',
-        context: 'Preliminary schedule handoff',
-        state: 'Review before publish',
-        permission: 'Manager approval required',
-      }
-    }
-
     if (pathname === '/publish' || pathname.startsWith('/publish/')) {
       return {
         workflow: 'Publish',
         context: 'Schedule Block history',
         state: 'Queued, published, offline',
         permission: 'Manager controlled',
+      }
+    }
+
+    if (pathname === '/preliminary' || pathname === '/approvals') {
+      return {
+        workflow: 'Publish',
+        context: 'Preliminary schedule handoff',
+        state: 'Review before final publish',
+        permission: 'Manager approval required',
+      }
+    }
+
+    if (pathname === '/analytics') {
+      return {
+        workflow: 'Analytics',
+        context: 'Schedule and staffing trends',
+        state: 'Review metrics',
+        permission: 'Manager visibility',
+      }
+    }
+
+    if (pathname === '/settings/audit-log') {
+      return {
+        workflow: 'Audit',
+        context: 'Operational change history',
+        state: 'Review events',
+        permission: 'Manager visibility',
       }
     }
 

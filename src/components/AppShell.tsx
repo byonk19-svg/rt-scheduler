@@ -395,7 +395,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                 {mobileTitle}
               </p>
               <nav
-                className="ml-2 hidden items-center gap-0.5 md:flex"
+                className="ml-2 hidden items-center gap-0.5 overflow-x-auto md:flex"
                 aria-label="Main navigation"
               >
                 {primaryItems.map((item) => (
@@ -403,7 +403,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      'relative flex items-center gap-1.5 rounded-md px-4 py-2.5 text-base font-medium transition-colors duration-150',
+                      'relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2.5 text-sm font-medium transition-colors duration-150 lg:px-4 lg:text-base',
                       item.current
                         ? 'bg-sidebar-accent/70 text-sidebar-primary shadow-tw-2xs after:absolute after:bottom-[-10px] after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-[var(--attention)]'
                         : 'text-sidebar-foreground hover:text-sidebar-accent-foreground'
