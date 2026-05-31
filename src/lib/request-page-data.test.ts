@@ -18,6 +18,7 @@ afterEach(() => {
 
 function createSupabaseMock(overrides?: {
   requestRows?: Array<Record<string, unknown>>
+  interestPostRows?: Array<Record<string, unknown>>
   interestRows?: Array<Record<string, unknown>>
   profiles?: Array<{ id: string; full_name: string }>
 }) {
@@ -147,7 +148,7 @@ function createSupabaseMock(overrides?: {
                 }
               },
               in: async () => ({
-                data: [
+                data: overrides?.interestPostRows ?? [
                   {
                     id: 'interest-post-expired',
                     type: 'pickup',
@@ -237,6 +238,72 @@ describe('request page data', () => {
     expect(snapshot?.myOpenRequests.map((request) => request.status)).toEqual(['pending'])
   })
 
+  it('uses explicit team coverage responder lifecycle labels for interested and selected offers', async () => {
+    const snapshot = await loadRequestPageSnapshot(
+      createSupabaseMock({
+        requestRows: [],
+        interestRows: [
+          {
+            id: 'interest-backup',
+            shift_post_id: 'post-open',
+            therapist_id: 'therapist-1',
+            status: 'pending',
+            created_at: '2026-04-28T11:00:00.000Z',
+          },
+          {
+            id: 'interest-selected',
+            shift_post_id: 'post-selected',
+            therapist_id: 'therapist-1',
+            status: 'selected',
+            created_at: '2026-04-28T10:00:00.000Z',
+          },
+        ],
+        interestPostRows: [
+          {
+            id: 'post-open',
+            type: 'pickup',
+            status: 'pending',
+            recipient_response: null,
+            request_kind: 'standard',
+            created_at: '2026-04-28T09:00:00.000Z',
+            shift_id: 'shift-1',
+            posted_by: 'therapist-2',
+            claimed_by: null,
+            visibility: 'team',
+            message: 'Open coverage request',
+          },
+          {
+            id: 'post-selected',
+            type: 'pickup',
+            status: 'pending',
+            recipient_response: null,
+            request_kind: 'standard',
+            created_at: '2026-04-28T08:00:00.000Z',
+            shift_id: 'shift-1',
+            posted_by: 'therapist-2',
+            claimed_by: null,
+            visibility: 'team',
+            message: 'Selected coverage request',
+          },
+        ],
+      }),
+      '2026-04-28'
+    )
+
+    expect(snapshot?.myOpenRequests).toEqual([
+      expect.objectContaining({
+        id: 'interest-backup',
+        status: 'pending',
+        stageLabel: 'Interested',
+      }),
+      expect.objectContaining({
+        id: 'interest-selected',
+        status: 'selected',
+        stageLabel: 'Selected',
+      }),
+    ])
+  })
+
   it('filters eligible direct-request teammates by shift and lead requirement', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
@@ -291,9 +358,83 @@ describe('request page data', () => {
     })
 
     expect(stage).toEqual({
-      label: 'Waiting on manager approval',
+      label: 'Selected',
       detail: 'You suggested a trade partner. A manager still has to approve the trade request.',
     })
+  })
+
+  it('uses explicit direct request lifecycle labels', () => {
+    const baseRequest = {
+      id: 'post-direct',
+      type: 'swap' as const,
+      request_kind: 'standard' as const,
+      created_at: '2026-04-28T12:00:00.000Z',
+      shift_id: 'shift-1',
+      posted_by: 'therapist-1',
+      claimed_by: 'therapist-2',
+      visibility: 'direct' as const,
+      message: 'Direct trade',
+    }
+
+    expect(
+      deriveRequestStage({
+        currentUserId: 'therapist-1',
+        involvement: 'posted',
+        request: {
+          ...baseRequest,
+          status: 'pending',
+          recipient_response: 'pending',
+        },
+      }).label
+    ).toBe('Sent')
+
+    expect(
+      deriveRequestStage({
+        currentUserId: 'therapist-1',
+        involvement: 'posted',
+        request: {
+          ...baseRequest,
+          status: 'pending',
+          recipient_response: 'accepted',
+        },
+      }).label
+    ).toBe('Accepted')
+
+    expect(
+      deriveRequestStage({
+        currentUserId: 'therapist-1',
+        involvement: 'posted',
+        request: {
+          ...baseRequest,
+          status: 'denied',
+          recipient_response: 'declined',
+        },
+      }).label
+    ).toBe('Declined')
+
+    expect(
+      deriveRequestStage({
+        currentUserId: 'therapist-1',
+        involvement: 'posted',
+        request: {
+          ...baseRequest,
+          status: 'denied',
+          recipient_response: 'accepted',
+        },
+      }).label
+    ).toBe('Manager denied')
+
+    expect(
+      deriveRequestStage({
+        currentUserId: 'therapist-1',
+        involvement: 'posted',
+        request: {
+          ...baseRequest,
+          status: 'approved',
+          recipient_response: 'accepted',
+        },
+      }).label
+    ).toBe('Manager approved')
   })
 
   it('maps seeded received and suggested swap cards to the requester instead of the current therapist', async () => {
@@ -340,13 +481,13 @@ describe('request page data', () => {
       expect.objectContaining({
         id: 'post-direct',
         involvement: 'received_direct',
-        stageLabel: 'Needs your response',
+        stageLabel: 'Sent',
         swapWith: 'Ruth G.',
       }),
       expect.objectContaining({
         id: 'post-suggested',
         involvement: 'claimed',
-        stageLabel: 'Waiting on manager approval',
+        stageLabel: 'Selected',
         swapWith: 'Ruth G.',
       }),
     ])

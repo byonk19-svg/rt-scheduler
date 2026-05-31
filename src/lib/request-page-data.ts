@@ -150,7 +150,7 @@ function deriveRequestStage(params: {
 
   if (request.status === 'approved') {
     return {
-      label: 'Approved',
+      label: 'Manager approved',
       detail:
         request.visibility === 'direct'
           ? 'Teammate accepted and the manager approved the trade request.'
@@ -179,19 +179,19 @@ function deriveRequestStage(params: {
     if (request.visibility === 'direct') {
       if (request.recipient_response === 'declined') {
         return {
-          label: involvement === 'received_direct' ? 'You declined' : 'Declined by teammate',
+          label: 'Declined',
           detail: 'The direct trade request stopped before manager approval.',
         }
       }
 
       return {
-        label: 'Denied by manager',
+        label: 'Manager denied',
         detail: 'Manager review did not approve this request.',
       }
     }
 
     return {
-      label: 'Denied by manager',
+      label: 'Manager denied',
       detail: 'Manager review did not approve this request.',
     }
   }
@@ -199,7 +199,7 @@ function deriveRequestStage(params: {
   if (request.visibility === 'direct') {
     if (request.recipient_response === 'accepted') {
       return {
-        label: 'Waiting on manager approval',
+        label: 'Accepted',
         detail:
           involvement === 'received_direct'
             ? 'You accepted this trade request. Nothing changes unless a manager approves it.'
@@ -209,11 +209,11 @@ function deriveRequestStage(params: {
 
     if (request.recipient_response === 'pending') {
       return {
-        label: involvement === 'received_direct' ? 'Needs your response' : 'Waiting for teammate',
+        label: 'Sent',
         detail:
           involvement === 'received_direct'
-            ? 'Accept sends it to manager review. Decline stops the request.'
-            : 'Your teammate must accept before this goes to manager review.',
+            ? 'This direct request was sent to you. Accept sends it to manager review; decline stops it.'
+            : 'This direct request was sent to your teammate and needs their response before manager review.',
       }
     }
   }
@@ -221,21 +221,21 @@ function deriveRequestStage(params: {
   if (request.visibility === 'team' && request.type === 'swap' && request.claimed_by) {
     if (involvement === 'claimed') {
       return {
-        label: 'Waiting on manager approval',
+        label: 'Selected',
         detail:
           'You are the suggested trade partner. Nothing changes unless a manager approves it.',
       }
     }
 
     return {
-      label: 'Waiting on manager approval',
+      label: 'Selected',
       detail: 'You suggested a trade partner. A manager still has to approve the trade request.',
     }
   }
 
   return {
-    label: 'Waiting on manager approval',
-    detail: 'This request is on the team board for manager review.',
+    label: 'Open',
+    detail: 'This request is open on the team board and still needs a responder or manager review.',
   }
 }
 
@@ -394,12 +394,13 @@ async function mapOpenRequests(params: {
       const stage =
         interest.status === 'selected'
           ? {
-              label: 'Approved',
-              detail: 'Manager selected you as the responder for this request.',
+              label: 'Selected',
+              detail:
+                'You are first in line for this coverage request. Nothing changes unless a manager approves it.',
             }
           : {
-              label: 'Waiting for manager review',
-              detail: 'Your interest is still waiting on manager selection.',
+              label: 'Interested',
+              detail: 'Your offer is listed as a backup until a manager selects a responder.',
             }
 
       return {
