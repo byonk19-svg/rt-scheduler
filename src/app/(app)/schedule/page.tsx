@@ -132,6 +132,10 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     redirect('/login')
   }
 
+  if (result.status === 'inactive') {
+    redirect('/login?error=account_inactive')
+  }
+
   if (result.status === 'forbidden') {
     redirect('/dashboard/staff')
   }

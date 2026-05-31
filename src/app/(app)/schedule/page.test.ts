@@ -181,6 +181,14 @@ describe('schedule route', () => {
     )
   })
 
+  it('redirects inactive or archived users to the inactive-account login state', async () => {
+    loadScheduleGridDataMock.mockResolvedValue({ status: 'inactive' })
+
+    await expect(SchedulePage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
+      'REDIRECT:/login?error=account_inactive'
+    )
+  })
+
   it('redirects forbidden users to the staff dashboard', async () => {
     loadScheduleGridDataMock.mockResolvedValue({ status: 'forbidden' })
 
