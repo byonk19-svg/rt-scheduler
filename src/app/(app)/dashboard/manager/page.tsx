@@ -15,6 +15,7 @@ import {
 import { getNotificationDisplayCopy } from '@/lib/notification-display'
 import { resolveNotificationHref } from '@/lib/notification-routing'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { getScheduleBlockLifecycleLabel } from '@/lib/schedule-block-state'
 import { availabilityDueDateKey } from '@/lib/schedule-block-planning'
 import { createClient } from '@/lib/supabase/server'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
@@ -394,11 +395,10 @@ export default async function ManagerDashboardPage() {
     Boolean(activeCycle) && dayRows.length === 0 && nightRows.length === 0
 
   const currentCycleStatus = activeCycle
-    ? activeCycle.published
-      ? 'Published'
-      : activeCycleHasNoShifts
-        ? 'Draft not started'
-        : 'Draft Schedule Block'
+    ? getScheduleBlockLifecycleLabel({
+        published: activeCycle.published,
+        status: activeCycle.status,
+      })
     : 'No active Schedule Block'
 
   const currentCycleDetail = activeCycle
@@ -432,6 +432,7 @@ export default async function ManagerDashboardPage() {
       pendingRequests={pendingApprovalsResult.count ?? 0}
       approvalsWaiting={pendingApprovalsResult.count ?? 0}
       currentCycleStatus={currentCycleStatus}
+      currentCycleHasNoShifts={activeCycleHasNoShifts}
       currentCycleDetail={currentCycleDetail}
       nextCycleLabel={nextCycleLabel}
       nextCycleDetail={nextCycleDetail}

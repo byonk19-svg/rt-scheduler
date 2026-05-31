@@ -29,6 +29,7 @@ type ManagerTriageDashboardProps = {
   pendingRequests: number | '--'
   approvalsWaiting: number | '--'
   currentCycleStatus: string
+  currentCycleHasNoShifts?: boolean
   currentCycleDetail: string
   nextCycleLabel: string
   nextCycleDetail: string
@@ -131,6 +132,7 @@ function buildTodayShiftSummaries(rows: Array<{ label: string; detail: string }>
 
 function getCycleStepState(args: {
   currentCycleStatus: string
+  currentCycleHasNoShifts?: boolean
   needsReviewCount: number | '--'
   nextCycleLabel: string
 }): Array<{ label: string; value: string; tone: 'success' | 'warning' | 'muted' }> {
@@ -144,8 +146,7 @@ function getCycleStepState(args: {
         ? 'Pending'
         : 'Ready'
   const buildState =
-    args.currentCycleStatus === 'Draft not started' ||
-    args.currentCycleStatus === 'No active Schedule Block'
+    args.currentCycleHasNoShifts || args.currentCycleStatus === 'No active Schedule Block'
       ? 'Not started'
       : 'Complete'
   const reviewState =
@@ -154,7 +155,16 @@ function getCycleStepState(args: {
       : args.needsReviewCount > 0
         ? `${args.needsReviewCount} to review`
         : 'Complete'
-  const publishState = args.currentCycleStatus === 'Published' ? 'Published' : 'Not published'
+  const publishState =
+    args.currentCycleStatus === 'No active Schedule Block'
+      ? 'Not published'
+      : args.currentCycleStatus
+  const publishTone =
+    publishState === 'Published'
+      ? 'success'
+      : publishState === 'Preliminary' || publishState === 'Offline'
+        ? 'warning'
+        : 'muted'
 
   return [
     {
@@ -175,7 +185,7 @@ function getCycleStepState(args: {
     {
       label: 'Publish',
       value: publishState,
-      tone: publishState === 'Published' ? 'success' : 'muted',
+      tone: publishTone,
     },
   ]
 }
@@ -189,6 +199,7 @@ export function ManagerTriageDashboard({
   recentActivity,
   pendingRequests,
   currentCycleStatus,
+  currentCycleHasNoShifts = false,
   currentCycleDetail,
   nextCycleLabel,
   nextCycleDetail,
@@ -225,7 +236,12 @@ export function ManagerTriageDashboard({
         Math.max(nightShiftsTotal - nightShiftsFilled, 0)
   const todayShiftSummaries = buildTodayShiftSummaries(todayStaffedShifts)
   const missingLeadCount = todayShiftSummaries.filter((shift) => !shift.lead).length
-  const cycleSteps = getCycleStepState({ currentCycleStatus, needsReviewCount, nextCycleLabel })
+  const cycleSteps = getCycleStepState({
+    currentCycleStatus,
+    currentCycleHasNoShifts,
+    needsReviewCount,
+    nextCycleLabel,
+  })
 
   const attentionItems: AttentionItem[] = [
     {
