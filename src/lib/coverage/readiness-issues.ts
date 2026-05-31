@@ -9,6 +9,7 @@ export type ReadinessIssueType =
   | 'missing_lead'
   | 'need_to_work_miss'
   | 'need_off_conflict'
+  | 'missing_availability_submission'
 
 export type ReadinessIssueTarget =
   | {
@@ -21,6 +22,10 @@ export type ReadinessIssueTarget =
       kind: 'therapist_date'
       date: string
       shiftType: ShiftType | 'both'
+      therapistId: string
+    }
+  | {
+      kind: 'therapist'
       therapistId: string
     }
 
@@ -44,6 +49,13 @@ const ISSUE_TYPE_ORDER: Record<ReadinessIssueType, number> = {
   missing_lead: 1,
   need_to_work_miss: 2,
   need_off_conflict: 3,
+  missing_availability_submission: 4,
+}
+
+export type MissingAvailabilitySubmissionReadinessInput = {
+  expectedTherapists: ReadonlyArray<{ id: string; fullName: string | null | undefined }>
+  submittedTherapistIds?: Iterable<string>
+  availabilityProvidedTherapistIds?: Iterable<string>
 }
 
 function formatShiftType(shiftType: ShiftType | 'both'): string {
@@ -65,8 +77,8 @@ function stableNameSegment(name: string | null | undefined): string {
 
 function sortReadinessIssues(issues: ReadinessIssue[]): ReadinessIssue[] {
   return issues.sort((left, right) => {
-    const leftDate = left.date ?? ''
-    const rightDate = right.date ?? ''
+    const leftDate = left.date ?? '9999-12-31'
+    const rightDate = right.date ?? '9999-12-31'
     if (leftDate !== rightDate) return leftDate.localeCompare(rightDate)
 
     const leftShift = left.shiftType ?? ''
@@ -87,7 +99,10 @@ export function buildReadinessIssues(
     | 'missingLeadSlotDetails'
     | 'forcedMustWorkMissDetails'
     | 'needOffConflictDetails'
-  >
+  >,
+  options?: {
+    missingAvailabilitySubmissions?: MissingAvailabilitySubmissionReadinessInput
+  }
 ): ReadinessIssue[] {
   const issues: ReadinessIssue[] = []
 
@@ -173,6 +188,34 @@ export function buildReadinessIssues(
         therapistId: conflict.therapistId,
       },
     })
+  }
+
+  if (options?.missingAvailabilitySubmissions) {
+    const submitted = new Set(options.missingAvailabilitySubmissions.submittedTherapistIds ?? [])
+    const provided = new Set(
+      options.missingAvailabilitySubmissions.availabilityProvidedTherapistIds ?? []
+    )
+
+    for (const therapist of options.missingAvailabilitySubmissions.expectedTherapists) {
+      if (submitted.has(therapist.id) || provided.has(therapist.id)) continue
+
+      const name = therapistLabel(therapist.fullName)
+      issues.push({
+        id: `missing-availability-submission:${therapist.id}`,
+        severity: 'warning',
+        type: 'missing_availability_submission',
+        therapistId: therapist.id,
+        therapistName: name,
+        title: `${name} has not submitted availability`,
+        detail: `${name} has no official availability submission or manager-entered availability for this Schedule Block.`,
+        recommendedAction:
+          'Send a reminder, enter manager-confirmed availability, or review the risk before publishing with missing availability.',
+        target: {
+          kind: 'therapist',
+          therapistId: therapist.id,
+        },
+      })
+    }
   }
 
   return sortReadinessIssues(issues)

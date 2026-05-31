@@ -123,33 +123,79 @@ describe('buildReadinessIssues', () => {
     ])
   })
 
+  it('creates warning issues for missing availability submissions', () => {
+    const issues = buildReadinessIssues(
+      {
+        unfilledConstraintSlots: [],
+        missingLeadSlotDetails: [],
+        forcedMustWorkMissDetails: [],
+        needOffConflictDetails: [],
+      },
+      {
+        missingAvailabilitySubmissions: {
+          expectedTherapists: [
+            { id: 'therapist-1', fullName: 'Avery Chen' },
+            { id: 'therapist-2', fullName: 'Blair Morgan' },
+            { id: 'therapist-3', fullName: null },
+          ],
+          submittedTherapistIds: ['therapist-1'],
+          availabilityProvidedTherapistIds: ['therapist-2'],
+        },
+      }
+    )
+
+    expect(issues).toEqual([
+      expect.objectContaining({
+        id: 'missing-availability-submission:therapist-3',
+        severity: 'warning',
+        type: 'missing_availability_submission',
+        therapistId: 'therapist-3',
+        therapistName: 'Unknown therapist',
+        title: 'Unknown therapist has not submitted availability',
+        target: {
+          kind: 'therapist',
+          therapistId: 'therapist-3',
+        },
+      }),
+    ])
+  })
+
   it('orders multiple issues deterministically by date, shift, category, and id', () => {
-    const issues = buildReadinessIssues({
-      unfilledConstraintSlots: [
-        { date: '2026-04-09', shiftType: 'night', missingCount: 1 },
-        { date: '2026-04-07', shiftType: 'day', missingCount: 1 },
-      ],
-      missingLeadSlotDetails: [
-        { date: '2026-04-07', shiftType: 'day' },
-        { date: '2026-04-07', shiftType: 'night' },
-      ],
-      forcedMustWorkMissDetails: [
-        {
-          therapistId: 'therapist-b',
-          therapistName: 'Blair',
-          date: '2026-04-07',
-          shiftType: 'day',
+    const issues = buildReadinessIssues(
+      {
+        unfilledConstraintSlots: [
+          { date: '2026-04-09', shiftType: 'night', missingCount: 1 },
+          { date: '2026-04-07', shiftType: 'day', missingCount: 1 },
+        ],
+        missingLeadSlotDetails: [
+          { date: '2026-04-07', shiftType: 'day' },
+          { date: '2026-04-07', shiftType: 'night' },
+        ],
+        forcedMustWorkMissDetails: [
+          {
+            therapistId: 'therapist-b',
+            therapistName: 'Blair',
+            date: '2026-04-07',
+            shiftType: 'day',
+          },
+        ],
+        needOffConflictDetails: [
+          {
+            therapistId: 'therapist-a',
+            therapistName: 'Ari',
+            date: '2026-04-07',
+            shiftType: 'day',
+          },
+        ],
+      },
+      {
+        missingAvailabilitySubmissions: {
+          expectedTherapists: [{ id: 'therapist-c', fullName: 'Casey' }],
+          submittedTherapistIds: [],
+          availabilityProvidedTherapistIds: [],
         },
-      ],
-      needOffConflictDetails: [
-        {
-          therapistId: 'therapist-a',
-          therapistName: 'Ari',
-          date: '2026-04-07',
-          shiftType: 'day',
-        },
-      ],
-    })
+      }
+    )
 
     expect(issues.map((issue) => issue.id)).toEqual([
       'unfilled-assignment:2026-04-07:day',
@@ -158,6 +204,7 @@ describe('buildReadinessIssues', () => {
       'need-off-conflict:2026-04-07:day:therapist-a',
       'missing-lead:2026-04-07:night',
       'unfilled-assignment:2026-04-09:night',
+      'missing-availability-submission:therapist-c',
     ])
   })
 

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Role } from '@/lib/auth/roles'
 import { loadDraftInputsForCycle } from '@/lib/coverage/draft-inputs'
+import { buildReadinessIssues } from '@/lib/coverage/readiness-issues'
 import { createClient } from '@/lib/supabase/server'
 
 vi.mock('server-only', () => ({}))
@@ -15,7 +16,18 @@ vi.mock('@/lib/operational-codes', () => ({
 }))
 
 vi.mock('@/lib/coverage/draft-inputs', () => ({
-  loadDraftInputsForCycle: vi.fn(async () => ({ data: {}, error: null })),
+  loadDraftInputsForCycle: vi.fn(async () => ({
+    data: {
+      cycleId: 'draft-cycle',
+      cycleStartDate: '2026-05-04',
+      cycleEndDate: '2026-05-05',
+      therapists: [],
+      existingShifts: [],
+      allAvailabilityOverrides: [],
+      weeklyShifts: [],
+    },
+    error: null,
+  })),
   toDraftInputSupabaseClient: vi.fn((client) => client),
 }))
 
@@ -91,6 +103,11 @@ type ScheduleShift = {
   role: 'staff' | 'lead'
 }
 
+type AvailabilitySubmission = {
+  schedule_cycle_id: string
+  therapist_id: string
+}
+
 const draftCycle: Cycle = {
   id: 'draft-cycle',
   label: 'Draft cycle',
@@ -134,12 +151,14 @@ function makeSupabaseMock({
   cycles,
   therapistProfiles = therapistRows,
   shiftRows = [],
+  availabilitySubmissions = [],
   failures = {},
 }: {
   viewer: Profile
   cycles: Cycle[]
   therapistProfiles?: Profile[]
   shiftRows?: ScheduleShift[]
+  availabilitySubmissions?: AvailabilitySubmission[]
   failures?: ScheduleGridReadFailures
 }) {
   const profiles = [viewer, ...therapistProfiles.filter((profile) => profile.id !== viewer.id)]
@@ -222,6 +241,13 @@ function makeSupabaseMock({
         }
         return Promise.resolve({ data: single ? null : [], error: null })
       }
+      if (table === 'therapist_availability_submissions') {
+        let rows = availabilitySubmissions
+        if (typeof state.filters.schedule_cycle_id === 'string') {
+          rows = rows.filter((row) => row.schedule_cycle_id === state.filters.schedule_cycle_id)
+        }
+        return Promise.resolve({ data: single ? null : rows, error: null })
+      }
       return Promise.resolve({ data: single ? null : [], error: null })
     }
 
@@ -277,12 +303,14 @@ function setScheduleViewer({
   cycles,
   therapistProfiles,
   shiftRows,
+  availabilitySubmissions,
   failures,
 }: {
   viewer: Profile
   cycles: Cycle[]
   therapistProfiles?: Profile[]
   shiftRows?: ScheduleShift[]
+  availabilitySubmissions?: AvailabilitySubmission[]
   failures?: ScheduleGridReadFailures
 }) {
   vi.mocked(createClient).mockResolvedValue(
@@ -291,6 +319,7 @@ function setScheduleViewer({
       cycles,
       therapistProfiles,
       shiftRows,
+      availabilitySubmissions,
       failures,
     }) as unknown as Awaited<ReturnType<typeof createClient>>
   )
@@ -348,6 +377,106 @@ describe('loadScheduleGridData visibility', () => {
         therapistScope: 'active-non-fmla',
       })
     )
+  })
+
+  it('adds missing availability submission context to manager pre-flight issues', async () => {
+    vi.mocked(loadDraftInputsForCycle).mockResolvedValueOnce({
+      data: {
+        cycleId: 'draft-cycle',
+        cycleStartDate: '2026-05-04',
+        cycleEndDate: '2026-05-05',
+        therapists: [
+          {
+            id: 'therapist-1',
+            full_name: 'Avery Chen',
+            shift_type: 'day',
+            is_lead_eligible: false,
+            employment_type: 'full_time',
+            max_work_days_per_week: 3,
+            works_dow: [],
+            offs_dow: [],
+            weekend_rotation: 'none',
+            weekend_anchor_date: null,
+            works_dow_mode: 'hard',
+            on_fmla: false,
+            fmla_return_date: null,
+            is_active: true,
+          },
+          {
+            id: 'therapist-2',
+            full_name: 'Blair Morgan',
+            shift_type: 'night',
+            is_lead_eligible: false,
+            employment_type: 'full_time',
+            max_work_days_per_week: 3,
+            works_dow: [],
+            offs_dow: [],
+            weekend_rotation: 'none',
+            weekend_anchor_date: null,
+            works_dow_mode: 'hard',
+            on_fmla: false,
+            fmla_return_date: null,
+            is_active: true,
+          },
+          {
+            id: 'therapist-3',
+            full_name: 'Casey Singh',
+            shift_type: 'day',
+            is_lead_eligible: false,
+            employment_type: 'full_time',
+            max_work_days_per_week: 3,
+            works_dow: [],
+            offs_dow: [],
+            weekend_rotation: 'none',
+            weekend_anchor_date: null,
+            works_dow_mode: 'hard',
+            on_fmla: false,
+            fmla_return_date: null,
+            is_active: true,
+          },
+        ],
+        existingShifts: [],
+        allAvailabilityOverrides: [
+          {
+            therapist_id: 'therapist-2',
+            cycle_id: 'draft-cycle',
+            date: '2026-05-04',
+            shift_type: 'day',
+            override_type: 'force_on',
+            source: 'manager',
+          },
+        ],
+        weeklyShifts: [],
+      },
+      error: null,
+    })
+    setScheduleViewer({
+      viewer: {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      cycles: [draftCycle],
+      availabilitySubmissions: [{ schedule_cycle_id: 'draft-cycle', therapist_id: 'therapist-1' }],
+    })
+
+    const result = await loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    expect(vi.mocked(buildReadinessIssues)).toHaveBeenCalledWith(expect.anything(), {
+      missingAvailabilitySubmissions: {
+        expectedTherapists: [
+          { id: 'therapist-1', fullName: 'Avery Chen' },
+          { id: 'therapist-2', fullName: 'Blair Morgan' },
+          { id: 'therapist-3', fullName: 'Casey Singh' },
+        ],
+        submittedTherapistIds: ['therapist-1'],
+        availabilityProvidedTherapistIds: ['therapist-2'],
+      },
+    })
   })
 
   it('loads only published schedule cycles for leads', async () => {
