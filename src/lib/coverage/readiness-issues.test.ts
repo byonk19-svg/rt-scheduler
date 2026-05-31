@@ -160,6 +160,58 @@ describe('buildReadinessIssues', () => {
     ])
   })
 
+  it('creates warning issues for open Shift Board requests touching the block', () => {
+    const issues = buildReadinessIssues(
+      {
+        unfilledConstraintSlots: [],
+        missingLeadSlotDetails: [],
+        forcedMustWorkMissDetails: [],
+        needOffConflictDetails: [],
+      },
+      {
+        openShiftBoardRequests: [
+          {
+            id: 'post-coverage-1',
+            requestType: 'coverage',
+            date: '2026-04-11',
+            shiftType: 'day',
+          },
+          {
+            id: 'post-trade-1',
+            requestType: 'trade',
+            date: '2026-04-12',
+            shiftType: 'night',
+          },
+        ],
+      }
+    )
+
+    expect(issues).toEqual([
+      expect.objectContaining({
+        id: 'open-shift-board-request:post-coverage-1',
+        severity: 'warning',
+        type: 'open_shift_board_request',
+        date: '2026-04-11',
+        shiftType: 'day',
+        title: 'Coverage request is still open',
+        target: {
+          kind: 'shift_board_request',
+          requestId: 'post-coverage-1',
+          date: '2026-04-11',
+          shiftType: 'day',
+        },
+      }),
+      expect.objectContaining({
+        id: 'open-shift-board-request:post-trade-1',
+        severity: 'warning',
+        type: 'open_shift_board_request',
+        date: '2026-04-12',
+        shiftType: 'night',
+        title: 'Trade request is still open',
+      }),
+    ])
+  })
+
   it('orders multiple issues deterministically by date, shift, category, and id', () => {
     const issues = buildReadinessIssues(
       {
@@ -194,6 +246,14 @@ describe('buildReadinessIssues', () => {
           submittedTherapistIds: [],
           availabilityProvidedTherapistIds: [],
         },
+        openShiftBoardRequests: [
+          {
+            id: 'post-1',
+            requestType: 'coverage',
+            date: '2026-04-07',
+            shiftType: 'day',
+          },
+        ],
       }
     )
 
@@ -202,6 +262,7 @@ describe('buildReadinessIssues', () => {
       'missing-lead:2026-04-07:day',
       'need-to-work-miss:2026-04-07:day:therapist-b',
       'need-off-conflict:2026-04-07:day:therapist-a',
+      'open-shift-board-request:post-1',
       'missing-lead:2026-04-07:night',
       'unfilled-assignment:2026-04-09:night',
       'missing-availability-submission:therapist-c',
@@ -209,19 +270,31 @@ describe('buildReadinessIssues', () => {
   })
 
   it('filters blocking readiness issues for schedule actions', () => {
-    const issues = buildReadinessIssues({
-      unfilledConstraintSlots: [],
-      missingLeadSlotDetails: [{ date: '2026-04-08', shiftType: 'night' }],
-      forcedMustWorkMissDetails: [
-        {
-          therapistId: 'therapist-b',
-          therapistName: 'Blair',
-          date: '2026-04-09',
-          shiftType: 'day',
-        },
-      ],
-      needOffConflictDetails: [],
-    })
+    const issues = buildReadinessIssues(
+      {
+        unfilledConstraintSlots: [],
+        missingLeadSlotDetails: [{ date: '2026-04-08', shiftType: 'night' }],
+        forcedMustWorkMissDetails: [
+          {
+            therapistId: 'therapist-b',
+            therapistName: 'Blair',
+            date: '2026-04-09',
+            shiftType: 'day',
+          },
+        ],
+        needOffConflictDetails: [],
+      },
+      {
+        openShiftBoardRequests: [
+          {
+            id: 'post-1',
+            requestType: 'coverage',
+            date: '2026-04-09',
+            shiftType: 'day',
+          },
+        ],
+      }
+    )
 
     expect(getBlockingReadinessIssues(issues).map((issue) => issue.type)).toEqual([
       'missing_lead',

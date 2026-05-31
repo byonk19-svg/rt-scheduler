@@ -90,6 +90,7 @@ type ScheduleGridReadFailures = {
   therapists?: unknown
   shifts?: unknown
   forceOff?: unknown
+  shiftPosts?: unknown
 }
 
 type ScheduleShift = {
@@ -106,6 +107,14 @@ type ScheduleShift = {
 type AvailabilitySubmission = {
   schedule_cycle_id: string
   therapist_id: string
+}
+
+type ShiftPost = {
+  id: string
+  type: 'pickup' | 'swap'
+  status: 'pending' | 'approved' | 'denied' | 'expired' | 'withdrawn'
+  shift_id: string | null
+  swap_shift_id: string | null
 }
 
 const draftCycle: Cycle = {
@@ -152,6 +161,7 @@ function makeSupabaseMock({
   therapistProfiles = therapistRows,
   shiftRows = [],
   availabilitySubmissions = [],
+  shiftPosts = [],
   failures = {},
 }: {
   viewer: Profile
@@ -159,6 +169,7 @@ function makeSupabaseMock({
   therapistProfiles?: Profile[]
   shiftRows?: ScheduleShift[]
   availabilitySubmissions?: AvailabilitySubmission[]
+  shiftPosts?: ShiftPost[]
   failures?: ScheduleGridReadFailures
 }) {
   const profiles = [viewer, ...therapistProfiles.filter((profile) => profile.id !== viewer.id)]
@@ -248,6 +259,26 @@ function makeSupabaseMock({
         }
         return Promise.resolve({ data: single ? null : rows, error: null })
       }
+      if (table === 'shift_posts') {
+        if (failures.shiftPosts) {
+          return Promise.resolve({ data: null, error: failures.shiftPosts })
+        }
+        let rows = shiftPosts
+        if (typeof state.filters.status === 'string') {
+          rows = rows.filter((row) => row.status === state.filters.status)
+        }
+        if (Array.isArray(state.inFilters.shift_id)) {
+          rows = rows.filter((row) =>
+            row.shift_id ? state.inFilters.shift_id.includes(row.shift_id) : false
+          )
+        }
+        if (Array.isArray(state.inFilters.swap_shift_id)) {
+          rows = rows.filter((row) =>
+            row.swap_shift_id ? state.inFilters.swap_shift_id.includes(row.swap_shift_id) : false
+          )
+        }
+        return Promise.resolve({ data: single ? null : rows, error: null })
+      }
       return Promise.resolve({ data: single ? null : [], error: null })
     }
 
@@ -304,6 +335,7 @@ function setScheduleViewer({
   therapistProfiles,
   shiftRows,
   availabilitySubmissions,
+  shiftPosts,
   failures,
 }: {
   viewer: Profile
@@ -311,6 +343,7 @@ function setScheduleViewer({
   therapistProfiles?: Profile[]
   shiftRows?: ScheduleShift[]
   availabilitySubmissions?: AvailabilitySubmission[]
+  shiftPosts?: ShiftPost[]
   failures?: ScheduleGridReadFailures
 }) {
   vi.mocked(createClient).mockResolvedValue(
@@ -320,6 +353,7 @@ function setScheduleViewer({
       therapistProfiles,
       shiftRows,
       availabilitySubmissions,
+      shiftPosts,
       failures,
     }) as unknown as Awaited<ReturnType<typeof createClient>>
   )
@@ -467,6 +501,7 @@ describe('loadScheduleGridData visibility', () => {
 
     expect(result.status).toBe('ok')
     expect(vi.mocked(buildReadinessIssues)).toHaveBeenCalledWith(expect.anything(), {
+      openShiftBoardRequests: [],
       missingAvailabilitySubmissions: {
         expectedTherapists: [
           { id: 'therapist-1', fullName: 'Avery Chen' },
@@ -475,6 +510,90 @@ describe('loadScheduleGridData visibility', () => {
         ],
         submittedTherapistIds: ['therapist-1'],
         availabilityProvidedTherapistIds: ['therapist-2'],
+      },
+    })
+  })
+
+  it('adds pending Shift Board request context to manager pre-flight issues', async () => {
+    setScheduleViewer({
+      viewer: {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      cycles: [draftCycle],
+      shiftRows: [
+        {
+          id: 'shift-day-1',
+          user_id: 'therapist-1',
+          cycle_id: 'draft-cycle',
+          date: '2026-05-04',
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: null,
+          role: 'staff',
+        },
+        {
+          id: 'shift-night-1',
+          user_id: 'therapist-2',
+          cycle_id: 'draft-cycle',
+          date: '2026-05-05',
+          shift_type: 'night',
+          status: 'scheduled',
+          assignment_status: null,
+          role: 'staff',
+        },
+      ],
+      shiftPosts: [
+        {
+          id: 'post-coverage-1',
+          type: 'pickup',
+          status: 'pending',
+          shift_id: 'shift-day-1',
+          swap_shift_id: null,
+        },
+        {
+          id: 'post-trade-1',
+          type: 'swap',
+          status: 'pending',
+          shift_id: 'shift-outside',
+          swap_shift_id: 'shift-night-1',
+        },
+        {
+          id: 'post-approved-1',
+          type: 'pickup',
+          status: 'approved',
+          shift_id: 'shift-day-1',
+          swap_shift_id: null,
+        },
+      ],
+    })
+
+    const result = await loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    expect(vi.mocked(buildReadinessIssues)).toHaveBeenCalledWith(expect.anything(), {
+      openShiftBoardRequests: [
+        {
+          id: 'post-coverage-1',
+          requestType: 'coverage',
+          date: '2026-05-04',
+          shiftType: 'day',
+        },
+        {
+          id: 'post-trade-1',
+          requestType: 'trade',
+          date: '2026-05-05',
+          shiftType: 'night',
+        },
+      ],
+      missingAvailabilitySubmissions: {
+        expectedTherapists: [],
+        submittedTherapistIds: [],
+        availabilityProvidedTherapistIds: [],
       },
     })
   })

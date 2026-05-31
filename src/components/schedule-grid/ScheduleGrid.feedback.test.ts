@@ -190,6 +190,23 @@ const scheduleGridFeedbackEntry = String.raw`
           therapistId: 'therapist-2',
         },
       },
+      {
+        id: 'open-shift-board-request:post-1',
+        severity: 'warning',
+        type: 'open_shift_board_request',
+        date: '2026-05-04',
+        shiftType: 'day',
+        title: 'Coverage request is still open',
+        detail: 'Coverage request touching day shift on 2026-05-04 may change staffing after publish.',
+        recommendedAction:
+          'Review the request on Shift Board before publishing, or continue knowing the schedule may change.',
+        target: {
+          kind: 'shift_board_request',
+          requestId: 'post-1',
+          date: '2026-05-04',
+          shiftType: 'day',
+        },
+      },
     ],
   }
 
@@ -345,13 +362,15 @@ describe('ScheduleGrid feedback rendering', () => {
         await page.getByRole('button', { name: 'Pre-flight' }).click()
 
         await page.getByText('Pre-flight summary').waitFor({ state: 'visible' })
-        await page.getByText('3 readiness issues').waitFor({ state: 'visible' })
+        await page.getByText('4 readiness issues').waitFor({ state: 'visible' })
         await page.getByText('1 missing availability submission').waitFor({ state: 'visible' })
+        await page.getByText('1 open Shift Board request').waitFor({ state: 'visible' })
         await page.getByText('Day shift is short 1 assignment').waitFor({ state: 'visible' })
         await page.getByText('Day shift needs a lead').waitFor({ state: 'visible' })
         await page
           .getByText('Blair Morgan has not submitted availability')
           .waitFor({ state: 'visible' })
+        await page.getByText('Coverage request is still open').waitFor({ state: 'visible' })
         await page
           .getByLabel('Pre-flight readiness issues')
           .getByText('Blair Morgan', { exact: true })
