@@ -11,6 +11,10 @@ import {
 import { loadDraftInputsForCycle, toDraftInputSupabaseClient } from '@/lib/coverage/draft-inputs'
 import { generateDraftForCycle } from '@/lib/coverage/generate-draft'
 import { summarizePreFlight } from '@/lib/coverage/pre-flight'
+import {
+  loadIneligibleAssignmentReadinessInputsForCycle,
+  type ReadinessAssignmentConflictClient,
+} from '@/lib/coverage/readiness-assignment-conflicts'
 import { buildReadinessIssues } from '@/lib/coverage/readiness-issues'
 import { fetchActiveOperationalDetailMap } from '@/lib/operational-codes'
 import { createClient } from '@/lib/supabase/server'
@@ -284,6 +288,10 @@ export async function loadScheduleGridData(
     }
 
     const openShiftBoardRequests = await loadOpenShiftBoardRequestsForCycle(cycleForSummary.id)
+    const ineligibleAssignments = await loadIneligibleAssignmentReadinessInputsForCycle(
+      supabase as unknown as ReadinessAssignmentConflictClient,
+      cycleForSummary.id
+    )
 
     if (openShiftBoardRequests.error) {
       console.error(
@@ -293,10 +301,19 @@ export async function loadScheduleGridData(
       return null
     }
 
+    if (ineligibleAssignments.error) {
+      console.error(
+        'Could not load ineligible assignment conflicts for pre-flight summary:',
+        ineligibleAssignments.error
+      )
+      return null
+    }
+
     const preFlightResult = generateDraftForCycle(draftInputs.data)
     return shapePreFlightSummary({
       ...summarizePreFlight(preFlightResult),
       readinessIssues: buildReadinessIssues(preFlightResult, {
+        ineligibleAssignments: ineligibleAssignments.data,
         openShiftBoardRequests: openShiftBoardRequests.data,
         missingAvailabilitySubmissions: {
           expectedTherapists: draftInputs.data.therapists.map((therapist) => ({

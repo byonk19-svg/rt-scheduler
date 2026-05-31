@@ -80,6 +80,13 @@ type TestContext = {
   cycleEndDate?: string
   cycleSiteId?: string
   profileFilterSnapshots?: Array<Map<string, unknown>>
+  assignmentProfiles?: Array<{
+    id: string
+    full_name: string | null
+    is_active: boolean | null
+    on_fmla: boolean | null
+    archived_at: string | null
+  }>
   shifts?: Array<{
     id: string
     cycle_id: string
@@ -205,6 +212,25 @@ function createSupabaseMock(context: TestContext) {
             )
           }
 
+          if (table === 'profiles' && Array.isArray(filters.get('id'))) {
+            const ids = filters.get('id') as string[]
+            const rows =
+              context.assignmentProfiles ??
+              ids.map((id) => ({
+                id,
+                full_name: 'Active Therapist',
+                is_active: true,
+                on_fmla: false,
+                archived_at: null,
+              }))
+            return Promise.resolve(
+              resolve({
+                data: rows.filter((row) => ids.includes(row.id)),
+                error: null,
+              })
+            )
+          }
+
           if (
             table === 'profiles' &&
             Array.isArray(filters.get('role')) &&
@@ -320,6 +346,27 @@ describe('sendPreliminaryScheduleAction', () => {
       role: 'manager',
       cyclePublished: false,
       cycleSiteId: 'site-main',
+      shifts: [
+        {
+          id: 'shift-inactive-1',
+          cycle_id: 'cycle-1',
+          user_id: 'inactive-1',
+          date: '2026-04-02',
+          shift_type: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          profiles: { full_name: 'Inactive Therapist' },
+        },
+      ],
+      assignmentProfiles: [
+        {
+          id: 'inactive-1',
+          full_name: 'Inactive Therapist',
+          is_active: false,
+          on_fmla: false,
+          archived_at: null,
+        },
+      ],
     })
     createClientMock.mockResolvedValue(supabase)
     createAdminClientMock.mockReturnValue(admin)
@@ -338,6 +385,18 @@ describe('sendPreliminaryScheduleAction', () => {
         therapistScope: 'active-non-fmla',
       })
     )
+    expect(buildReadinessIssuesMock).toHaveBeenCalledWith(expect.anything(), {
+      ineligibleAssignments: [
+        {
+          shiftId: 'shift-inactive-1',
+          therapistId: 'inactive-1',
+          therapistName: 'Inactive Therapist',
+          date: '2026-04-02',
+          shiftType: 'day',
+          reason: 'inactive',
+        },
+      ],
+    })
     expect(admin.rpc).not.toHaveBeenCalled()
     expect(notifyUsersMock).not.toHaveBeenCalled()
   })
