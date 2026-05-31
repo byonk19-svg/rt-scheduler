@@ -7,6 +7,11 @@ const {
   createAdminClientMock,
   notifyUsersMock,
   writeAuditLogMock,
+  loadDraftInputsForCycleMock,
+  toDraftInputSupabaseClientMock,
+  generateDraftForCycleMock,
+  buildReadinessIssuesMock,
+  getBlockingReadinessIssuesMock,
 } = vi.hoisted(() => ({
   redirectMock: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`)
@@ -16,6 +21,11 @@ const {
   createAdminClientMock: vi.fn(),
   notifyUsersMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
+  loadDraftInputsForCycleMock: vi.fn(),
+  toDraftInputSupabaseClientMock: vi.fn(),
+  generateDraftForCycleMock: vi.fn(),
+  buildReadinessIssuesMock: vi.fn(),
+  getBlockingReadinessIssuesMock: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -40,6 +50,20 @@ vi.mock('@/lib/notifications', () => ({
 
 vi.mock('@/lib/audit-log', () => ({
   writeAuditLog: writeAuditLogMock,
+}))
+
+vi.mock('@/lib/coverage/draft-inputs', () => ({
+  loadDraftInputsForCycle: loadDraftInputsForCycleMock,
+  toDraftInputSupabaseClient: toDraftInputSupabaseClientMock,
+}))
+
+vi.mock('@/lib/coverage/generate-draft', () => ({
+  generateDraftForCycle: generateDraftForCycleMock,
+}))
+
+vi.mock('@/lib/coverage/readiness-issues', () => ({
+  buildReadinessIssues: buildReadinessIssuesMock,
+  getBlockingReadinessIssues: getBlockingReadinessIssuesMock,
 }))
 
 import { sendPreliminaryScheduleAction } from '@/app/schedule/actions'
@@ -239,6 +263,13 @@ function createAdminMock(context: TestContext) {
 describe('sendPreliminaryScheduleAction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    toDraftInputSupabaseClientMock.mockImplementation((client: unknown) => client)
+    loadDraftInputsForCycleMock.mockResolvedValue({ data: { cycleId: 'cycle-1' }, error: null })
+    generateDraftForCycleMock.mockReturnValue({ generated: true })
+    buildReadinessIssuesMock.mockReturnValue([])
+    getBlockingReadinessIssuesMock.mockImplementation((issues: Array<{ severity: string }>) =>
+      issues.filter((issue) => issue.severity === 'blocking')
+    )
     createAdminClientMock.mockReturnValue(createAdminMock({}))
   })
 
@@ -274,6 +305,41 @@ describe('sendPreliminaryScheduleAction', () => {
     )
     expect(profileFilterSnapshots.some((filters) => filters.get('archived_at') === null)).toBe(true)
     expect(revalidatePathMock).toHaveBeenCalledWith('/preliminary')
+  })
+
+  it('blocks preliminary send when shared readiness has blocking issues', async () => {
+    const blockingIssue = {
+      id: 'missing-lead:2026-04-08:day',
+      severity: 'blocking',
+      type: 'missing_lead',
+    }
+    buildReadinessIssuesMock.mockReturnValue([blockingIssue])
+    const admin = createAdminMock({})
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      cyclePublished: false,
+      cycleSiteId: 'site-main',
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(sendPreliminaryScheduleAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/schedule?cycle=cycle-1&error=preliminary_readiness_blocked&readiness_issues=1'
+    )
+
+    expect(loadDraftInputsForCycleMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        cycle: expect.objectContaining({
+          id: 'cycle-1',
+          site_id: 'site-main',
+        }),
+        therapistScope: 'active-non-fmla',
+      })
+    )
+    expect(admin.rpc).not.toHaveBeenCalled()
+    expect(notifyUsersMock).not.toHaveBeenCalled()
   })
 
   it('denies non-managers', async () => {

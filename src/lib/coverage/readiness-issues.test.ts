@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildReadinessIssues } from '@/lib/coverage/readiness-issues'
+import {
+  buildReadinessIssues,
+  getBlockingReadinessIssues,
+} from '@/lib/coverage/readiness-issues'
 
 describe('buildReadinessIssues', () => {
   it('returns no issues when the pre-flight result has no row-level details', () => {
@@ -79,7 +82,7 @@ describe('buildReadinessIssues', () => {
     expect(issues).toEqual([
       expect.objectContaining({
         id: 'need-to-work-miss:2026-04-09:both:therapist-1',
-        severity: 'warning',
+        severity: 'blocking',
         type: 'need_to_work_miss',
         therapistId: 'therapist-1',
         therapistName: 'Avery Chen',
@@ -155,6 +158,27 @@ describe('buildReadinessIssues', () => {
       'need-off-conflict:2026-04-07:day:therapist-a',
       'missing-lead:2026-04-07:night',
       'unfilled-assignment:2026-04-09:night',
+    ])
+  })
+
+  it('filters blocking readiness issues for schedule actions', () => {
+    const issues = buildReadinessIssues({
+      unfilledConstraintSlots: [],
+      missingLeadSlotDetails: [{ date: '2026-04-08', shiftType: 'night' }],
+      forcedMustWorkMissDetails: [
+        {
+          therapistId: 'therapist-b',
+          therapistName: 'Blair',
+          date: '2026-04-09',
+          shiftType: 'day',
+        },
+      ],
+      needOffConflictDetails: [],
+    })
+
+    expect(getBlockingReadinessIssues(issues).map((issue) => issue.type)).toEqual([
+      'missing_lead',
+      'need_to_work_miss',
     ])
   })
 })

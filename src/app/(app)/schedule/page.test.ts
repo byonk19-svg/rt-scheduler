@@ -154,6 +154,39 @@ describe('schedule route', () => {
     expect(html).toContain('Publish with missing availability')
   })
 
+  it('renders readiness blockers for preliminary and final publish actions', async () => {
+    loadScheduleGridDataMock.mockResolvedValue({
+      status: 'ok',
+      dataset: okDataset(),
+      initialShiftTab: 'Day',
+      preFlightSummary: null,
+    })
+
+    const publishHtml = renderToStaticMarkup(
+      await SchedulePage({
+        searchParams: Promise.resolve({
+          error: 'publish_readiness_blocked',
+          readiness_issues: '2',
+        }),
+      })
+    )
+    expect(publishHtml).toContain(
+      'Publish blocked: resolve 2 blocking readiness issues in pre-flight before final publish.'
+    )
+
+    const preliminaryHtml = renderToStaticMarkup(
+      await SchedulePage({
+        searchParams: Promise.resolve({
+          error: 'preliminary_readiness_blocked',
+          readiness_issues: '1',
+        }),
+      })
+    )
+    expect(preliminaryHtml).toContain(
+      'Preliminary send blocked: resolve 1 blocking readiness issue in pre-flight before staff review.'
+    )
+  })
+
   it('shows setup completion feedback on the schedule page', async () => {
     loadScheduleGridDataMock.mockResolvedValue({
       status: 'ok',

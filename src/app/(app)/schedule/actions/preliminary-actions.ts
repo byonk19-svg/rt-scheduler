@@ -10,7 +10,11 @@ import { buildScheduleUrl } from '@/lib/schedule-helpers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-import { buildScheduleActionUrl, getRoleForUser } from './helpers'
+import {
+  buildScheduleActionUrl,
+  getRoleForUser,
+  loadBlockingReadinessIssuesForCycle,
+} from './helpers'
 
 type SendPreliminaryScheduleRpcClient = {
   rpc: (
@@ -54,6 +58,47 @@ export async function sendPreliminaryScheduleAction(formData: FormData) {
     redirect(buildReturnUrl(undefined, { ...viewParams, error: 'preliminary_missing_cycle' }))
   }
 
+  const { data: cycleData, error: cycleError } = await supabase
+    .from('schedule_cycles')
+    .select('id, label, start_date, end_date, published, status, site_id')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleError || !cycleData) {
+    console.error('Failed to load cycle for preliminary readiness validation:', cycleError)
+    redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'preliminary_send_failed' }))
+  }
+
+  if (cycleData.status === 'archived') {
+    redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'preliminary_cycle_archived' }))
+  }
+
+  if (cycleData.published || cycleData.status === 'final') {
+    redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'preliminary_cycle_published' }))
+  }
+
+  const readinessValidation = await loadBlockingReadinessIssuesForCycle(supabase, {
+    id: cycleData.id,
+    start_date: cycleData.start_date,
+    end_date: cycleData.end_date,
+    site_id: cycleData.site_id,
+  })
+
+  if (readinessValidation.error) {
+    console.error('Failed to load preliminary readiness validation:', readinessValidation.error)
+    redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'preliminary_send_failed' }))
+  }
+
+  if (readinessValidation.issues.length > 0) {
+    redirect(
+      buildReturnUrl(cycleId, {
+        ...viewParams,
+        error: 'preliminary_readiness_blocked',
+        readiness_issues: String(readinessValidation.issues.length),
+      })
+    )
+  }
+
   const preliminaryMutationClient =
     createAdminClient() as unknown as SendPreliminaryScheduleRpcClient
   const sendResult = await preliminaryMutationClient.rpc('app_send_preliminary_schedule', {
@@ -73,23 +118,13 @@ export async function sendPreliminaryScheduleAction(formData: FormData) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: sendError }))
   }
 
-  const { data: cycleData, error: cycleError } = await supabase
-    .from('schedule_cycles')
-    .select('site_id')
-    .eq('id', cycleId)
-    .maybeSingle()
-
-  if (cycleError || !cycleData?.site_id) {
-    console.error('Failed to load preliminary schedule site for recipients:', cycleError)
-  }
-
   const { data: recipientsData, error: recipientsError } = await supabase
     .from('profiles')
     .select('id')
     .in('role', ['therapist', 'lead'])
     .eq('is_active', true)
     .is('archived_at', null)
-    .eq('site_id', cycleData?.site_id ?? '__missing_site__')
+    .eq('site_id', cycleData.site_id ?? '__missing_site__')
     .order('id', { ascending: true })
 
   if (recipientsError) {

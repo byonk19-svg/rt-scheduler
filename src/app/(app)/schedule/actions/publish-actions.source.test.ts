@@ -23,6 +23,17 @@ describe('publish actions immediate email processing', () => {
     expect(source).toContain("from('therapist_availability_submissions')")
   })
 
+  it('checks shared readiness blockers before final publish mutation', () => {
+    const filePath = resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('loadBlockingReadinessIssuesForCycle')
+    expect(source).toContain("'publish_readiness_blocked'")
+    expect(source.indexOf('loadBlockingReadinessIssuesForCycle')).toBeLessThan(
+      source.indexOf("'app_publish_schedule_cycle'")
+    )
+  })
+
   it('uses Schedule Block language in final publish notifications', () => {
     const filePath = resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts')
     const source = readFileSync(filePath, 'utf8')

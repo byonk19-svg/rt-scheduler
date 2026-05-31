@@ -75,6 +75,7 @@ function getScheduleFeedback(params: Record<string, string | string[] | undefine
   const under = getSetupParam(params.under)
   const over = getSetupParam(params.over)
   const missingAvailability = getSetupParam(params.missing_availability)
+  const readinessIssues = getSetupParam(params.readiness_issues)
 
   if (success === 'preliminary_sent') {
     return {
@@ -104,6 +105,11 @@ function getScheduleFeedback(params: Record<string, string | string[] | undefine
       'Publish blocked: resolve coverage or lead staffing issues before final publish.',
     publish_availability_rule_violation:
       'Publish blocked: resolve Need Off or Need to Work conflicts before final publish.',
+    publish_readiness_blocked: `Publish blocked: resolve ${
+      readinessIssues ?? 'the'
+    } blocking readiness ${
+      readinessIssues === '1' ? 'issue' : 'issues'
+    } in pre-flight before final publish.`,
     publish_missing_availability_warning: `Publish paused: ${missingAvailability ?? 'some'} staff ${
       missingAvailability === '1' ? 'member is' : 'members are'
     } missing availability. Review the gap, then use Publish with missing availability to continue.`,
@@ -113,6 +119,11 @@ function getScheduleFeedback(params: Record<string, string | string[] | undefine
       'Publish blocked: resolve preliminary requests before final publish.',
     preliminary_send_failed:
       'Could not send the preliminary schedule. Review the draft and try again.',
+    preliminary_readiness_blocked: `Preliminary send blocked: resolve ${
+      readinessIssues ?? 'the'
+    } blocking readiness ${
+      readinessIssues === '1' ? 'issue' : 'issues'
+    } in pre-flight before staff review.`,
     preliminary_cycle_archived: 'Archived Schedule Blocks cannot be sent to preliminary review.',
     preliminary_cycle_published: 'Published Schedule Blocks cannot be sent to preliminary review.',
   }

@@ -105,6 +105,7 @@ export type ScheduleSearchParams = {
   need_to_work_misses?: string
   need_off_overrides?: string
   missing_availability?: string
+  readiness_issues?: string
   acknowledge_missing_availability?: string
   affected?: string
   set_lead_error?: string
