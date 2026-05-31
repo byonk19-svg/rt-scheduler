@@ -49,6 +49,7 @@ export type ScheduleGridServerData =
       preFlightSummary: ScheduleGridPreFlightSummary | null
     }
   | { status: 'unauthenticated' }
+  | { status: 'inactive' }
   | { status: 'forbidden' }
   | { status: 'no_cycle' }
   | { status: 'load_error' }
@@ -108,10 +109,11 @@ export async function loadScheduleGridData(
     archivedAt: profile?.archived_at ?? null,
   }
 
-  if (
-    !actorRole ||
-    (!can(actorRole, 'access_lead_tools', permissionContext) && actorRole !== 'therapist')
-  ) {
+  if (profile?.is_active === false || profile?.archived_at) {
+    return { status: 'inactive' }
+  }
+
+  if (!actorRole || (!can(actorRole, 'access_lead_tools') && actorRole !== 'therapist')) {
     return { status: 'forbidden' }
   }
 

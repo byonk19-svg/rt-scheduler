@@ -391,6 +391,36 @@ describe('loadScheduleGridData visibility', () => {
   })
 
   it.each([
+    ['inactive therapist', 'therapist', { is_active: false, archived_at: null }],
+    [
+      'archived therapist',
+      'therapist',
+      { is_active: true, archived_at: '2026-05-01T12:00:00.000Z' },
+    ],
+    ['inactive manager', 'manager', { is_active: false, archived_at: null }],
+    ['archived lead', 'lead', { is_active: true, archived_at: '2026-05-01T12:00:00.000Z' }],
+  ] satisfies Array<[string, Role, { is_active: boolean; archived_at: string | null }]>)(
+    'blocks %s before loading schedule data',
+    async (_label, role, lifecycle) => {
+      setViewer(
+        {
+          id: 'viewer-1',
+          role,
+          shift_type: 'day',
+          is_active: lifecycle.is_active,
+          archived_at: lifecycle.archived_at,
+          site_id: 'site-a',
+        },
+        [draftCycle, publishedCycle]
+      )
+
+      await expect(loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })).resolves.toEqual({
+        status: 'inactive',
+      })
+    }
+  )
+
+  it.each([
     ['viewer profile', { viewerProfile: { message: 'profile read failed' } }],
     ['schedule cycles', { cycles: { message: 'cycle read failed' } }],
     ['therapist roster', { therapists: { message: 'therapist read failed' } }],
