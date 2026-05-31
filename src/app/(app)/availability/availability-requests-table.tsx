@@ -42,6 +42,8 @@ export type AvailabilityEntryTableRow = {
   cycleLabel: string
   entryType: 'force_off' | 'force_on'
   shiftType: 'day' | 'night' | 'both'
+  source?: 'manager' | 'therapist'
+  intent?: string | null
   canDelete: boolean
 }
 
@@ -78,6 +80,10 @@ function formatShiftTypeLabel(shiftType: AvailabilityEntryTableRow['shiftType'])
   if (shiftType === 'both') return 'Both shifts'
   if (shiftType === 'night') return 'Night shift'
   return 'Day shift'
+}
+
+function formatEntrySourceLabel(row: AvailabilityEntryTableRow): string {
+  return row.source === 'manager' ? 'Manager-entered' : 'Therapist-entered'
 }
 
 function getCompactEmptyMessage(filtersExcludedAllRows: boolean): string {
@@ -145,7 +151,7 @@ export function AvailabilityEntriesTable({
   const filteredRows = useMemo(() => {
     const mappedRows: Array<AvailabilityEntryTableRow & FilterableRow> = scopedRows.map((row) => ({
       ...row,
-      searchText: `${row.requestedBy} ${row.reason ?? ''} ${row.cycleLabel} ${formatDate(row.date)} ${row.entryType} ${row.shiftType}`,
+      searchText: `${row.requestedBy} ${row.reason ?? ''} ${row.cycleLabel} ${formatDate(row.date)} ${row.entryType} ${row.shiftType} ${formatEntrySourceLabel(row)}`,
       date: row.date,
       sortDate: row.createdAt,
       status: row.entryType,
@@ -339,6 +345,7 @@ export function AvailabilityEntriesTable({
               const isExpanded = expandedEntryIds.has(row.id)
               const noteText = row.reason?.trim() ?? ''
               const noteDisplay = noteText || <span className="text-muted-foreground">-</span>
+              const entrySourceLabel = formatEntrySourceLabel(row)
 
               return (
                 <Fragment key={row.id}>
@@ -358,20 +365,28 @@ export function AvailabilityEntriesTable({
                       {formatDate(row.date)}
                     </TableCell>
                     {canManageAvailability ? (
-                      <TableCell className="hidden text-foreground md:table-cell">
-                        {row.requestedBy}
+                      <TableCell className="hidden md:table-cell">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-medium text-foreground">{row.requestedBy}</p>
+                          <p className="text-xs text-muted-foreground">{entrySourceLabel}</p>
+                        </div>
                       </TableCell>
                     ) : null}
                     <TableCell>
-                      <Badge
-                        variant={row.entryType === 'force_off' ? 'destructive' : 'outline'}
-                        className={cn(
-                          row.entryType === 'force_on' &&
-                            'border-[var(--info-border)] bg-[var(--info-subtle)] font-medium text-[var(--info-text)]'
-                        )}
-                      >
-                        {formatEntryLabel(row.entryType)}
-                      </Badge>
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge
+                          variant={row.entryType === 'force_off' ? 'destructive' : 'outline'}
+                          className={cn(
+                            row.entryType === 'force_on' &&
+                              'border-[var(--info-border)] bg-[var(--info-subtle)] font-medium text-[var(--info-text)]'
+                          )}
+                        >
+                          {formatEntryLabel(row.entryType)}
+                        </Badge>
+                        {!canManageAvailability && row.source === 'manager' ? (
+                          <span className="text-xs text-muted-foreground">{entrySourceLabel}</span>
+                        ) : null}
+                      </div>
                     </TableCell>
                     {showShiftColumn ? (
                       <TableCell className="hidden md:table-cell">
@@ -445,6 +460,12 @@ export function AvailabilityEntriesTable({
                               <p className="text-sm text-foreground">{row.requestedBy}</p>
                             </div>
                           ) : null}
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              Entry source
+                            </p>
+                            <p className="text-sm text-foreground">{entrySourceLabel}</p>
+                          </div>
                           <div className="md:col-span-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                               Note

@@ -23,6 +23,7 @@ const MANAGER_ROWS: AvailabilityEntryTableRow[] = [
     cycleLabel: 'Mar 22-May 2',
     entryType: 'force_off',
     shiftType: 'both',
+    source: 'manager',
     canDelete: false,
   },
 ]
@@ -40,6 +41,7 @@ const THERAPIST_REVIEW_ROWS: AvailabilityEntryTableRow[] = [
     cycleLabel: 'Mar 22-May 2',
     entryType: 'force_off',
     shiftType: 'both',
+    source: 'therapist',
     canDelete: true,
   },
   {
@@ -54,6 +56,7 @@ const THERAPIST_REVIEW_ROWS: AvailabilityEntryTableRow[] = [
     cycleLabel: 'Mar 22-May 2',
     entryType: 'force_on',
     shiftType: 'both',
+    source: 'therapist',
     canDelete: true,
   },
 ]
@@ -74,7 +77,28 @@ describe('AvailabilityEntriesTable', () => {
     expect(html).toContain('Selected therapist')
     expect(html).toContain('All staff')
     expect(html).toContain('current Schedule Block')
+    expect(html).toContain('Manager-entered')
     expect(html).not.toContain('current planning cycle')
+  })
+
+  it('labels entry source without calling manager-entered rows therapist-submitted', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityEntriesTable, {
+        role: 'manager',
+        rows: MANAGER_ROWS,
+        deleteAvailabilityEntryAction: async () => {},
+        initialFilters: {},
+      })
+    )
+
+    expect(html).toContain('Manager-entered')
+    expect(html).not.toContain('Therapist-submitted')
+
+    const src = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/availability-requests-table.tsx'),
+      'utf8'
+    )
+    expect(src).toContain('Entry source')
   })
 
   it('uses a compact empty state instead of a full table shell when no rows match', () => {
@@ -132,6 +156,7 @@ describe('AvailabilityEntriesTable', () => {
         cycleLabel: 'Mar 22-May 2',
         entryType: 'force_off',
         shiftType: 'day',
+        source: 'therapist',
         canDelete: true,
       },
     ]
