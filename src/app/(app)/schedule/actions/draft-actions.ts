@@ -94,6 +94,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
       end_date: cycle.end_date,
       site_id: cycle.site_id,
     },
+    therapistScope: 'active-non-fmla',
   })
 
   if (draftInputs.error) {

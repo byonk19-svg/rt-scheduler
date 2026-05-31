@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Role } from '@/lib/auth/roles'
+import { loadDraftInputsForCycle } from '@/lib/coverage/draft-inputs'
 import { createClient } from '@/lib/supabase/server'
 
 vi.mock('server-only', () => ({}))
@@ -323,6 +324,30 @@ describe('loadScheduleGridData visibility', () => {
       'draft-cycle',
       'published-cycle',
     ])
+  })
+
+  it('builds manager pre-flight summaries from active non-FMLA non-archived draft candidates', async () => {
+    setViewer(
+      {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      [draftCycle]
+    )
+
+    const result = await loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    expect(vi.mocked(loadDraftInputsForCycle)).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        therapistScope: 'active-non-fmla',
+      })
+    )
   })
 
   it('loads only published schedule cycles for leads', async () => {

@@ -245,6 +245,7 @@ export async function loadScheduleGridData(
         end_date: cycleForSummary.end_date,
         site_id: cycleForSummary.site_id,
       },
+      therapistScope: 'active-non-fmla',
     })
 
     if (draftInputs.error) {

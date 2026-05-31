@@ -135,6 +135,7 @@ describe('schedule lifecycle hardening', () => {
     expect(draftActionsSource).toContain('app_delete_unpublished_cycle_shifts')
     expect(draftActionsSource).toContain('app_start_schedule_cycle_over')
     expect(draftActionsSource).toContain('insertUnpublishedCycleShifts')
+    expect(draftActionsSource).toContain("therapistScope: 'active-non-fmla'")
     expect(templateActionsSource).toContain('insertUnpublishedCycleShifts')
   })
 
