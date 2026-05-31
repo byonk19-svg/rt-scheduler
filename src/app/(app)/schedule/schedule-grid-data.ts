@@ -79,9 +79,12 @@ function filterScheduleTherapistsForCycle({
     shifts.map((shift) => shift.user_id).filter((userId): userId is string => Boolean(userId))
   )
 
-  return therapists.filter(
-    (therapist) => therapist.is_active !== false || assignedTherapistIds.has(therapist.id)
-  )
+  return therapists.filter((therapist) => {
+    if (therapist.archived_at) return assignedTherapistIds.has(therapist.id)
+    if (isPublished) return true
+    if (therapist.is_active === false) return assignedTherapistIds.has(therapist.id)
+    return true
+  })
 }
 
 export async function loadScheduleGridData(
@@ -163,7 +166,6 @@ export async function loadScheduleGridData(
       'id, full_name, shift_type, employment_type, on_fmla, is_active, is_lead_eligible, archived_at, role, max_work_days_per_week'
     )
     .in('role', ['therapist', 'lead'])
-    .is('archived_at', null)
     .order('full_name', { ascending: true })
 
   if (profile?.site_id) {

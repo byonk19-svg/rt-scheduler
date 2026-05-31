@@ -565,6 +565,102 @@ describe('loadScheduleGridData visibility', () => {
     })
   })
 
+  it('hides archived therapists from draft schedule planning when they have no assignments', async () => {
+    setScheduleViewer({
+      viewer: {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      cycles: [draftCycle],
+      therapistProfiles: [
+        ...therapistRows,
+        {
+          id: 'archived-1',
+          role: 'therapist',
+          shift_type: 'day',
+          is_active: true,
+          archived_at: '2026-05-01T12:00:00.000Z',
+          site_id: 'site-a',
+          full_name: 'Archived Therapist',
+          employment_type: 'full_time',
+          on_fmla: false,
+          max_work_days_per_week: 3,
+        },
+      ],
+    })
+
+    const result = await loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.dataset.therapistRows.map((row) => row.userId)).toEqual(['therapist-1'])
+  })
+
+  it('keeps archived therapists visible when the selected block already has their assignment', async () => {
+    setScheduleViewer({
+      viewer: {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      cycles: [draftCycle],
+      therapistProfiles: [
+        ...therapistRows,
+        {
+          id: 'archived-1',
+          role: 'therapist',
+          shift_type: 'day',
+          is_active: true,
+          archived_at: '2026-05-01T12:00:00.000Z',
+          site_id: 'site-a',
+          full_name: 'Archived Therapist',
+          employment_type: 'full_time',
+          on_fmla: false,
+          max_work_days_per_week: 3,
+        },
+      ],
+      shiftRows: [
+        {
+          id: 'shift-archived-1',
+          user_id: 'archived-1',
+          cycle_id: 'draft-cycle',
+          date: '2026-05-04',
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: null,
+          role: 'staff',
+        },
+      ],
+    })
+
+    const result = await loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    const archivedRow = result.dataset.therapistRows.find((row) => row.userId === 'archived-1')
+    expect(archivedRow).toMatchObject({
+      name: 'Archived Therapist',
+      isActive: false,
+    })
+    expect(archivedRow?.cells['2026-05-04']).toMatchObject({
+      shiftId: 'shift-archived-1',
+      status: 'staff',
+      isIneligible: false,
+    })
+    expect(archivedRow?.cells['2026-05-05']).toMatchObject({
+      status: 'off',
+      isIneligible: true,
+      ineligibleReason: 'inactive',
+    })
+  })
+
   it('keeps inactive therapists visible on published schedules for historical schedule review', async () => {
     setScheduleViewer({
       viewer: {
@@ -598,6 +694,53 @@ describe('loadScheduleGridData visibility', () => {
     expect(result.status).toBe('ok')
     if (result.status !== 'ok') return
     expect(result.dataset.therapistRows.map((row) => row.userId)).toContain('inactive-1')
+  })
+
+  it('keeps archived assigned therapists visible on published schedules for historical review', async () => {
+    setScheduleViewer({
+      viewer: {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      cycles: [publishedCycle],
+      therapistProfiles: [
+        ...therapistRows,
+        {
+          id: 'archived-1',
+          role: 'therapist',
+          shift_type: 'day',
+          is_active: true,
+          archived_at: '2026-05-01T12:00:00.000Z',
+          site_id: 'site-a',
+          full_name: 'Archived Therapist',
+          employment_type: 'full_time',
+          on_fmla: false,
+          max_work_days_per_week: 3,
+        },
+      ],
+      shiftRows: [
+        {
+          id: 'shift-archived-1',
+          user_id: 'archived-1',
+          cycle_id: 'published-cycle',
+          date: '2026-04-20',
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: null,
+          role: 'staff',
+        },
+      ],
+    })
+
+    const result = await loadScheduleGridData({ cycle: 'published-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.dataset.therapistRows.map((row) => row.userId)).toContain('archived-1')
   })
 })
 

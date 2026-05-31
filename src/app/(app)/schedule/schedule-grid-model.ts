@@ -188,7 +188,7 @@ export function buildTherapistGridRows({
         userId: therapist.id,
         name: therapist.full_name?.trim() || 'Unknown',
         isOnFmla: therapist.on_fmla === true,
-        isActive: therapist.is_active !== false,
+        isActive: isTherapistActiveForSchedule(therapist),
         isLeadEligible: therapist.is_lead_eligible === true,
         employmentType:
           therapist.employment_type === 'part_time' || therapist.employment_type === 'prn'
@@ -274,8 +274,11 @@ function buildTherapistCells({
         isIneligible: false,
       }
     } else {
-      const ineligibleReason =
-        therapist.is_active === false ? 'inactive' : therapist.on_fmla === true ? 'fmla' : undefined
+      const ineligibleReason = !isTherapistActiveForSchedule(therapist)
+        ? 'inactive'
+        : therapist.on_fmla === true
+          ? 'fmla'
+          : undefined
       cells[date] = {
         shiftId: null,
         status: 'off',
@@ -287,6 +290,10 @@ function buildTherapistCells({
   }
 
   return cells
+}
+
+function isTherapistActiveForSchedule(therapist: TherapistRow): boolean {
+  return therapist.is_active !== false && !therapist.archived_at
 }
 
 function buildForceOffSet(
