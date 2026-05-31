@@ -134,6 +134,33 @@ function getScheduleFeedback(params: Record<string, string | string[] | undefine
   }
 }
 
+function ScheduleAccessDenied() {
+  return (
+    <main className="mx-auto flex min-h-[56vh] max-w-3xl items-center px-4 py-12 md:px-6">
+      <section className="w-full rounded-xl border border-border/70 bg-card p-6 text-center shadow-tw-sm">
+        <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Schedule access required
+        </p>
+        <h1 className="mt-2 font-heading text-2xl font-bold tracking-tight text-foreground">
+          You do not have access to Team Schedule.
+        </h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+          Team Schedule is available to active therapists, leads, and managers. Your account is
+          signed in, but this role is not assigned schedule access.
+        </p>
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
+          <Button asChild>
+            <Link href="/dashboard">Open dashboard</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/profile">View profile</Link>
+          </Button>
+        </div>
+      </section>
+    </main>
+  )
+}
+
 export default async function SchedulePage({ searchParams }: SchedulePageProps) {
   const params = (await searchParams) ?? {}
   const showSetupCompleteBanner = getSetupParam(params.setup) === 'complete'
@@ -148,7 +175,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   }
 
   if (result.status === 'forbidden') {
-    redirect('/dashboard/staff')
+    return <ScheduleAccessDenied />
   }
 
   if (result.status === 'no_cycle') {
