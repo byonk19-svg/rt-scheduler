@@ -165,6 +165,8 @@ describe('ScheduleGrid source invariants', () => {
     expect(dataCode).toContain('buildReadinessIssues(preFlightResult, {')
     expect(dataCode).toContain('therapist_availability_submissions')
     expect(dataCode).toContain('missingAvailabilitySubmissions')
+    expect(dataCode).toContain('loadIneligibleAssignmentReadinessInputsForCycle')
+    expect(dataCode).toContain('ineligibleAssignments')
     expect(dataCode).toContain("from('shift_posts')")
     expect(dataCode).toContain("in('shift_id', shiftIds)")
     expect(dataCode).toContain("in('swap_shift_id', shiftIds)")

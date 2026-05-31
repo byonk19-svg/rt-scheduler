@@ -207,6 +207,26 @@ const scheduleGridFeedbackEntry = String.raw`
           shiftType: 'day',
         },
       },
+      {
+        id: 'ineligible-assignment:shift-inactive-1',
+        severity: 'blocking',
+        type: 'ineligible_assignment',
+        date: '2026-05-04',
+        shiftType: 'day',
+        therapistId: 'inactive-1',
+        therapistName: 'Inactive Therapist',
+        title: 'Inactive Therapist is assigned while inactive',
+        detail:
+          'Inactive Therapist is assigned to day shift on 2026-05-04, but this therapist is inactive.',
+        recommendedAction:
+          'Move the assignment to an eligible therapist before sending or publishing.',
+        target: {
+          kind: 'therapist_date',
+          date: '2026-05-04',
+          shiftType: 'day',
+          therapistId: 'inactive-1',
+        },
+      },
     ],
   }
 
@@ -362,7 +382,7 @@ describe('ScheduleGrid feedback rendering', () => {
         await page.getByRole('button', { name: 'Pre-flight' }).click()
 
         await page.getByText('Pre-flight summary').waitFor({ state: 'visible' })
-        await page.getByText('4 readiness issues').waitFor({ state: 'visible' })
+        await page.getByText('5 readiness issues').waitFor({ state: 'visible' })
         await page.getByText('1 missing availability submission').waitFor({ state: 'visible' })
         await page.getByText('1 open Shift Board request').waitFor({ state: 'visible' })
         await page.getByText('Day shift is short 1 assignment').waitFor({ state: 'visible' })
@@ -371,6 +391,9 @@ describe('ScheduleGrid feedback rendering', () => {
           .getByText('Blair Morgan has not submitted availability')
           .waitFor({ state: 'visible' })
         await page.getByText('Coverage request is still open').waitFor({ state: 'visible' })
+        await page
+          .getByText('Inactive Therapist is assigned while inactive')
+          .waitFor({ state: 'visible' })
         await page
           .getByLabel('Pre-flight readiness issues')
           .getByText('Blair Morgan', { exact: true })

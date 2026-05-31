@@ -9,6 +9,7 @@ export type ReadinessIssueType =
   | 'missing_lead'
   | 'need_to_work_miss'
   | 'need_off_conflict'
+  | 'ineligible_assignment'
   | 'open_shift_board_request'
   | 'missing_availability_submission'
 
@@ -56,8 +57,9 @@ const ISSUE_TYPE_ORDER: Record<ReadinessIssueType, number> = {
   missing_lead: 1,
   need_to_work_miss: 2,
   need_off_conflict: 3,
-  open_shift_board_request: 4,
-  missing_availability_submission: 5,
+  ineligible_assignment: 4,
+  open_shift_board_request: 5,
+  missing_availability_submission: 6,
 }
 
 export type MissingAvailabilitySubmissionReadinessInput = {
@@ -71,6 +73,17 @@ export type OpenShiftBoardRequestReadinessInput = {
   requestType: 'coverage' | 'trade'
   date?: string | null
   shiftType?: ShiftType | null
+}
+
+export type IneligibleAssignmentReason = 'inactive' | 'archived' | 'fmla'
+
+export type IneligibleAssignmentReadinessInput = {
+  shiftId: string
+  therapistId: string
+  therapistName: string | null | undefined
+  date: string
+  shiftType: ShiftType
+  reason: IneligibleAssignmentReason
 }
 
 function formatShiftType(shiftType: ShiftType | 'both'): string {
@@ -88,6 +101,12 @@ function therapistLabel(name: string | null | undefined): string {
 
 function stableNameSegment(name: string | null | undefined): string {
   return name?.trim().toLowerCase().replace(/\s+/g, '-') || 'unknown'
+}
+
+function formatIneligibleAssignmentReason(reason: IneligibleAssignmentReason): string {
+  if (reason === 'fmla') return 'on FMLA'
+  if (reason === 'archived') return 'archived'
+  return 'inactive'
 }
 
 function sortReadinessIssues(issues: ReadinessIssue[]): ReadinessIssue[] {
@@ -118,6 +137,7 @@ export function buildReadinessIssues(
   options?: {
     missingAvailabilitySubmissions?: MissingAvailabilitySubmissionReadinessInput
     openShiftBoardRequests?: ReadonlyArray<OpenShiftBoardRequestReadinessInput>
+    ineligibleAssignments?: ReadonlyArray<IneligibleAssignmentReadinessInput>
   }
 ): ReadinessIssue[] {
   const issues: ReadinessIssue[] = []
@@ -202,6 +222,29 @@ export function buildReadinessIssues(
         date: conflict.date,
         shiftType: conflict.shiftType,
         therapistId: conflict.therapistId,
+      },
+    })
+  }
+
+  for (const assignment of options?.ineligibleAssignments ?? []) {
+    const name = therapistLabel(assignment.therapistName)
+    const reason = formatIneligibleAssignmentReason(assignment.reason)
+    issues.push({
+      id: `ineligible-assignment:${assignment.shiftId}`,
+      severity: 'blocking',
+      type: 'ineligible_assignment',
+      date: assignment.date,
+      shiftType: assignment.shiftType,
+      therapistId: assignment.therapistId,
+      therapistName: name,
+      title: `${name} is assigned while ${reason}`,
+      detail: `${name} is assigned to ${formatShiftType(assignment.shiftType).toLowerCase()} on ${assignment.date}, but this therapist is ${reason}.`,
+      recommendedAction: 'Move the assignment to an eligible therapist before sending or publishing.',
+      target: {
+        kind: 'therapist_date',
+        date: assignment.date,
+        shiftType: assignment.shiftType,
+        therapistId: assignment.therapistId,
       },
     })
   }

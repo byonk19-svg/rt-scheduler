@@ -9,6 +9,10 @@ import {
 import { loadDraftInputsForCycle, toDraftInputSupabaseClient } from '@/lib/coverage/draft-inputs'
 import { generateDraftForCycle } from '@/lib/coverage/generate-draft'
 import {
+  loadIneligibleAssignmentReadinessInputsForCycle,
+  type ReadinessAssignmentConflictClient,
+} from '@/lib/coverage/readiness-assignment-conflicts'
+import {
   buildReadinessIssues,
   getBlockingReadinessIssues,
   type ReadinessIssue,
@@ -109,7 +113,18 @@ export async function loadBlockingReadinessIssuesForCycle(
     return { issues: [], error: draftInputs.error }
   }
 
-  const readinessIssues = buildReadinessIssues(generateDraftForCycle(draftInputs.data))
+  const ineligibleAssignments = await loadIneligibleAssignmentReadinessInputsForCycle(
+    supabase as unknown as ReadinessAssignmentConflictClient,
+    cycle.id
+  )
+
+  if (ineligibleAssignments.error) {
+    return { issues: [], error: ineligibleAssignments.error }
+  }
+
+  const readinessIssues = buildReadinessIssues(generateDraftForCycle(draftInputs.data), {
+    ineligibleAssignments: ineligibleAssignments.data,
+  })
   return {
     issues: getBlockingReadinessIssues(readinessIssues),
     error: null,

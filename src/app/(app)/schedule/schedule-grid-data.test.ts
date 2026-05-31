@@ -189,6 +189,9 @@ function makeSupabaseMock({
       if (Array.isArray(state.inFilters.role)) {
         rows = rows.filter((row) => state.inFilters.role.includes(row.role))
       }
+      if (Array.isArray(state.inFilters.id)) {
+        rows = rows.filter((row) => state.inFilters.id.includes(row.id))
+      }
       if (state.filters.archived_at === null) {
         rows = rows.filter((row) => row.archived_at === null)
       }
@@ -501,6 +504,7 @@ describe('loadScheduleGridData visibility', () => {
 
     expect(result.status).toBe('ok')
     expect(vi.mocked(buildReadinessIssues)).toHaveBeenCalledWith(expect.anything(), {
+      ineligibleAssignments: [],
       openShiftBoardRequests: [],
       missingAvailabilitySubmissions: {
         expectedTherapists: [
@@ -576,6 +580,7 @@ describe('loadScheduleGridData visibility', () => {
 
     expect(result.status).toBe('ok')
     expect(vi.mocked(buildReadinessIssues)).toHaveBeenCalledWith(expect.anything(), {
+      ineligibleAssignments: [],
       openShiftBoardRequests: [
         {
           id: 'post-coverage-1',
@@ -590,6 +595,129 @@ describe('loadScheduleGridData visibility', () => {
           shiftType: 'night',
         },
       ],
+      missingAvailabilitySubmissions: {
+        expectedTherapists: [],
+        submittedTherapistIds: [],
+        availabilityProvidedTherapistIds: [],
+      },
+    })
+  })
+
+  it('adds inactive, archived, and FMLA assignment context to manager pre-flight issues', async () => {
+    setScheduleViewer({
+      viewer: {
+        id: 'manager-1',
+        role: 'manager',
+        shift_type: 'day',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      cycles: [draftCycle],
+      therapistProfiles: [
+        ...therapistRows,
+        {
+          id: 'inactive-1',
+          role: 'therapist',
+          shift_type: 'day',
+          is_active: false,
+          archived_at: null,
+          site_id: 'site-a',
+          full_name: 'Inactive Therapist',
+          employment_type: 'full_time',
+          on_fmla: false,
+          max_work_days_per_week: 3,
+        },
+        {
+          id: 'archived-1',
+          role: 'therapist',
+          shift_type: 'night',
+          is_active: true,
+          archived_at: '2026-05-01T12:00:00.000Z',
+          site_id: 'site-a',
+          full_name: 'Archived Therapist',
+          employment_type: 'full_time',
+          on_fmla: false,
+          max_work_days_per_week: 3,
+        },
+        {
+          id: 'fmla-1',
+          role: 'therapist',
+          shift_type: 'night',
+          is_active: true,
+          archived_at: null,
+          site_id: 'site-a',
+          full_name: 'FMLA Therapist',
+          employment_type: 'full_time',
+          on_fmla: true,
+          max_work_days_per_week: 3,
+        },
+      ],
+      shiftRows: [
+        {
+          id: 'shift-inactive-1',
+          user_id: 'inactive-1',
+          cycle_id: 'draft-cycle',
+          date: '2026-05-04',
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: null,
+          role: 'staff',
+        },
+        {
+          id: 'shift-archived-1',
+          user_id: 'archived-1',
+          cycle_id: 'draft-cycle',
+          date: '2026-05-05',
+          shift_type: 'night',
+          status: 'scheduled',
+          assignment_status: null,
+          role: 'staff',
+        },
+        {
+          id: 'shift-fmla-1',
+          user_id: 'fmla-1',
+          cycle_id: 'draft-cycle',
+          date: '2026-05-05',
+          shift_type: 'night',
+          status: 'scheduled',
+          assignment_status: null,
+          role: 'staff',
+        },
+      ],
+    })
+
+    const result = await loadScheduleGridData({ cycle: 'draft-cycle', shift: 'day' })
+
+    expect(result.status).toBe('ok')
+    expect(vi.mocked(buildReadinessIssues)).toHaveBeenCalledWith(expect.anything(), {
+      ineligibleAssignments: [
+        {
+          shiftId: 'shift-inactive-1',
+          therapistId: 'inactive-1',
+          therapistName: 'Inactive Therapist',
+          date: '2026-05-04',
+          shiftType: 'day',
+          reason: 'inactive',
+        },
+        {
+          shiftId: 'shift-archived-1',
+          therapistId: 'archived-1',
+          therapistName: 'Archived Therapist',
+          date: '2026-05-05',
+          shiftType: 'night',
+          reason: 'archived',
+        },
+        {
+          shiftId: 'shift-fmla-1',
+          therapistId: 'fmla-1',
+          therapistName: 'FMLA Therapist',
+          date: '2026-05-05',
+          shiftType: 'night',
+          reason: 'fmla',
+        },
+      ],
+      openShiftBoardRequests: [],
       missingAvailabilitySubmissions: {
         expectedTherapists: [],
         submittedTherapistIds: [],

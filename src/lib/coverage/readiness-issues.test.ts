@@ -212,6 +212,62 @@ describe('buildReadinessIssues', () => {
     ])
   })
 
+  it('creates blocking issues for inactive, archived, or FMLA assignments', () => {
+    const issues = buildReadinessIssues(
+      {
+        unfilledConstraintSlots: [],
+        missingLeadSlotDetails: [],
+        forcedMustWorkMissDetails: [],
+        needOffConflictDetails: [],
+      },
+      {
+        ineligibleAssignments: [
+          {
+            shiftId: 'shift-inactive',
+            therapistId: 'therapist-1',
+            therapistName: 'Avery Chen',
+            date: '2026-04-13',
+            shiftType: 'day',
+            reason: 'inactive',
+          },
+          {
+            shiftId: 'shift-fmla',
+            therapistId: 'therapist-2',
+            therapistName: 'Blair Morgan',
+            date: '2026-04-14',
+            shiftType: 'night',
+            reason: 'fmla',
+          },
+        ],
+      }
+    )
+
+    expect(issues).toEqual([
+      expect.objectContaining({
+        id: 'ineligible-assignment:shift-inactive',
+        severity: 'blocking',
+        type: 'ineligible_assignment',
+        date: '2026-04-13',
+        shiftType: 'day',
+        therapistId: 'therapist-1',
+        therapistName: 'Avery Chen',
+        title: 'Avery Chen is assigned while inactive',
+        target: {
+          kind: 'therapist_date',
+          date: '2026-04-13',
+          shiftType: 'day',
+          therapistId: 'therapist-1',
+        },
+      }),
+      expect.objectContaining({
+        id: 'ineligible-assignment:shift-fmla',
+        severity: 'blocking',
+        type: 'ineligible_assignment',
+        title: 'Blair Morgan is assigned while on FMLA',
+      }),
+    ])
+  })
+
   it('orders multiple issues deterministically by date, shift, category, and id', () => {
     const issues = buildReadinessIssues(
       {
@@ -254,6 +310,16 @@ describe('buildReadinessIssues', () => {
             shiftType: 'day',
           },
         ],
+        ineligibleAssignments: [
+          {
+            shiftId: 'shift-ineligible',
+            therapistId: 'therapist-d',
+            therapistName: 'Drew',
+            date: '2026-04-07',
+            shiftType: 'day',
+            reason: 'inactive',
+          },
+        ],
       }
     )
 
@@ -262,6 +328,7 @@ describe('buildReadinessIssues', () => {
       'missing-lead:2026-04-07:day',
       'need-to-work-miss:2026-04-07:day:therapist-b',
       'need-off-conflict:2026-04-07:day:therapist-a',
+      'ineligible-assignment:shift-ineligible',
       'open-shift-board-request:post-1',
       'missing-lead:2026-04-07:night',
       'unfilled-assignment:2026-04-09:night',
@@ -293,12 +360,23 @@ describe('buildReadinessIssues', () => {
             shiftType: 'day',
           },
         ],
+        ineligibleAssignments: [
+          {
+            shiftId: 'shift-ineligible',
+            therapistId: 'therapist-c',
+            therapistName: 'Casey',
+            date: '2026-04-09',
+            shiftType: 'day',
+            reason: 'archived',
+          },
+        ],
       }
     )
 
     expect(getBlockingReadinessIssues(issues).map((issue) => issue.type)).toEqual([
       'missing_lead',
       'need_to_work_miss',
+      'ineligible_assignment',
     ])
   })
 })
