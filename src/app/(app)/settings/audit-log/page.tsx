@@ -5,6 +5,11 @@ import { redirect } from 'next/navigation'
 import { ManagerToolAccessDenied } from '@/components/auth/ManagerToolAccessDenied'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { Button } from '@/components/ui/button'
+import {
+  getAuditLogActionDisplay,
+  getAuditLogTargetTypeLabel,
+  type AuditLogActionTone,
+} from '@/lib/audit-log-display'
 import { resolveManagerToolAccess } from '@/lib/auth/manager-tool-access'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -87,30 +92,13 @@ function targetCell(row: AuditLogRow) {
   return <span className="max-w-[12ch] truncate font-mono text-xs">{row.target_id}</span>
 }
 
-function actionLabel(action: string) {
-  switch (action) {
-    case 'post_publish_modification':
-      return 'Published schedule changed'
-    case 'shift_added':
-      return 'Shift added'
-    case 'shift_removed':
-      return 'Shift removed'
-    case 'designated_lead_assigned':
-      return 'Lead assigned'
-    case 'team_profile_updated':
-      return 'Team profile updated'
-    default:
-      return action.replaceAll('_', ' ')
-  }
-}
-
-function actionBadgeClass(action: string) {
-  if (action === 'post_publish_modification') {
+function actionBadgeClass(tone: AuditLogActionTone) {
+  if (tone === 'warning') {
     return 'bg-[var(--warning-subtle)] text-[var(--warning-text)]'
   }
-  if (action === 'shift_added') return 'bg-[var(--success-subtle)] text-[var(--success-text)]'
-  if (action === 'shift_removed') return 'bg-[var(--error-subtle)] text-[var(--error-text)]'
-  if (action === 'team_profile_updated') return 'bg-[var(--info-subtle)] text-[var(--info-text)]'
+  if (tone === 'success') return 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+  if (tone === 'error') return 'bg-[var(--error-subtle)] text-[var(--error-text)]'
+  if (tone === 'info') return 'bg-[var(--info-subtle)] text-[var(--info-text)]'
   return 'bg-muted text-muted-foreground'
 }
 
@@ -235,28 +223,33 @@ export default async function AuditLogPage({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="hover:bg-secondary/20">
-                  <td className="whitespace-nowrap px-4 py-2.5 text-sm text-foreground">
-                    {formatAuditLogTime(row.created_at)}
-                  </td>
-                  <td className="px-4 py-2.5 text-sm text-muted-foreground">{getActorName(row)}</td>
-                  <td className="px-4 py-2.5">
-                    <span
-                      title={row.action}
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${actionBadgeClass(row.action)}`}
-                    >
-                      {actionLabel(row.action)}
-                    </span>
-                  </td>
-                  <td className="hidden px-4 py-2.5 text-sm text-muted-foreground md:table-cell">
-                    {row.target_type}
-                  </td>
-                  <td className="hidden px-4 py-2.5 text-sm text-foreground md:table-cell">
-                    {targetCell(row)}
-                  </td>
-                </tr>
-              ))
+              rows.map((row) => {
+                const actionDisplay = getAuditLogActionDisplay(row.action)
+                return (
+                  <tr key={row.id} className="hover:bg-secondary/20">
+                    <td className="whitespace-nowrap px-4 py-2.5 text-sm text-foreground">
+                      {formatAuditLogTime(row.created_at)}
+                    </td>
+                    <td className="px-4 py-2.5 text-sm text-muted-foreground">
+                      {getActorName(row)}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        title={row.action}
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${actionBadgeClass(actionDisplay.tone)}`}
+                      >
+                        {actionDisplay.label}
+                      </span>
+                    </td>
+                    <td className="hidden px-4 py-2.5 text-sm text-muted-foreground md:table-cell">
+                      {getAuditLogTargetTypeLabel(row.target_type)}
+                    </td>
+                    <td className="hidden px-4 py-2.5 text-sm text-foreground md:table-cell">
+                      {targetCell(row)}
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
