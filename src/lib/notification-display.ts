@@ -98,6 +98,57 @@ const REQUEST_COPY_BY_EVENT: Record<string, NotificationDisplayRule> = {
   },
 }
 
+const SCHEDULE_COPY_BY_EVENT: Record<string, NotificationDisplayCopy> = {
+  availability_ready: {
+    title: 'Availability ready',
+    message: 'A Schedule Block is ready for availability submissions.',
+  },
+  availability_due_date_changed: {
+    title: 'Availability due date changed',
+    message: 'The availability due date changed for a Schedule Block.',
+  },
+  cycle_published: {
+    title: 'Schedule Block published',
+    message: '',
+  },
+  operational_status_attention: {
+    title: 'Coverage attention needed',
+    message: '',
+  },
+  preliminary_sent: {
+    title: 'Preliminary schedule ready',
+    message: '',
+  },
+  preliminary_refreshed: {
+    title: 'Preliminary schedule refreshed',
+    message: '',
+  },
+  published_schedule_changed: {
+    title: 'Published schedule changed',
+    message: '',
+  },
+  preliminary_request_submitted: {
+    title: 'Preliminary request submitted',
+    message: 'A staff member submitted preliminary schedule feedback for manager review.',
+  },
+  preliminary_request_approved: {
+    title: 'Preliminary request approved',
+    message: 'A preliminary schedule request was approved.',
+  },
+  preliminary_request_denied: {
+    title: 'Preliminary request denied',
+    message: 'A preliminary schedule request was denied.',
+  },
+  preliminary_schedule_changed: {
+    title: 'Preliminary schedule changed',
+    message: '',
+  },
+  shift_reminder: {
+    title: 'Upcoming shift reminder',
+    message: '',
+  },
+}
+
 function getFallbackTitle(item: NotificationDisplayItem): string {
   return item.title?.trim() || 'Notification'
 }
@@ -128,10 +179,11 @@ export function getNotificationDisplayCopy(
   const requestCopy = resolveRequestCopy(item, role)
   if (requestCopy) return requestCopy
 
-  if (item.event_type === 'cycle_published') {
+  const scheduleCopy = SCHEDULE_COPY_BY_EVENT[item.event_type]
+  if (scheduleCopy) {
     return {
-      title: 'Schedule Block published',
-      message: getFallbackMessage(item),
+      title: scheduleCopy.title,
+      message: getFallbackMessage(item) || scheduleCopy.message,
     }
   }
 
