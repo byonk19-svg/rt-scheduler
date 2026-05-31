@@ -9,6 +9,7 @@ export type ReadinessIssueType =
   | 'missing_lead'
   | 'need_to_work_miss'
   | 'need_off_conflict'
+  | 'open_shift_board_request'
   | 'missing_availability_submission'
 
 export type ReadinessIssueTarget =
@@ -27,6 +28,12 @@ export type ReadinessIssueTarget =
   | {
       kind: 'therapist'
       therapistId: string
+    }
+  | {
+      kind: 'shift_board_request'
+      requestId: string
+      date?: string
+      shiftType?: ShiftType
     }
 
 export type ReadinessIssue = {
@@ -49,13 +56,21 @@ const ISSUE_TYPE_ORDER: Record<ReadinessIssueType, number> = {
   missing_lead: 1,
   need_to_work_miss: 2,
   need_off_conflict: 3,
-  missing_availability_submission: 4,
+  open_shift_board_request: 4,
+  missing_availability_submission: 5,
 }
 
 export type MissingAvailabilitySubmissionReadinessInput = {
   expectedTherapists: ReadonlyArray<{ id: string; fullName: string | null | undefined }>
   submittedTherapistIds?: Iterable<string>
   availabilityProvidedTherapistIds?: Iterable<string>
+}
+
+export type OpenShiftBoardRequestReadinessInput = {
+  id: string
+  requestType: 'coverage' | 'trade'
+  date?: string | null
+  shiftType?: ShiftType | null
 }
 
 function formatShiftType(shiftType: ShiftType | 'both'): string {
@@ -102,6 +117,7 @@ export function buildReadinessIssues(
   >,
   options?: {
     missingAvailabilitySubmissions?: MissingAvailabilitySubmissionReadinessInput
+    openShiftBoardRequests?: ReadonlyArray<OpenShiftBoardRequestReadinessInput>
   }
 ): ReadinessIssue[] {
   const issues: ReadinessIssue[] = []
@@ -186,6 +202,32 @@ export function buildReadinessIssues(
         date: conflict.date,
         shiftType: conflict.shiftType,
         therapistId: conflict.therapistId,
+      },
+    })
+  }
+
+  for (const request of options?.openShiftBoardRequests ?? []) {
+    const requestLabel = request.requestType === 'trade' ? 'Trade request' : 'Coverage request'
+    const shiftLabel =
+      request.date && request.shiftType
+        ? `${formatShiftType(request.shiftType).toLowerCase()} on ${request.date}`
+        : 'this Schedule Block'
+
+    issues.push({
+      id: `open-shift-board-request:${request.id}`,
+      severity: 'warning',
+      type: 'open_shift_board_request',
+      date: request.date ?? undefined,
+      shiftType: request.shiftType ?? undefined,
+      title: `${requestLabel} is still open`,
+      detail: `${requestLabel} touching ${shiftLabel} may change staffing after publish.`,
+      recommendedAction:
+        'Review the request on Shift Board before publishing, or continue knowing the schedule may change.',
+      target: {
+        kind: 'shift_board_request',
+        requestId: request.id,
+        date: request.date ?? undefined,
+        shiftType: request.shiftType ?? undefined,
       },
     })
   }

@@ -41,6 +41,19 @@ type ViewerProfile = {
   site_id: string | null
 }
 
+type ScheduleBlockShiftLookupRow = {
+  id: string
+  date: string
+  shift_type: 'day' | 'night'
+}
+
+type ScheduleBlockShiftPostRow = {
+  id: string
+  type: string | null
+  shift_id: string | null
+  swap_shift_id: string | null
+}
+
 export type ScheduleGridServerData =
   | {
       status: 'ok'
@@ -270,10 +283,21 @@ export async function loadScheduleGridData(
       return null
     }
 
+    const openShiftBoardRequests = await loadOpenShiftBoardRequestsForCycle(cycleForSummary.id)
+
+    if (openShiftBoardRequests.error) {
+      console.error(
+        'Could not load open Shift Board requests for pre-flight summary:',
+        openShiftBoardRequests.error
+      )
+      return null
+    }
+
     const preFlightResult = generateDraftForCycle(draftInputs.data)
     return shapePreFlightSummary({
       ...summarizePreFlight(preFlightResult),
       readinessIssues: buildReadinessIssues(preFlightResult, {
+        openShiftBoardRequests: openShiftBoardRequests.data,
         missingAvailabilitySubmissions: {
           expectedTherapists: draftInputs.data.therapists.map((therapist) => ({
             id: therapist.id,
@@ -288,5 +312,67 @@ export async function loadScheduleGridData(
         },
       }),
     })
+  }
+
+  async function loadOpenShiftBoardRequestsForCycle(cycleId: string) {
+    const { data: shiftData, error: shiftError } = await supabase
+      .from('shifts')
+      .select('id, date, shift_type')
+      .eq('cycle_id', cycleId)
+
+    if (shiftError) {
+      return { data: [], error: shiftError }
+    }
+
+    const shifts = (shiftData ?? []) as ScheduleBlockShiftLookupRow[]
+    const shiftIds = shifts.map((shift) => shift.id).filter(Boolean)
+
+    if (shiftIds.length === 0) {
+      return { data: [], error: null }
+    }
+
+    const shiftById = new Map(shifts.map((shift) => [shift.id, shift]))
+    const postColumns = 'id, type, shift_id, swap_shift_id'
+    const [primaryPostResult, swapPostResult] = await Promise.all([
+      supabase
+        .from('shift_posts')
+        .select(postColumns)
+        .eq('status', 'pending')
+        .in('shift_id', shiftIds),
+      supabase
+        .from('shift_posts')
+        .select(postColumns)
+        .eq('status', 'pending')
+        .in('swap_shift_id', shiftIds),
+    ])
+
+    if (primaryPostResult.error || swapPostResult.error) {
+      return { data: [], error: primaryPostResult.error ?? swapPostResult.error }
+    }
+
+    const postsById = new Map<string, ScheduleBlockShiftPostRow>()
+
+    for (const row of [
+      ...((primaryPostResult.data ?? []) as ScheduleBlockShiftPostRow[]),
+      ...((swapPostResult.data ?? []) as ScheduleBlockShiftPostRow[]),
+    ]) {
+      if (row.id) postsById.set(row.id, row)
+    }
+
+    return {
+      data: Array.from(postsById.values()).map((post) => {
+        const targetShift =
+          (post.shift_id ? shiftById.get(post.shift_id) : undefined) ??
+          (post.swap_shift_id ? shiftById.get(post.swap_shift_id) : undefined)
+
+        return {
+          id: post.id,
+          requestType: post.type === 'swap' ? ('trade' as const) : ('coverage' as const),
+          date: targetShift?.date ?? null,
+          shiftType: targetShift?.shift_type ?? null,
+        }
+      }),
+      error: null,
+    }
   }
 }
