@@ -257,10 +257,36 @@ export async function loadScheduleGridData(
       return null
     }
 
+    const { data: submissionData, error: submissionError } = await supabase
+      .from('therapist_availability_submissions')
+      .select('therapist_id')
+      .eq('schedule_cycle_id', cycleForSummary.id)
+
+    if (submissionError) {
+      console.error(
+        'Could not load availability submissions for pre-flight summary:',
+        submissionError
+      )
+      return null
+    }
+
     const preFlightResult = generateDraftForCycle(draftInputs.data)
     return shapePreFlightSummary({
       ...summarizePreFlight(preFlightResult),
-      readinessIssues: buildReadinessIssues(preFlightResult),
+      readinessIssues: buildReadinessIssues(preFlightResult, {
+        missingAvailabilitySubmissions: {
+          expectedTherapists: draftInputs.data.therapists.map((therapist) => ({
+            id: therapist.id,
+            fullName: therapist.full_name,
+          })),
+          submittedTherapistIds: ((submissionData ?? []) as Array<{ therapist_id: string }>).map(
+            (submission) => submission.therapist_id
+          ),
+          availabilityProvidedTherapistIds: draftInputs.data.allAvailabilityOverrides.map(
+            (override) => override.therapist_id
+          ),
+        },
+      }),
     })
   }
 }

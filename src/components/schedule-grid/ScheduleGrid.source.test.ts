@@ -162,12 +162,15 @@ describe('ScheduleGrid source invariants', () => {
       'utf8'
     )
 
-    expect(dataCode).toContain('buildReadinessIssues(preFlightResult)')
+    expect(dataCode).toContain('buildReadinessIssues(preFlightResult, {')
+    expect(dataCode).toContain('therapist_availability_submissions')
+    expect(dataCode).toContain('missingAvailabilitySubmissions')
     expect(code).toContain('MAX_VISIBLE_PREFLIGHT_ISSUES')
     expect(code).toContain('Pre-flight readiness issues')
     expect(code).toContain('data-readiness-issue-id')
     expect(code).toContain('issue.recommendedAction')
     expect(code).toContain('getReadinessTargetLabel')
+    expect(code).toContain('missing_availability_submission')
     expect(code).not.toContain('buildReadinessIssues(')
   })
 })

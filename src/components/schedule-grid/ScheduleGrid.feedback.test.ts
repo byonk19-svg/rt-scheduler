@@ -174,6 +174,22 @@ const scheduleGridFeedbackEntry = String.raw`
           role: 'lead',
         },
       },
+      {
+        id: 'missing-availability-submission:therapist-2',
+        severity: 'warning',
+        type: 'missing_availability_submission',
+        therapistId: 'therapist-2',
+        therapistName: 'Blair Morgan',
+        title: 'Blair Morgan has not submitted availability',
+        detail:
+          'Blair Morgan has no official availability submission or manager-entered availability for this Schedule Block.',
+        recommendedAction:
+          'Send a reminder, enter manager-confirmed availability, or review the risk before publishing with missing availability.',
+        target: {
+          kind: 'therapist',
+          therapistId: 'therapist-2',
+        },
+      },
     ],
   }
 
@@ -329,9 +345,17 @@ describe('ScheduleGrid feedback rendering', () => {
         await page.getByRole('button', { name: 'Pre-flight' }).click()
 
         await page.getByText('Pre-flight summary').waitFor({ state: 'visible' })
-        await page.getByText('2 readiness issues').waitFor({ state: 'visible' })
+        await page.getByText('3 readiness issues').waitFor({ state: 'visible' })
+        await page.getByText('1 missing availability submission').waitFor({ state: 'visible' })
         await page.getByText('Day shift is short 1 assignment').waitFor({ state: 'visible' })
         await page.getByText('Day shift needs a lead').waitFor({ state: 'visible' })
+        await page
+          .getByText('Blair Morgan has not submitted availability')
+          .waitFor({ state: 'visible' })
+        await page
+          .getByLabel('Pre-flight readiness issues')
+          .getByText('Blair Morgan', { exact: true })
+          .waitFor({ state: 'visible' })
         await page
           .getByLabel('Pre-flight readiness issues')
           .getByText('2026-05-04 day shift')

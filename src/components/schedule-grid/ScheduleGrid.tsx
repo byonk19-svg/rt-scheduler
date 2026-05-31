@@ -188,6 +188,9 @@ function getReadinessTargetLabel(
   if (issue.target.kind === 'slot') {
     return `${issue.target.date} ${issue.target.shiftType} shift`
   }
+  if (issue.target.kind === 'therapist') {
+    return issue.therapistName ?? 'Therapist'
+  }
   return `${issue.target.date} ${issue.target.shiftType} shift · ${issue.therapistName ?? 'Therapist'}`
 }
 
@@ -432,6 +435,13 @@ export function ScheduleGrid({
     preFlightSummary?.readinessIssues.slice(0, MAX_VISIBLE_PREFLIGHT_ISSUES) ?? []
   const hiddenPreFlightIssueCount =
     (preFlightSummary?.readinessIssues.length ?? 0) - visiblePreFlightIssues.length
+  const missingAvailabilityIssueCount =
+    preFlightSummary?.readinessIssues.filter(
+      (issue) => issue.type === 'missing_availability_submission'
+    ).length ?? 0
+  const missingAvailabilityIssueLabel = `${missingAvailabilityIssueCount} missing availability ${
+    missingAvailabilityIssueCount === 1 ? 'submission' : 'submissions'
+  }`
 
   return (
     <div className="rounded-xl border border-border/60 bg-[color-mix(in_srgb,var(--muted)_68%,var(--background))] p-3 shadow-inner sm:p-4 lg:p-5">
@@ -503,7 +513,8 @@ export function ScheduleGrid({
                 <p className="mt-1">
                   {preFlightSummary.unfilledSlots} unfilled assignments,{' '}
                   {preFlightSummary.missingLeadSlots} missing lead slots,{' '}
-                  {preFlightSummary.forcedMustWorkMisses} need-to-work misses.
+                  {preFlightSummary.forcedMustWorkMisses} need-to-work misses,{' '}
+                  {missingAvailabilityIssueLabel}.
                 </p>
               </div>
               {preFlightSummary.readinessIssues.length > 0 ? (
