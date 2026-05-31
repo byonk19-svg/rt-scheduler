@@ -135,7 +135,7 @@ export function buildReadinessIssues(
     const name = therapistLabel(miss.therapistName)
     issues.push({
       id: `need-to-work-miss:${miss.date}:${miss.shiftType}:${miss.therapistId || stableNameSegment(miss.therapistName)}`,
-      severity: 'warning',
+      severity: 'blocking',
       type: 'need_to_work_miss',
       date: miss.date,
       shiftType: miss.shiftType,
@@ -176,4 +176,10 @@ export function buildReadinessIssues(
   }
 
   return sortReadinessIssues(issues)
+}
+
+export function getBlockingReadinessIssues(
+  issues: readonly ReadinessIssue[]
+): ReadinessIssue[] {
+  return issues.filter((issue) => issue.severity === 'blocking')
 }

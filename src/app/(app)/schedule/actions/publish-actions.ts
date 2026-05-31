@@ -30,6 +30,7 @@ import {
   getOne,
   getRoleForUser,
   getWeeklyLimitFromProfile,
+  loadBlockingReadinessIssuesForCycle,
 } from './helpers'
 
 // Primary schedule publish toggle. Publish history/email requeue actions live in
@@ -148,6 +149,31 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       label: cycle.label,
       startDate: cycle.start_date,
       endDate: cycle.end_date,
+    }
+
+    const readinessValidation = await loadBlockingReadinessIssuesForCycle(supabase, {
+      id: cycleId,
+      start_date: cycle.start_date,
+      end_date: cycle.end_date,
+      site_id: cycle.site_id,
+    })
+
+    if (readinessValidation.error) {
+      console.error('Failed to load final publish readiness validation:', readinessValidation.error)
+      redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
+    }
+
+    if (readinessValidation.issues.length > 0) {
+      redirect(
+        buildReturnUrl(cycleId, {
+          ...viewParams,
+          error: 'publish_readiness_blocked',
+          readiness_issues: String(readinessValidation.issues.length),
+          override_weekly_rules: overrideWeeklyRules ? 'true' : undefined,
+          override_shift_rules: overrideShiftRules ? 'true' : undefined,
+          acknowledge_missing_availability: acknowledgeMissingAvailability ? 'true' : undefined,
+        })
+      )
     }
 
     const cycleDates = buildDateRange(cycle.start_date, cycle.end_date)

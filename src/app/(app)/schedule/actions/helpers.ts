@@ -6,6 +6,13 @@ import {
   getDefaultWeeklyLimitForEmploymentType,
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
+import { loadDraftInputsForCycle, toDraftInputSupabaseClient } from '@/lib/coverage/draft-inputs'
+import { generateDraftForCycle } from '@/lib/coverage/generate-draft'
+import {
+  buildReadinessIssues,
+  getBlockingReadinessIssues,
+  type ReadinessIssue,
+} from '@/lib/coverage/readiness-issues'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createClient } from '@/lib/supabase/server'
 
@@ -80,6 +87,33 @@ export function buildScheduleActionUrl(
 export function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
+}
+
+type ScheduleReadinessCycle = {
+  id: string
+  start_date: string
+  end_date: string
+  site_id?: string | null
+}
+
+export async function loadBlockingReadinessIssuesForCycle(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  cycle: ScheduleReadinessCycle
+): Promise<{ issues: ReadinessIssue[]; error: unknown | null }> {
+  const draftInputs = await loadDraftInputsForCycle(toDraftInputSupabaseClient(supabase), {
+    cycle,
+    therapistScope: 'active-non-fmla',
+  })
+
+  if (draftInputs.error) {
+    return { issues: [], error: draftInputs.error }
+  }
+
+  const readinessIssues = buildReadinessIssues(generateDraftForCycle(draftInputs.data))
+  return {
+    issues: getBlockingReadinessIssues(readinessIssues),
+    error: null,
+  }
 }
 
 export function getPanelParam(formData: FormData): 'setup' | 'new-cycle' | 'add-shift' | undefined {
