@@ -27,12 +27,16 @@ describe('getInitialTeamTab', () => {
 })
 
 describe('Team page source contract', () => {
-  it('uses Next Link for the internal import route', () => {
+  it('uses clear actions for import and roster export scopes', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/team/page.tsx'), 'utf8')
 
     expect(source).toContain("import Link from 'next/link'")
     expect(source).toContain('<Link')
     expect(source).toContain('href="/team/import"')
     expect(source).not.toContain('<a\n            href="/team/import"')
+    expect(source).toContain('href="/api/team/roster/export?scope=active"')
+    expect(source).toContain('Export active roster')
+    expect(source).toContain('href="/api/team/roster/export?scope=all"')
+    expect(source).toContain('Export all roster')
   })
 })
