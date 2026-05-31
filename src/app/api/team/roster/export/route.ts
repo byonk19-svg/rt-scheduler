@@ -13,6 +13,7 @@ type RosterExportRow = {
   is_lead_eligible: boolean | null
   is_active: boolean | null
   on_fmla: boolean | null
+  archived_at: string | null
   phone_number: string | null
   max_work_days_per_week: number | null
 }
@@ -24,7 +25,20 @@ type RosterActorProfile = {
   site_id: string | null
 }
 
-export async function GET() {
+type RosterExportScope = 'active' | 'all'
+
+function getRosterExportScope(request: Request): RosterExportScope {
+  const scope = new URL(request.url).searchParams.get('scope')
+  return scope === 'all' ? 'all' : 'active'
+}
+
+const ROSTER_EXPORT_SCOPE_LABEL: Record<RosterExportScope, string> = {
+  active: 'active_staff',
+  all: 'all_staff',
+}
+
+export async function GET(request: Request) {
+  const exportScope = getRosterExportScope(request)
   const supabase = await createClient()
   const {
     data: { user },
@@ -54,14 +68,20 @@ export async function GET() {
     return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
   }
 
-  const { data, error } = await supabase
+  let rosterQuery = supabase
     .from('profiles')
     .select(
-      'full_name, role, shift_type, employment_type, is_lead_eligible, is_active, on_fmla, phone_number, max_work_days_per_week'
+      'full_name, role, shift_type, employment_type, is_lead_eligible, is_active, on_fmla, archived_at, phone_number, max_work_days_per_week'
     )
     .eq('site_id', actorProfile.site_id)
     .not('role', 'is', null)
     .order('full_name', { ascending: true })
+
+  if (exportScope === 'active') {
+    rosterQuery = rosterQuery.eq('is_active', true).is('archived_at', null)
+  }
+
+  const { data, error } = await rosterQuery
 
   if (error) {
     console.error('Failed to export team roster:', error)
@@ -78,6 +98,8 @@ export async function GET() {
     'is_lead_eligible',
     'is_active',
     'on_fmla',
+    'archived_at',
+    'export_scope',
     'phone_number',
     'max_work_days_per_week',
   ]
@@ -91,6 +113,8 @@ export async function GET() {
       row.is_lead_eligible === null ? '' : String(row.is_lead_eligible),
       row.is_active === null ? '' : String(row.is_active),
       row.on_fmla === null ? '' : String(row.on_fmla),
+      row.archived_at ?? '',
+      ROSTER_EXPORT_SCOPE_LABEL[exportScope],
       row.phone_number ?? '',
       row.max_work_days_per_week === null ? '' : String(row.max_work_days_per_week),
     ]
@@ -98,7 +122,10 @@ export async function GET() {
   })
 
   const csv = [header.join(','), ...lines].join('\n')
-  const filename = 'team-roster-export.csv'
+  const filename =
+    exportScope === 'active'
+      ? 'team-roster-active-staff-export.csv'
+      : 'team-roster-all-staff-export.csv'
 
   return new NextResponse(csv, {
     status: 200,

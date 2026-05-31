@@ -26,6 +26,9 @@ export const metadata: Metadata = {
   description: 'Manage staffing, roles, roster access, and team work patterns.',
 }
 
+const TEAM_HEADER_ACTION_CLASS =
+  'inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-secondary/70'
+
 type ProfileRow = {
   id: string
   full_name: string | null
@@ -323,12 +326,17 @@ export default async function TeamPage({
         subtitle="Manage staffing, roles, and roster access from one workspace."
         className="px-0"
         actions={
-          <Link
-            href="/team/import"
-            className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-secondary/70"
-          >
-            Import
-          </Link>
+          <>
+            <a href="/api/team/roster/export?scope=active" className={TEAM_HEADER_ACTION_CLASS}>
+              Export active roster
+            </a>
+            <a href="/api/team/roster/export?scope=all" className={TEAM_HEADER_ACTION_CLASS}>
+              Export all roster
+            </a>
+            <Link href="/team/import" className={TEAM_HEADER_ACTION_CLASS}>
+              Import
+            </Link>
+          </>
         }
       />
 
