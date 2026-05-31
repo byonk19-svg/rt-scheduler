@@ -222,12 +222,17 @@ describe('schedule route', () => {
     )
   })
 
-  it('redirects forbidden users to the staff dashboard', async () => {
+  it('renders an explanatory access-denied state for forbidden users', async () => {
     loadScheduleGridDataMock.mockResolvedValue({ status: 'forbidden' })
 
-    await expect(SchedulePage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
-      'REDIRECT:/dashboard/staff'
-    )
+    const html = renderToStaticMarkup(await SchedulePage({ searchParams: Promise.resolve({}) }))
+
+    expect(html).toContain('Schedule access required')
+    expect(html).toContain('You do not have access to Team Schedule.')
+    expect(html).toContain('Team Schedule is available to active therapists, leads, and managers.')
+    expect(html).toContain('Open dashboard')
+    expect(html).toContain('View profile')
+    expect(redirectMock).not.toHaveBeenCalled()
   })
 
   it('renders an empty state when there is no cycle visible to the user', async () => {
