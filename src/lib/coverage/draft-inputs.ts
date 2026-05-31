@@ -70,6 +70,7 @@ type DraftInputFilterBuilder = PromiseLike<{ data: unknown; error: unknown }> & 
   in: (column: string, values: unknown[]) => DraftInputFilterBuilder
   order: (column: string, options?: Record<string, unknown>) => DraftInputFilterBuilder
   eq: (column: string, value: unknown) => DraftInputFilterBuilder
+  is: (column: string, value: unknown) => DraftInputFilterBuilder
   gte: (column: string, value: unknown) => DraftInputFilterBuilder
   lte: (column: string, value: unknown) => DraftInputFilterBuilder
 }
@@ -270,7 +271,7 @@ export async function loadDraftInputsForCycle(
 
 function applyTherapistScope(query: DraftInputFilterBuilder, scope: DraftTherapistScope) {
   if (scope !== 'active-non-fmla') return query
-  return query.eq('is_active', true).eq('on_fmla', false)
+  return query.eq('is_active', true).eq('on_fmla', false).is('archived_at', null)
 }
 
 function loadTherapistsForDraft(

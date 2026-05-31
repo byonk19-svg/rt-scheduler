@@ -6,10 +6,70 @@ import {
   DRAFT_THERAPIST_COLUMNS,
   DRAFT_WEEKLY_SHIFT_COLUMNS,
   DRAFT_WORK_PATTERN_COLUMNS,
+  type DraftTherapistRow,
   buildDraftTherapists,
   loadDraftInputsForCycle,
   toDraftExistingShifts,
 } from '@/lib/coverage/draft-inputs'
+
+type DraftProfileFixture = DraftTherapistRow & {
+  role: 'therapist' | 'lead'
+  archived_at: string | null
+  site_id: string
+}
+
+function makeDraftInputClient(profiles: DraftProfileFixture[]) {
+  return {
+    from(table: string) {
+      const filters: Record<string, unknown> = {}
+      const nullFilters: Record<string, unknown> = {}
+      const inFilters: Record<string, unknown[]> = {}
+      const builder = {
+        select: () => builder,
+        eq: (column: string, value: unknown) => {
+          filters[column] = value
+          return builder
+        },
+        is: (column: string, value: unknown) => {
+          nullFilters[column] = value
+          return builder
+        },
+        in: (column: string, values: unknown[]) => {
+          inFilters[column] = values
+          return builder
+        },
+        gte: () => builder,
+        lte: () => builder,
+        order: () => builder,
+        then: (
+          onFulfilled?: (value: { data: unknown[]; error: null }) => unknown,
+          onRejected?: (reason: unknown) => unknown
+        ) => {
+          let rows: unknown[] = []
+          if (table === 'profiles') {
+            let profileRows = profiles
+            if (Array.isArray(inFilters.role)) {
+              profileRows = profileRows.filter((row) => inFilters.role.includes(row.role))
+            }
+            for (const [column, value] of Object.entries(filters)) {
+              profileRows = profileRows.filter(
+                (row) => row[column as keyof DraftProfileFixture] === value
+              )
+            }
+            for (const [column, value] of Object.entries(nullFilters)) {
+              profileRows = profileRows.filter(
+                (row) => row[column as keyof DraftProfileFixture] === value
+              )
+            }
+            rows = profileRows
+          }
+          return Promise.resolve({ data: rows, error: null }).then(onFulfilled, onRejected)
+        },
+      }
+      return builder
+    },
+  }
+}
 
 describe('draft input loader helpers', () => {
   it('keeps the shared draft query columns in one module', () => {
@@ -104,7 +164,7 @@ describe('draft input loader helpers', () => {
   })
 
   it('loads draft therapists only from the Schedule Block site', async () => {
-    const profiles = [
+    const profiles: DraftProfileFixture[] = [
       {
         id: 'site-a-therapist',
         full_name: 'Site A Therapist',
@@ -116,6 +176,7 @@ describe('draft input loader helpers', () => {
         on_fmla: false,
         fmla_return_date: null,
         is_active: true,
+        archived_at: null,
         site_id: 'site-a',
       },
       {
@@ -129,63 +190,107 @@ describe('draft input loader helpers', () => {
         on_fmla: false,
         fmla_return_date: null,
         is_active: true,
+        archived_at: null,
         site_id: 'site-b',
       },
     ]
-    const client = {
-      from(table: string) {
-        const filters: Record<string, unknown> = {}
-        const inFilters: Record<string, unknown[]> = {}
-        const builder = {
-          select: () => builder,
-          eq: (column: string, value: unknown) => {
-            filters[column] = value
-            return builder
-          },
-          in: (column: string, values: unknown[]) => {
-            inFilters[column] = values
-            return builder
-          },
-          gte: () => builder,
-          lte: () => builder,
-          order: () => builder,
-          then: (
-            onFulfilled?: (value: { data: unknown[]; error: null }) => unknown,
-            onRejected?: (reason: unknown) => unknown
-          ) => {
-            let rows: unknown[] = []
-            if (table === 'profiles') {
-              let profileRows = profiles
-              if (Array.isArray(inFilters.role)) {
-                profileRows = profileRows.filter((row) => inFilters.role.includes(row.role))
-              }
-              if (typeof filters.site_id === 'string') {
-                profileRows = profileRows.filter((row) => row.site_id === filters.site_id)
-              }
-              rows = profileRows
-            }
-            return Promise.resolve({ data: rows, error: null }).then(onFulfilled, onRejected)
-          },
-        }
-        return builder
-      },
-    }
+    const client = makeDraftInputClient(profiles)
 
     const result = await loadDraftInputsForCycle(
       client as Parameters<typeof loadDraftInputsForCycle>[0],
       {
-      cycle: {
-        id: 'cycle-1',
-        start_date: '2026-05-03',
-        end_date: '2026-06-13',
-        site_id: 'site-a',
-      },
+        cycle: {
+          id: 'cycle-1',
+          start_date: '2026-05-03',
+          end_date: '2026-06-13',
+          site_id: 'site-a',
+        },
       }
     )
 
     expect(result.error).toBeNull()
     expect(result.data?.therapists.map((therapist) => therapist.id)).toEqual([
       'site-a-therapist',
+    ])
+  })
+
+  it('can scope future draft planning to active non-FMLA non-archived therapists', async () => {
+    const profiles: DraftProfileFixture[] = [
+      {
+        id: 'eligible-therapist',
+        full_name: 'Eligible Therapist',
+        role: 'therapist',
+        shift_type: 'day',
+        is_lead_eligible: false,
+        employment_type: 'full_time',
+        max_work_days_per_week: 3,
+        on_fmla: false,
+        fmla_return_date: null,
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      {
+        id: 'inactive-therapist',
+        full_name: 'Inactive Therapist',
+        role: 'therapist',
+        shift_type: 'day',
+        is_lead_eligible: false,
+        employment_type: 'full_time',
+        max_work_days_per_week: 3,
+        on_fmla: false,
+        fmla_return_date: null,
+        is_active: false,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      {
+        id: 'fmla-therapist',
+        full_name: 'FMLA Therapist',
+        role: 'therapist',
+        shift_type: 'day',
+        is_lead_eligible: false,
+        employment_type: 'full_time',
+        max_work_days_per_week: 3,
+        on_fmla: true,
+        fmla_return_date: '2026-06-01',
+        is_active: true,
+        archived_at: null,
+        site_id: 'site-a',
+      },
+      {
+        id: 'archived-therapist',
+        full_name: 'Archived Therapist',
+        role: 'therapist',
+        shift_type: 'day',
+        is_lead_eligible: false,
+        employment_type: 'full_time',
+        max_work_days_per_week: 3,
+        on_fmla: false,
+        fmla_return_date: null,
+        is_active: true,
+        archived_at: '2026-05-01T12:00:00Z',
+        site_id: 'site-a',
+      },
+    ]
+    const client = makeDraftInputClient(profiles)
+
+    const result = await loadDraftInputsForCycle(
+      client as Parameters<typeof loadDraftInputsForCycle>[0],
+      {
+        cycle: {
+          id: 'cycle-1',
+          start_date: '2026-05-03',
+          end_date: '2026-06-13',
+          site_id: 'site-a',
+        },
+        therapistScope: 'active-non-fmla',
+      }
+    )
+
+    expect(result.error).toBeNull()
+    expect(result.data?.therapists.map((therapist) => therapist.id)).toEqual([
+      'eligible-therapist',
     ])
   })
 })
