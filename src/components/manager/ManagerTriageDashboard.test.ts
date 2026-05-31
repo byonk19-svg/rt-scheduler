@@ -24,7 +24,7 @@ const baseProps = {
   ],
   pendingRequests: 5,
   approvalsWaiting: 5,
-  currentCycleStatus: 'Draft Schedule Block',
+  currentCycleStatus: 'Draft',
   currentCycleDetail: 'Publish by Apr 27',
   nextCycleLabel: 'Collect availability Mar 17',
   nextCycleDetail: 'Publish by Apr 27',
@@ -55,7 +55,7 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Shift context')
     expect(html).toContain('Day / Night / Both')
     expect(html).toContain('Schedule status')
-    expect(html).toContain('Draft Schedule Block')
+    expect(html).toContain('Draft')
 
     const attentionIndex = html.indexOf('Needs your attention')
     const staffingIndex = html.indexOf('Today&#x27;s staffing')
@@ -148,6 +148,36 @@ describe('ManagerTriageDashboard', () => {
     expect(html).not.toContain('Scheduling workflow')
     expect(html).not.toContain('Follow these steps each Schedule Block')
     expect(html).not.toContain('Prepare availability')
+  })
+
+  it('keeps Schedule Block lifecycle states visible in the dashboard workflow', () => {
+    const preliminaryHtml = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        ...baseProps,
+        currentCycleStatus: 'Preliminary',
+      })
+    )
+    const offlineHtml = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        ...baseProps,
+        currentCycleStatus: 'Offline',
+      })
+    )
+    const noShiftDraftHtml = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        ...baseProps,
+        currentCycleStatus: 'Draft',
+        currentCycleHasNoShifts: true,
+      })
+    )
+
+    expect(preliminaryHtml).toContain('Schedule status')
+    expect(preliminaryHtml).toContain('Preliminary')
+    expect(preliminaryHtml).not.toContain('Not published')
+    expect(offlineHtml).toContain('Offline')
+    expect(offlineHtml).not.toContain('Not published')
+    expect(noShiftDraftHtml).toContain('Draft')
+    expect(noShiftDraftHtml).toContain('Not started')
   })
 
   it('keeps availability planning states distinct from ready schedule work', () => {

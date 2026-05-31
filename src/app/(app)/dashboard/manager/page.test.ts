@@ -51,4 +51,12 @@ describe('manager dashboard Schedule Block Planning cues', () => {
     expect(source).toContain('getNotificationDisplayCopy(row,')
     expect(source).not.toContain('const title = row.title?.trim()')
   })
+
+  it('uses the shared Schedule Block lifecycle label on the manager dashboard', () => {
+    expect(source).toContain('getScheduleBlockLifecycleLabel')
+    expect(source).toContain('status: activeCycle.status')
+    expect(source).toContain('currentCycleHasNoShifts={activeCycleHasNoShifts}')
+    expect(source).not.toContain("? 'Published'")
+    expect(source).not.toContain("'Draft Schedule Block'")
+  })
 })
