@@ -1307,6 +1307,40 @@ describe('availability actions', () => {
     expect(supabase.state.upsertPayloads).toHaveLength(0)
   })
 
+  it('blocks inbound email requests matched to a Schedule Block outside the manager site', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+      cycleSiteId: 'site-b',
+    })
+    supabase.state.emailIntakeRow = {
+      id: 'intake-1',
+      matched_therapist_id: 'therapist-1',
+      matched_cycle_id: 'cycle-1',
+      parse_status: 'parsed',
+      parsed_requests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off',
+          shift_type: 'both',
+          note: null,
+          source_line: 'Off Mar 24',
+        },
+      ],
+    }
+    createClientMock.mockResolvedValue(supabase)
+    const formData = new FormData()
+    formData.set('intake_id', 'intake-1')
+
+    await expect(applyEmailAvailabilityImportAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=email_intake_apply_failed&tab=intake'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(supabase.state.updates).toHaveLength(0)
+  })
+
   it('updates the therapist and cycle match on an intake and marks it parsed when actionable', async () => {
     const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
     supabase.state.emailIntakeRow = {
@@ -1341,6 +1375,38 @@ describe('availability actions', () => {
         filters: { id: 'intake-1' },
       },
     ])
+  })
+
+  it('blocks intake therapist matches outside the manager site', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+      therapistSiteId: 'site-b',
+      cycleSiteId: 'site-a',
+    })
+    supabase.state.emailIntakeRow = {
+      matched_cycle_id: 'cycle-1',
+      parsed_requests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off',
+          shift_type: 'both',
+          source_line: 'Need off Mar 24',
+        },
+      ],
+    }
+    createClientMock.mockResolvedValue(supabase)
+    const formData = new FormData()
+    formData.set('intake_id', 'intake-1')
+    formData.set('therapist_id', 'therapist-1')
+    formData.set('cycle_id', 'cycle-1')
+
+    await expect(updateEmailIntakeTherapistAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=email_intake_match_failed&tab=intake'
+    )
+
+    expect(supabase.state.updates).toEqual([])
   })
 
   it('cycles an intake item request and saves the updated parsed requests', async () => {

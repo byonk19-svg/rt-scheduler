@@ -51,6 +51,42 @@ type AvailabilityOverrideWrite = {
   source: 'therapist' | 'manager'
 }
 
+async function validateAvailabilityEmailTarget(params: {
+  supabase: SupabaseClient
+  managerSiteId: string
+  therapistId: string
+  cycleId: string
+}): Promise<boolean> {
+  const { supabase, managerSiteId, therapistId, cycleId } = params
+  const [{ data: therapist, error: therapistError }, { data: cycle, error: cycleError }] =
+    await Promise.all([
+      supabase
+        .from('profiles')
+        .select('site_id, is_active, archived_at')
+        .eq('id', therapistId)
+        .maybeSingle(),
+      supabase
+        .from('schedule_cycles')
+        .select('site_id, archived_at, status')
+        .eq('id', cycleId)
+        .maybeSingle(),
+    ])
+
+  if (therapistError || cycleError || !therapist || !cycle) {
+    console.error('Failed to validate email intake target:', { therapistError, cycleError })
+    return false
+  }
+
+  return (
+    therapist.site_id === managerSiteId &&
+    cycle.site_id === managerSiteId &&
+    therapist.is_active !== false &&
+    !therapist.archived_at &&
+    !cycle.archived_at &&
+    cycle.status !== 'archived'
+  )
+}
+
 async function hasBlockingAvailabilityOverwrite(
   supabase: SupabaseClient,
   payload: AvailabilityOverrideWrite[]
@@ -363,10 +399,11 @@ export async function autoApplyReadyAvailabilityEmailIntakeItems(params: {
 export async function applyAvailabilityEmailImport(params: {
   supabase: SupabaseClient
   userId: string
+  managerSiteId: string
   itemId: string
   intakeId: string
 }): Promise<EmailIntakeLifecycleResult<{ cycleId: string; therapistId: string }>> {
-  const { supabase, userId, itemId, intakeId } = params
+  const { supabase, userId, managerSiteId, itemId, intakeId } = params
   let effectiveIntakeId = intakeId
   let matchedTherapistId: string | null = null
   let matchedCycleId: string | null = null
@@ -408,6 +445,17 @@ export async function applyAvailabilityEmailImport(params: {
   }
 
   if (!matchedTherapistId || !matchedCycleId || parsedRequests.length === 0) {
+    return { ok: false, error: 'email_intake_apply_failed' }
+  }
+
+  const targetIsAllowed = await validateAvailabilityEmailTarget({
+    supabase,
+    managerSiteId,
+    therapistId: matchedTherapistId,
+    cycleId: matchedCycleId,
+  })
+
+  if (!targetIsAllowed) {
     return { ok: false, error: 'email_intake_apply_failed' }
   }
 
@@ -482,12 +530,24 @@ export async function applyAvailabilityEmailImport(params: {
 
 export async function updateEmailIntakeTherapistMatch(params: {
   supabase: SupabaseClient
+  managerSiteId: string
   itemId: string
   intakeId: string
   therapistId: string
   cycleId: string
 }): Promise<EmailIntakeLifecycleResult> {
-  const { supabase, itemId, intakeId, therapistId, cycleId } = params
+  const { supabase, managerSiteId, itemId, intakeId, therapistId, cycleId } = params
+
+  const targetIsAllowed = await validateAvailabilityEmailTarget({
+    supabase,
+    managerSiteId,
+    therapistId,
+    cycleId,
+  })
+
+  if (!targetIsAllowed) {
+    return { ok: false, error: 'email_intake_match_failed' }
+  }
 
   if (itemId) {
     const { data: item, error: loadError } = await supabase
