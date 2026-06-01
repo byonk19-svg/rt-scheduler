@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
+import { findBlockingAvailabilityOverwrite } from '@/lib/availability-overwrite-guard'
 import { getPlannerDateValidationError } from '@/lib/availability-planner'
 import { buildManagerOverrideInput, intentForTherapistOverride } from '@/lib/employee-directory'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -170,6 +171,43 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
   }
 
   if (payload.length > 0) {
+    const { data: conflictingRows, error: conflictsError } = await supabase
+      .from('availability_overrides')
+      .select('date, shift_type, source')
+      .eq('cycle_id', cycleId)
+      .eq('therapist_id', therapistId)
+      .eq('shift_type', 'both')
+      .in('date', uniqueDates)
+
+    if (conflictsError) {
+      console.error('Failed to check manager request overwrite conflicts:', conflictsError)
+      redirect(
+        buildAvailabilityUrl({
+          cycle: cycleId || undefined,
+          therapist: therapistId || undefined,
+          error: 'manager_request_save_failed',
+        })
+      )
+    }
+
+    const blockingConflict = findBlockingAvailabilityOverwrite(
+      conflictingRows ?? [],
+      payload.map((row) => ({
+        date: row.date,
+        shift_type: row.shift_type,
+        source: row.source,
+      }))
+    )
+    if (blockingConflict) {
+      redirect(
+        buildAvailabilityUrl({
+          cycle: cycleId || undefined,
+          therapist: therapistId || undefined,
+          error: 'manager_request_save_failed',
+        })
+      )
+    }
+
     const { error: upsertError } = await supabase
       .from('availability_overrides')
       .upsert(payload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })

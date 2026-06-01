@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 
 import { recordSubmission, touchSubmission } from '@/lib/availability/submission-lifecycle'
+import { findBlockingAvailabilityOverwrite } from '@/lib/availability-overwrite-guard'
 import { loadAvailabilityWindowState } from '@/lib/availability-window'
 import { intentForTherapistOverride } from '@/lib/employee-directory'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -77,6 +78,26 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
   const availabilityWindow = await loadAvailabilityWindowState(admin as never, cycleId)
   if (availabilityWindow.locked) {
     redirect(buildAvailabilityUrl({ error: 'submission_closed', cycle: cycleId }, returnPath))
+  }
+
+  const { data: conflictingRows, error: conflictsError } = await supabase
+    .from('availability_overrides')
+    .select('date, shift_type, source')
+    .eq('cycle_id', cycleId)
+    .eq('therapist_id', user.id)
+    .eq('date', date)
+    .eq('shift_type', shiftType)
+
+  if (conflictsError) {
+    console.error('Failed to check availability overwrite conflicts:', conflictsError)
+    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+  }
+
+  const blockingConflict = findBlockingAvailabilityOverwrite(conflictingRows ?? [], [
+    { date, shift_type: shiftType, source: 'therapist' },
+  ])
+  if (blockingConflict) {
+    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
   }
 
   const { error } = await supabase.from('availability_overrides').upsert(
@@ -214,6 +235,32 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
   ]
 
   if (payload.length > 0) {
+    const payloadDates = [...new Set(payload.map((row) => row.date))]
+    const { data: conflictingRows, error: conflictsError } = await supabase
+      .from('availability_overrides')
+      .select('date, shift_type, source')
+      .eq('cycle_id', cycleId)
+      .eq('therapist_id', user.id)
+      .eq('shift_type', 'both')
+      .in('date', payloadDates)
+
+    if (conflictsError) {
+      console.error('Failed to check therapist availability overwrite conflicts:', conflictsError)
+      redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+    }
+
+    const blockingConflict = findBlockingAvailabilityOverwrite(
+      conflictingRows ?? [],
+      payload.map((row) => ({
+        date: row.date,
+        shift_type: row.shift_type,
+        source: row.source,
+      }))
+    )
+    if (blockingConflict) {
+      redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+    }
+
     const { error: upsertError } = await supabase
       .from('availability_overrides')
       .upsert(payload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
