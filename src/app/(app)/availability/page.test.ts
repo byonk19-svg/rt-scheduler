@@ -147,4 +147,18 @@ describe('availability page role-specific actions', () => {
     expect(source).toContain('const intakeNeedsReviewCount = intakeReviewCount ?? 0')
     expect(source).not.toContain("availabilityLoadError('availability intake review count'")
   })
+
+  it('uses explicit feedback for availability overwrite conflicts', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain("error === 'availability_conflict'")
+    expect(source).toContain("error === 'planner_availability_conflict'")
+    expect(source).toContain("error === 'manager_request_availability_conflict'")
+    expect(source).toContain("error === 'email_intake_availability_conflict'")
+    expect(source).toContain('already has therapist-submitted availability')
+    expect(source).toContain('already has manager-entered availability')
+  })
 })

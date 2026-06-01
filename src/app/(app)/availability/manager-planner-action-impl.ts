@@ -181,7 +181,7 @@ export async function saveManagerPlannerDatesAction(formData: FormData) {
         buildAvailabilityUrl({
           cycle: cycleId,
           therapist: therapistId,
-          error: 'planner_save_failed',
+          error: 'planner_availability_conflict',
         })
       )
     }

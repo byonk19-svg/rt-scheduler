@@ -203,7 +203,7 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
         buildAvailabilityUrl({
           cycle: cycleId || undefined,
           therapist: therapistId || undefined,
-          error: 'manager_request_save_failed',
+          error: 'manager_request_availability_conflict',
         })
       )
     }

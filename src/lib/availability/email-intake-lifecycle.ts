@@ -425,7 +425,7 @@ export async function applyAvailabilityEmailImport(params: {
   )
 
   if (await hasBlockingAvailabilityOverwrite(supabase, payload)) {
-    return { ok: false, error: 'email_intake_apply_failed' }
+    return { ok: false, error: 'email_intake_availability_conflict' }
   }
 
   const { error: upsertError } = await supabase
