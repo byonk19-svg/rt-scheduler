@@ -1,5 +1,3 @@
-import type { createClient } from '@/lib/supabase/server'
-
 type AuditLogParams = {
   userId: string
   action: string
@@ -7,10 +5,19 @@ type AuditLogParams = {
   targetId: string
 }
 
-type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
+type AuditLogClient = {
+  from: (table: 'audit_log') => {
+    insert: (row: {
+      user_id: string
+      action: string
+      target_type: string
+      target_id: string
+    }) => PromiseLike<{ error: { message?: string } | null }>
+  }
+}
 
 export async function writeAuditLog(
-  supabase: ServerSupabaseClient,
+  supabase: AuditLogClient,
   params: AuditLogParams
 ): Promise<void> {
   const { error } = await supabase.from('audit_log').insert({

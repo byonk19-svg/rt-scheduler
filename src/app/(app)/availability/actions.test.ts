@@ -720,6 +720,15 @@ describe('availability actions', () => {
       }),
       filters: { id: 'cycle-1' },
     })
+    expect(admin.state.inserts).toContainEqual({
+      table: 'audit_log',
+      payload: {
+        user_id: 'manager-1',
+        action: 'availability_window_closed',
+        target_type: 'schedule_cycle',
+        target_id: 'cycle-1',
+      },
+    })
 
     vi.clearAllMocks()
     createClientMock.mockResolvedValue(supabase)
@@ -741,6 +750,15 @@ describe('availability actions', () => {
         availability_reopened_by: 'manager-1',
       }),
       filters: { id: 'cycle-1' },
+    })
+    expect(reopenAdmin.state.inserts).toContainEqual({
+      table: 'audit_log',
+      payload: {
+        user_id: 'manager-1',
+        action: 'availability_window_reopened',
+        target_type: 'schedule_cycle',
+        target_id: 'cycle-1',
+      },
     })
   })
 

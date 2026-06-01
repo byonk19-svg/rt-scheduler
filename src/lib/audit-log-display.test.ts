@@ -8,12 +8,28 @@ describe('audit log display helpers', () => {
       label: 'Schedule Block published',
       tone: 'success',
     })
+    expect(getAuditLogActionDisplay('schedule_block_taken_offline')).toEqual({
+      label: 'Schedule Block taken offline',
+      tone: 'warning',
+    })
+    expect(getAuditLogActionDisplay('schedule_block_archived')).toEqual({
+      label: 'Schedule Block archived',
+      tone: 'warning',
+    })
     expect(getAuditLogActionDisplay('schedule_block_planning_created_visible')).toEqual({
       label: 'Schedule Block opened for availability',
       tone: 'info',
     })
     expect(getAuditLogActionDisplay('preliminary_schedule_refreshed')).toEqual({
       label: 'Preliminary Schedule refreshed',
+      tone: 'info',
+    })
+    expect(getAuditLogActionDisplay('availability_window_closed')).toEqual({
+      label: 'Availability window locked',
+      tone: 'warning',
+    })
+    expect(getAuditLogActionDisplay('availability_window_reopened')).toEqual({
+      label: 'Availability window reopened',
       tone: 'info',
     })
   })

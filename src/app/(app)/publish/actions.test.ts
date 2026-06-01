@@ -40,6 +40,8 @@ import {
 type TestContext = {
   userId?: string | null
   role?: string | null
+  siteId?: string | null
+  cycleSiteId?: string | null
 }
 
 function createSupabaseMock(context: TestContext) {
@@ -51,6 +53,10 @@ function createSupabaseMock(context: TestContext) {
     publishEventPublished: false,
     deniedShiftPostIds: [] as string[],
     declinedShiftPostInterestIds: [] as string[],
+    inserts: [] as Array<{
+      table: string
+      payload: Record<string, unknown>
+    }>,
     cycleShifts: [
       {
         id: 'shift-1',
@@ -93,7 +99,12 @@ function createSupabaseMock(context: TestContext) {
         maybeSingle: async () => {
           if (table === 'profiles' && String(selected).includes('role')) {
             return {
-              data: { role: context.role, is_active: true, archived_at: null },
+              data: {
+                role: context.role,
+                is_active: true,
+                archived_at: null,
+                site_id: context.siteId ?? 'site-a',
+              },
               error: null,
             }
           }
@@ -105,6 +116,8 @@ function createSupabaseMock(context: TestContext) {
                 label: 'April schedule',
                 published: state.cyclePublished,
                 status: state.cycleStatus,
+                archived_at: null,
+                site_id: context.cycleSiteId ?? context.siteId ?? 'site-a',
               },
               error: null,
             }
@@ -191,6 +204,10 @@ function createSupabaseMock(context: TestContext) {
           }
 
           return updateBuilder
+        },
+        insert(payload: Record<string, unknown>) {
+          state.inserts.push({ table, payload })
+          return Promise.resolve({ error: null })
         },
         delete() {
           return {
@@ -320,6 +337,15 @@ describe('takeScheduleBlockOfflineAction', () => {
     expect(supabase.state.offlineRpcCalls).toEqual(['cycle-1'])
     expect(supabase.state.deniedShiftPostIds).toEqual(['post-1'])
     expect(supabase.state.declinedShiftPostInterestIds).toEqual(['post-1'])
+    expect(supabase.state.inserts).toContainEqual({
+      table: 'audit_log',
+      payload: {
+        user_id: 'manager-1',
+        action: 'schedule_block_taken_offline',
+        target_type: 'schedule_cycle',
+        target_id: 'cycle-1',
+      },
+    })
     expect(revalidatePathMock).toHaveBeenCalledWith('/schedule')
   })
 
@@ -415,7 +441,33 @@ describe('archiveCycleAction', () => {
       'REDIRECT:/publish?success=cycle_archived'
     )
 
+    expect(supabase.state.inserts).toContainEqual({
+      table: 'audit_log',
+      payload: {
+        user_id: 'manager-1',
+        action: 'schedule_block_archived',
+        target_type: 'schedule_cycle',
+        target_id: 'cycle-1',
+      },
+    })
     expect(revalidatePathMock).toHaveBeenCalledWith('/schedule')
+  })
+
+  it('blocks archiving a non-live cycle outside the manager site', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+      cycleSiteId: 'site-b',
+    })
+    supabase.state.cyclePublished = false
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(archiveCycleAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/publish?error=cycle_archive_failed'
+    )
+
+    expect(supabase.state.inserts).toEqual([])
   })
 
   it('blocks archiving live cycles', async () => {

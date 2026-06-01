@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { writeAuditLog } from '@/lib/audit-log'
 import { refreshPublishEventCounts } from '@/lib/publish-events'
 import {
   OFFLINE_SHIFT_BOARD_CLOSURE_REASON,
@@ -29,7 +30,7 @@ async function requireManagerUser() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -42,7 +43,7 @@ async function requireManagerUser() {
     redirect('/dashboard')
   }
 
-  return user
+  return { user, siteId: profile?.site_id ?? null }
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -103,7 +104,7 @@ export async function requeueFailedPublishEmailsAction(formData: FormData) {
 }
 
 export async function takeScheduleBlockOfflineAction(formData: FormData) {
-  const user = await requireManagerUser()
+  const { user } = await requireManagerUser()
 
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   if (!cycleId) {
@@ -171,6 +172,13 @@ export async function takeScheduleBlockOfflineAction(formData: FormData) {
     OFFLINE_SHIFT_BOARD_CLOSURE_REASON
   )
 
+  await writeAuditLog(supabase, {
+    userId: user.id,
+    action: 'schedule_block_taken_offline',
+    targetType: 'schedule_cycle',
+    targetId: cycleId,
+  })
+
   revalidatePath('/publish')
   revalidatePath('/schedule')
   revalidatePath('/preliminary')
@@ -232,7 +240,7 @@ export async function deletePublishEventAction(formData: FormData) {
 }
 
 export async function archiveCycleAction(formData: FormData) {
-  await requireManagerUser()
+  const { user, siteId } = await requireManagerUser()
 
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   if (!cycleId) {
@@ -242,7 +250,7 @@ export async function archiveCycleAction(formData: FormData) {
   const supabase = await createClient()
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, published, archived_at')
+    .select('id, published, archived_at, site_id')
     .eq('id', cycleId)
     .maybeSingle()
 
@@ -255,6 +263,10 @@ export async function archiveCycleAction(formData: FormData) {
     redirect('/publish?error=archive_live_cycle')
   }
 
+  if (!siteId || cycle.site_id !== siteId) {
+    redirect('/publish?error=cycle_archive_failed')
+  }
+
   const { error: archiveError } = await supabase
     .from('schedule_cycles')
     .update({ archived_at: new Date().toISOString(), status: 'archived' })
@@ -264,6 +276,13 @@ export async function archiveCycleAction(formData: FormData) {
     console.error('Failed to archive cycle:', archiveError)
     redirect('/publish?error=cycle_archive_failed')
   }
+
+  await writeAuditLog(supabase, {
+    userId: user.id,
+    action: 'schedule_block_archived',
+    targetType: 'schedule_cycle',
+    targetId: cycleId,
+  })
 
   revalidatePath('/publish')
   revalidatePath('/schedule')

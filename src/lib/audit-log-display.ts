@@ -10,6 +10,14 @@ const ACTION_DISPLAY_BY_KEY: Record<string, AuditLogActionDisplay> = {
     label: 'Schedule Block published',
     tone: 'success',
   },
+  schedule_block_taken_offline: {
+    label: 'Schedule Block taken offline',
+    tone: 'warning',
+  },
+  schedule_block_archived: {
+    label: 'Schedule Block archived',
+    tone: 'warning',
+  },
   draft_schedule_generated: {
     label: 'Draft Schedule generated',
     tone: 'info',
@@ -60,6 +68,14 @@ const ACTION_DISPLAY_BY_KEY: Record<string, AuditLogActionDisplay> = {
   },
   schedule_block_final_publish_target_changed: {
     label: 'Final Publish target changed',
+    tone: 'info',
+  },
+  availability_window_closed: {
+    label: 'Availability window locked',
+    tone: 'warning',
+  },
+  availability_window_reopened: {
+    label: 'Availability window reopened',
     tone: 'info',
   },
   create_request: {
