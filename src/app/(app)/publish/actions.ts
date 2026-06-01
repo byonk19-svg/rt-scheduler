@@ -6,6 +6,10 @@ import { redirect } from 'next/navigation'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { refreshPublishEventCounts } from '@/lib/publish-events'
+import {
+  OFFLINE_SHIFT_BOARD_CLOSURE_REASON,
+  canTakeScheduleBlockOffline,
+} from '@/lib/schedule-lifecycle-matrix'
 import { closePendingShiftPostsForShiftIds } from '@/lib/shift-post-cleanup'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -127,7 +131,7 @@ export async function takeScheduleBlockOfflineAction(formData: FormData) {
     redirect('/publish?error=take_offline_failed')
   }
 
-  if (!cycle.published || cycle.status !== 'final') {
+  if (!canTakeScheduleBlockOffline(cycle)) {
     redirect('/publish?error=take_offline_not_live')
   }
 
@@ -164,7 +168,7 @@ export async function takeScheduleBlockOfflineAction(formData: FormData) {
     ((currentShifts ?? []) as Array<{ id: string | null }>)
       .map((shift) => shift.id)
       .filter((id): id is string => Boolean(id)),
-    'Schedule block was taken offline. Submit a new request after it is republished.'
+    OFFLINE_SHIFT_BOARD_CLOSURE_REASON
   )
 
   revalidatePath('/publish')
