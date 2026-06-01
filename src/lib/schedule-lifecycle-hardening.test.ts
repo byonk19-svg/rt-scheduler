@@ -64,6 +64,13 @@ const offlineLifecycleMigrationSource = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260512155706_schedule_block_offline_lifecycle.sql'),
   'utf8'
 )
+const atomicOfflineCleanupMigrationSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260601023000_atomic_offline_shift_board_closure.sql'
+  ),
+  'utf8'
+)
 const availabilityPublishMigrationSource = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260512163433_publish_availability_preflight.sql'),
   'utf8'
@@ -231,6 +238,10 @@ describe('schedule lifecycle hardening', () => {
     expect(offlineLifecycleMigrationSource).toContain(
       'another live block covers the same date range'
     )
+    expect(atomicOfflineCleanupMigrationSource).toContain('v_closure_reason text :=')
+    expect(atomicOfflineCleanupMigrationSource).toContain('with posts_to_close as')
+    expect(atomicOfflineCleanupMigrationSource).toContain("set status = 'denied'")
+    expect(atomicOfflineCleanupMigrationSource).toContain("set status = 'declined'")
     expect(blockRuleMigrationSource).toContain('Resolve preliminary requests before publishing.')
     expect(blockRuleMigrationSource).toContain(
       'Final publish requires exactly one lead-capable assigned Designated Lead for every date and shift.'

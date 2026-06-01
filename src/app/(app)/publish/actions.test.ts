@@ -323,6 +323,25 @@ describe('takeScheduleBlockOfflineAction', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/schedule')
   })
 
+  it('blocks take-offline before the RPC unless the block is live final', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+    })
+    supabase.state.cyclePublished = true
+    supabase.state.cycleStatus = 'offline'
+    createClientMock.mockResolvedValue(supabase)
+    const admin = createAdminMock(supabase.state)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(takeScheduleBlockOfflineAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/publish?error=take_offline_not_live'
+    )
+
+    expect(supabase.state.offlineRpcCalls).toEqual([])
+    expect(supabase.state.deniedShiftPostIds).toEqual([])
+  })
+
   it('denies non-managers', async () => {
     createClientMock.mockResolvedValue(
       createSupabaseMock({

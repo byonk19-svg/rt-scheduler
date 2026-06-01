@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { preserveShiftPostHistoryBeforeShiftDeletion } from '@/lib/shift-post-cleanup'
+import {
+  closePendingShiftPostsForShiftIds,
+  preserveShiftPostHistoryBeforeShiftDeletion,
+} from '@/lib/shift-post-cleanup'
 
 function createSupabaseMock(linkedPosts: Array<{ id: string; status: string }>) {
   const shiftPostUpdates: Array<{ payload: Record<string, unknown>; ids: string[] }> = []
@@ -17,10 +20,21 @@ function createSupabaseMock(linkedPosts: Array<{ id: string; status: string }>) 
       if (table === 'shift_posts') {
         return {
           select: vi.fn(() => ({
-            in: vi.fn(async () => ({
-              data: linkedPosts,
-              error: null,
-            })),
+            in: vi.fn(() => {
+              const result = {
+                data: linkedPosts,
+                error: null,
+              }
+              return {
+                eq: vi.fn(async () => result),
+                then<TResult1 = typeof result, TResult2 = never>(
+                  onfulfilled?: ((value: typeof result) => TResult1 | PromiseLike<TResult1>) | null,
+                  onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+                ) {
+                  return Promise.resolve(result).then(onfulfilled, onrejected)
+                },
+              }
+            }),
           })),
           update: vi.fn((payload: Record<string, unknown>) => ({
             in: vi.fn(async (_column: string, ids: string[]) => {
@@ -75,6 +89,38 @@ describe('preserveShiftPostHistoryBeforeShiftDeletion', () => {
       {
         payload: { shift_id: null },
         ids: ['post-approved', 'post-withdrawn'],
+      },
+    ])
+    expect(supabase.shiftPostInterestUpdates).toEqual([
+      {
+        payload: expect.objectContaining({
+          status: 'declined',
+        }),
+        ids: ['post-pending'],
+        statuses: ['pending', 'selected'],
+      },
+    ])
+  })
+})
+
+describe('closePendingShiftPostsForShiftIds', () => {
+  it('denies pending posts and declines pending or selected interests for unique shift ids', async () => {
+    const supabase = createSupabaseMock([{ id: 'post-pending', status: 'pending' }])
+
+    await closePendingShiftPostsForShiftIds(
+      supabase as never,
+      ['shift-1', 'shift-1', '', 'shift-2'],
+      'Schedule block was taken offline. Submit a new request after it is republished.'
+    )
+
+    expect(supabase.shiftPostUpdates).toEqual([
+      {
+        payload: {
+          status: 'denied',
+          override_reason:
+            'Schedule block was taken offline. Submit a new request after it is republished.',
+        },
+        ids: ['post-pending'],
       },
     ])
     expect(supabase.shiftPostInterestUpdates).toEqual([
