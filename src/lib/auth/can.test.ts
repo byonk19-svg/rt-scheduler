@@ -10,6 +10,7 @@ const MANAGER_ONLY_PERMISSIONS: Permission[] = [
   'manage_coverage',
   'review_shift_posts',
   'export_all_availability',
+  'export_schedule',
 ]
 
 describe('can - manager-only permissions', () => {

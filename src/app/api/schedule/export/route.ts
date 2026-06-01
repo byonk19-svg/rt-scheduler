@@ -71,7 +71,7 @@ export async function GET(request: Request) {
   const actorProfile = (profile ?? null) as ExportActorProfile | null
 
   if (
-    !can(parseRole(actorProfile?.role), 'export_all_availability', {
+    !can(parseRole(actorProfile?.role), 'export_schedule', {
       isActive: actorProfile?.is_active !== false,
       archivedAt: actorProfile?.archived_at ?? null,
     })
