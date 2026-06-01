@@ -122,9 +122,19 @@ describe('ScheduleGrid source invariants', () => {
   it('adds a compact paper-style title inside the schedule grid', () => {
     const code = source()
 
-    expect(code).toContain('Respiratory Therapy')
+    expect(code).toContain('Night shift schedule')
+    expect(code).toContain('Day shift schedule')
     expect(code).toContain('cycleDateRangeLabel')
     expect(code).toContain('{sheetTitle}')
+    expect(code).not.toContain('Respiratory Therapy Day Shift')
+    expect(code).not.toContain('Respiratory Therapy Night Shift')
+  })
+
+  it('keeps readiness issue target copy ASCII-safe', () => {
+    const code = source()
+
+    expect(code).toContain("shift - ${issue.therapistName ?? 'Therapist'}")
+    expect(code).not.toContain('Â·')
   })
 
   it('uses non-blocking feedback for schedule mutation failures', () => {

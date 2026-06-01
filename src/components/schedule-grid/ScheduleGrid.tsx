@@ -197,7 +197,7 @@ function getReadinessTargetLabel(
     }
     return 'Shift Board'
   }
-  return `${issue.target.date} ${issue.target.shiftType} shift · ${issue.therapistName ?? 'Therapist'}`
+  return `${issue.target.date} ${issue.target.shiftType} shift - ${issue.therapistName ?? 'Therapist'}`
 }
 
 export function ScheduleGrid({
@@ -433,8 +433,7 @@ export function ScheduleGrid({
 
   const isAssignTarget = activeCellTarget?.cell.status === 'off'
   const isStatusTarget = Boolean(activeCellTarget && activeCellTarget.cell.status !== 'off')
-  const sheetTitle =
-    loadedShiftTab === 'Night' ? 'Respiratory Therapy Night Shift' : 'Respiratory Therapy Day Shift'
+  const sheetTitle = loadedShiftTab === 'Night' ? 'Night shift schedule' : 'Day shift schedule'
   const sheetDayCount = `${initialDataset.cycleDates.length} days`
   const interactionHint = getScheduleInteractionHint(interactionMode)
   const visiblePreFlightIssues =
