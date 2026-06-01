@@ -195,14 +195,12 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("label: 'Lottery'")
   })
 
-  it('badges manager Access work in desktop and mobile drawer navigation', () => {
+  it('badges manager Access work in desktop and mobile quick navigation', () => {
     const accessSection = buildManagerSections(6).find((section) => section.key === 'access')
 
     expect(accessSection?.href).toBe('/requests/user-access')
     expect(accessSection?.badgeCount).toBe(6)
-    expect(appShellSource).toContain(
-      'const moreBadgeCount = canAccessManagerUi && pendingCount > 0'
-    )
+    expect(appShellSource).toContain('!mobileQuickItems.some((item) => item.badgeCount)')
     expect(appShellSource).toContain('section.badgeCount')
   })
 
