@@ -103,10 +103,9 @@ export async function copyAvailabilityFromPreviousCycleAction(formData: FormData
 
   const { data: existingRows } = await supabase
     .from('availability_overrides')
-    .select('date')
+    .select('date, shift_type, source')
     .eq('cycle_id', cycleId)
     .eq('therapist_id', therapistId)
-    .eq('source', 'manager')
 
   const normalizedSourceOverrides: Array<{
     date: string

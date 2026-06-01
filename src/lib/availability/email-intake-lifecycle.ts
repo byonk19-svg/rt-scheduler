@@ -13,6 +13,7 @@ import {
   markRequestsEdited,
   removeIntakeRequest,
 } from '@/lib/availability-intake-request-cycler'
+import { findBlockingAvailabilityOverwrite } from '@/lib/availability-overwrite-guard'
 import { buildManagerOverrideInput } from '@/lib/employee-directory'
 import { extractTextFromAttachment } from '@/lib/openai-ocr'
 
@@ -41,6 +42,56 @@ type AvailabilityEmailAttachmentRow = {
 }
 
 type EmailIntakeLifecycleResult<T = unknown> = ({ ok: true } & T) | { ok: false; error: string }
+
+type AvailabilityOverrideWrite = {
+  cycle_id: string
+  therapist_id: string
+  date: string
+  shift_type: 'day' | 'night' | 'both'
+  source: 'therapist' | 'manager'
+}
+
+async function hasBlockingAvailabilityOverwrite(
+  supabase: SupabaseClient,
+  payload: AvailabilityOverrideWrite[]
+): Promise<boolean> {
+  const groups = new Map<string, AvailabilityOverrideWrite[]>()
+  for (const row of payload) {
+    const key = `${row.cycle_id}|${row.therapist_id}`
+    const current = groups.get(key) ?? []
+    current.push(row)
+    groups.set(key, current)
+  }
+
+  for (const rows of groups.values()) {
+    const first = rows[0]
+    if (!first) continue
+    const { data: existingRows, error } = await supabase
+      .from('availability_overrides')
+      .select('date, shift_type, source')
+      .eq('cycle_id', first.cycle_id)
+      .eq('therapist_id', first.therapist_id)
+      .in('date', [...new Set(rows.map((row) => row.date))])
+      .in('shift_type', [...new Set(rows.map((row) => row.shift_type))])
+
+    if (error) {
+      console.error('Failed to check email availability overwrite conflicts:', error)
+      return true
+    }
+
+    const blockingConflict = findBlockingAvailabilityOverwrite(
+      existingRows ?? [],
+      rows.map((row) => ({
+        date: row.date,
+        shift_type: row.shift_type,
+        source: row.source,
+      }))
+    )
+    if (blockingConflict) return true
+  }
+
+  return false
+}
 
 function summarizeAvailabilityItemRows(rows: AvailabilityEmailItemSummaryRow[]) {
   const items = rows.map((row, index) => ({
@@ -227,9 +278,13 @@ export async function autoApplyReadyAvailabilityEmailIntakeItems(params: {
     return { ok: true }
   }
 
-  const { error: applyError } = await supabase
-    .from('availability_overrides')
-    .upsert(autoApplyPayload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+  const hasOverwriteConflict = await hasBlockingAvailabilityOverwrite(supabase, autoApplyPayload)
+
+  const { error: applyError } = hasOverwriteConflict
+    ? { error: { message: 'availability_overwrite_conflict' } }
+    : await supabase
+        .from('availability_overrides')
+        .upsert(autoApplyPayload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
 
   const finalParsedItems = parsedItems.map((item) =>
     item.parseStatus === 'ready_to_apply'
@@ -368,6 +423,10 @@ export async function applyAvailabilityEmailImport(params: {
       intent: 'email_intake',
     })
   )
+
+  if (await hasBlockingAvailabilityOverwrite(supabase, payload)) {
+    return { ok: false, error: 'email_intake_apply_failed' }
+  }
 
   const { error: upsertError } = await supabase
     .from('availability_overrides')

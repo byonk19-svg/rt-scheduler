@@ -594,6 +594,24 @@ describe('availability actions', () => {
     ])
   })
 
+  it('blocks manager planner saves that would overwrite therapist-entered availability', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.existingTargetRows = [
+      {
+        date: '2026-03-24',
+        shift_type: 'day',
+        source: 'therapist',
+      },
+    ]
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(saveManagerPlannerDatesAction(makeManagerPlannerFormData())).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=planner_save_failed'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+  })
+
   it('blocks inactive managers before manager planner mutations', async () => {
     const supabase = createSupabaseMock({
       userId: 'manager-1',
@@ -872,6 +890,26 @@ describe('availability actions', () => {
     expect(admin.state.updates).toHaveLength(0)
   })
 
+  it('blocks manager-entered therapist requests that would overwrite therapist rows', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.existingTargetRows = [
+      {
+        date: '2026-03-24',
+        shift_type: 'both',
+        source: 'therapist',
+      },
+    ]
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(
+      saveManagerAvailabilityRequestsAction(makeManagerRequestFormData())
+    ).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=manager_request_save_failed'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+  })
+
   it('blocks manager-entered therapist requests across sites', async () => {
     const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
     const admin = createSupabaseMock({
@@ -987,6 +1025,24 @@ describe('availability actions', () => {
     expect(submissionPayload.therapist_id).toBe('therapist-1')
     expect(submissionPayload.schedule_cycle_id).toBe('cycle-1')
     expect(revalidatePathMock).toHaveBeenCalledWith('/dashboard/staff')
+  })
+
+  it('blocks therapist grid saves that would overwrite manager-entered availability', async () => {
+    const supabase = createSupabaseMock({ userId: 'therapist-1', role: 'therapist' })
+    supabase.state.existingTargetRows = [
+      {
+        date: '2026-03-24',
+        shift_type: 'both',
+        source: 'manager',
+      },
+    ]
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(
+      submitTherapistAvailabilityGridAction(makeTherapistGridFormData())
+    ).rejects.toThrow('REDIRECT:/availability?error=submit_failed&cycle=cycle-1')
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
   })
 
   it('saves grid draft without creating a submission record', async () => {
@@ -1147,6 +1203,41 @@ describe('availability actions', () => {
         filters: { id: 'intake-1' },
       },
     ])
+  })
+
+  it('blocks inbound email requests that would overwrite therapist availability', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.emailIntakeRow = {
+      id: 'intake-1',
+      matched_therapist_id: 'therapist-1',
+      matched_cycle_id: 'cycle-1',
+      parse_status: 'parsed',
+      parsed_requests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off',
+          shift_type: 'both',
+          note: null,
+          source_line: 'Off Mar 24',
+        },
+      ],
+    }
+    supabase.state.existingTargetRows = [
+      {
+        date: '2026-03-24',
+        shift_type: 'both',
+        source: 'therapist',
+      },
+    ]
+    createClientMock.mockResolvedValue(supabase)
+    const formData = new FormData()
+    formData.set('intake_id', 'intake-1')
+
+    await expect(applyEmailAvailabilityImportAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=email_intake_apply_failed&tab=intake'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
   })
 
   it('updates the therapist and cycle match on an intake and marks it parsed when actionable', async () => {
@@ -1717,5 +1808,28 @@ describe('copyAvailabilityFromPreviousCycleAction', () => {
     await expect(copyAvailabilityFromPreviousCycleAction(makeCopyFormData())).rejects.toThrow(
       'REDIRECT:/availability?cycle=cycle-new&therapist=therapist-1&error=copy_nothing_new'
     )
+  })
+
+  it('does not copy manager availability over an existing therapist row in the target cycle', async () => {
+    const mock = createSupabaseMock({ userId: 'mgr-1', role: 'manager' })
+    mock.state.sourceCycleRows = [
+      {
+        cycle_id: 'cycle-old',
+        schedule_cycles: { start_date: '2026-02-08', end_date: '2026-03-21', site_id: 'default' },
+      },
+    ]
+    mock.state.sourceOverrideRows = [
+      { date: '2026-02-11', override_type: 'force_on', shift_type: 'both', note: null },
+    ]
+    mock.state.existingTargetRows = [
+      { date: '2026-03-25', shift_type: 'both', source: 'therapist' },
+    ]
+    createClientMock.mockResolvedValue(mock)
+
+    await expect(copyAvailabilityFromPreviousCycleAction(makeCopyFormData())).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-new&therapist=therapist-1&error=copy_nothing_new'
+    )
+
+    expect(mock.state.upsertPayloads).toHaveLength(0)
   })
 })
