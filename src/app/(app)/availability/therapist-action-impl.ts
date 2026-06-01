@@ -97,7 +97,7 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
     { date, shift_type: shiftType, source: 'therapist' },
   ])
   if (blockingConflict) {
-    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+    redirect(buildAvailabilityUrl({ error: 'availability_conflict', cycle: cycleId }, returnPath))
   }
 
   const { error } = await supabase.from('availability_overrides').upsert(
@@ -258,7 +258,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
       }))
     )
     if (blockingConflict) {
-      redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+      redirect(buildAvailabilityUrl({ error: 'availability_conflict', cycle: cycleId }, returnPath))
     }
 
     const { error: upsertError } = await supabase

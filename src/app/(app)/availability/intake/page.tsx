@@ -150,6 +150,14 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     }
   }
 
+  if (error === 'email_intake_availability_conflict') {
+    return {
+      message:
+        'This email includes dates that already have therapist-submitted availability. Review the existing response before applying the import.',
+      variant: 'error',
+    }
+  }
+
   if (error === 'email_intake_match_failed') {
     return {
       message: "Couldn't save that match. Try again.",

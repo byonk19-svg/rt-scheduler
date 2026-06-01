@@ -165,6 +165,13 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
       variant: 'error',
     }
   }
+  if (error === 'availability_conflict') {
+    return {
+      message:
+        'That date already has manager-entered availability. Remove the existing entry before saving a different response.',
+      variant: 'error',
+    }
+  }
   if (error === 'submission_closed') {
     return {
       message: 'Availability changes are closed for this Schedule Block.',
@@ -259,6 +266,14 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     }
   }
 
+  if (error === 'planner_availability_conflict') {
+    return {
+      message:
+        'One or more selected dates already has therapist-submitted availability. Review the existing response before adding a staffing note.',
+      variant: 'error',
+    }
+  }
+
   if (error === 'planner_delete_failed') {
     return {
       message: "Couldn't remove that date. Try again.",
@@ -269,6 +284,14 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   if (error === 'manager_request_save_failed') {
     return {
       message: "Couldn't save that therapist availability request. Try again.",
+      variant: 'error',
+    }
+  }
+
+  if (error === 'manager_request_availability_conflict') {
+    return {
+      message:
+        'One or more selected dates already has therapist-submitted availability. Remove the conflicting therapist entry before saving a manager-entered request.',
       variant: 'error',
     }
   }
@@ -339,6 +362,14 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   if (error === 'email_intake_apply_failed') {
     return {
       message: "Couldn't apply this request. Review the matched dates first.",
+      variant: 'error',
+    }
+  }
+
+  if (error === 'email_intake_availability_conflict') {
+    return {
+      message:
+        'This email includes dates that already have therapist-submitted availability. Review the existing response before applying the import.',
       variant: 'error',
     }
   }

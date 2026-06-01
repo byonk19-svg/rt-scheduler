@@ -606,7 +606,7 @@ describe('availability actions', () => {
     createClientMock.mockResolvedValue(supabase)
 
     await expect(saveManagerPlannerDatesAction(makeManagerPlannerFormData())).rejects.toThrow(
-      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=planner_save_failed'
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=planner_availability_conflict'
     )
 
     expect(supabase.state.upsertPayloads).toHaveLength(0)
@@ -904,7 +904,7 @@ describe('availability actions', () => {
     await expect(
       saveManagerAvailabilityRequestsAction(makeManagerRequestFormData())
     ).rejects.toThrow(
-      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=manager_request_save_failed'
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&error=manager_request_availability_conflict'
     )
 
     expect(supabase.state.upsertPayloads).toHaveLength(0)
@@ -1040,7 +1040,7 @@ describe('availability actions', () => {
 
     await expect(
       submitTherapistAvailabilityGridAction(makeTherapistGridFormData())
-    ).rejects.toThrow('REDIRECT:/availability?error=submit_failed&cycle=cycle-1')
+    ).rejects.toThrow('REDIRECT:/availability?error=availability_conflict&cycle=cycle-1')
 
     expect(supabase.state.upsertPayloads).toHaveLength(0)
   })
@@ -1234,7 +1234,7 @@ describe('availability actions', () => {
     formData.set('intake_id', 'intake-1')
 
     await expect(applyEmailAvailabilityImportAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?error=email_intake_apply_failed&tab=intake'
+      'REDIRECT:/availability?error=email_intake_availability_conflict&tab=intake'
     )
 
     expect(supabase.state.upsertPayloads).toHaveLength(0)
