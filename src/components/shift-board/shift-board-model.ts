@@ -101,6 +101,12 @@ export const BOARD_SECTIONS: Array<{ id: ShiftBoardSection; label: string }> = [
   { id: 'history', label: 'History' },
 ]
 
+export function resolveShiftBoardTab(value: string | null): ShiftBoardSection {
+  return BOARD_SECTIONS.some((section) => section.id === value)
+    ? (value as ShiftBoardSection)
+    : 'needs-action'
+}
+
 export function getRequestTypeLabel(req: ShiftBoardRequest): string {
   if (req.type === 'swap' && req.visibility === 'direct') return 'Direct trade'
   if (req.type === 'swap') return req.swapWithId ? 'Trade request' : 'Open trade request'

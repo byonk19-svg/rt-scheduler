@@ -6,6 +6,7 @@ import {
   EmptyState,
   getRequestActionModel,
   ManagerRequestCard,
+  resolveShiftBoardTab,
   WaitingPreviewPanel,
   type ShiftBoardRequest,
 } from '@/components/shift-board/ShiftBoardClientPage'
@@ -89,6 +90,13 @@ function renderManagerCard(overrides: Partial<ShiftBoardRequest>): string {
 }
 
 describe('manager Shift Board action model', () => {
+  it('accepts notification tab links for terminal request history', () => {
+    expect(resolveShiftBoardTab('history')).toBe('history')
+    expect(resolveShiftBoardTab('open-shifts')).toBe('open-shifts')
+    expect(resolveShiftBoardTab('unknown')).toBe('needs-action')
+    expect(resolveShiftBoardTab(null)).toBe('needs-action')
+  })
+
   it('does not approve a direct swap waiting on teammate response', () => {
     const model = getRequestActionModel({
       req: request({ type: 'swap', visibility: 'direct', recipientResponse: 'pending' }),

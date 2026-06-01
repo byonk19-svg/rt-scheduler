@@ -47,46 +47,46 @@ const REQUEST_COPY_BY_EVENT: Record<string, NotificationDisplayRule> = {
   direct_request_declined: {
     manager: {
       title: 'Direct request declined',
-      message: 'A teammate declined a direct request before manager review.',
+      message: 'A teammate declined a direct request. This request is closed.',
     },
     therapist: {
       title: 'Direct request declined',
-      message: 'Your teammate declined the request.',
+      message: 'Your teammate declined the request. This request is closed.',
     },
     lead: {
       title: 'Direct request declined',
-      message: 'Your teammate declined the request.',
+      message: 'Your teammate declined the request. This request is closed.',
     },
   },
   direct_request_withdrawn: {
     manager: {
       title: 'Direct request withdrawn',
-      message: 'The requester withdrew the direct request before manager approval.',
+      message: 'The requester withdrew the direct request. This request is closed.',
     },
     therapist: {
       title: 'Direct request withdrawn',
-      message: 'The requester withdrew the direct request before manager approval.',
+      message: 'The requester withdrew the direct request. This request is closed.',
     },
     lead: {
       title: 'Direct request withdrawn',
-      message: 'The requester withdrew the direct request before manager approval.',
+      message: 'The requester withdrew the direct request. This request is closed.',
     },
   },
   direct_request_approved: {
     title: 'Direct request approved by manager',
-    message: 'The manager approved this direct request.',
+    message: 'The manager approved this direct request. No further action is needed.',
   },
   direct_request_denied: {
     title: 'Direct request denied by manager',
-    message: 'The manager denied this direct request.',
+    message: 'The manager denied this direct request. No further action is needed.',
   },
   request_approved: {
     title: 'Request approved by manager',
-    message: 'The manager approved this coverage or trade request.',
+    message: 'The manager approved this coverage or trade request. No further action is needed.',
   },
   request_denied: {
     title: 'Request denied by manager',
-    message: 'The manager denied this coverage or trade request.',
+    message: 'The manager denied this coverage or trade request. No further action is needed.',
   },
   shift_post_claimed: {
     title: 'Coverage request has a responder',

@@ -114,10 +114,13 @@ describe('shift-board route source contract', () => {
     expect(visibleCopy).toMatch(/backup responder/i)
   })
 
-  it('defaults the manager queue to Needs Action', () => {
-    const { clientSource } = readShiftBoardSources()
+  it('defaults the manager queue to Needs Action unless a notification tab is linked', () => {
+    const { routeSource, clientSource, modelSource } = readShiftBoardSources()
 
-    expect(clientSource).toContain("useState<ShiftBoardSection>('needs-action')")
+    expect(clientSource).toContain('initialTab =')
+    expect(clientSource).toContain('useState<ShiftBoardSection>(initialTab)')
+    expect(modelSource).toContain(": 'needs-action'")
+    expect(routeSource).toContain("initialTab === 'history' ? 'history' : 'open'")
   })
 
   it('puts the summary row before the manager decision queue cards', () => {
