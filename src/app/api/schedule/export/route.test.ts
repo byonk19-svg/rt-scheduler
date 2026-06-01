@@ -11,6 +11,8 @@ describe('schedule export route', () => {
     )
 
     expect(source).toContain("select('role, is_active, archived_at, site_id')")
+    expect(source).toContain("'export_schedule'")
+    expect(source).not.toContain("'export_all_availability'")
     expect(source).toContain("select('id, label, site_id')")
     expect(source).toContain('cycleRow.site_id !== actorProfile.site_id')
     expect(source).toContain(".eq('site_id', actorProfile.site_id)")
