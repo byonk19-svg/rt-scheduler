@@ -17,15 +17,15 @@ function getCycleId(formData: FormData) {
 }
 
 async function requireManager() {
-  const { user, role, permissionContext } = await getAuthenticatedUserWithRole()
-  if (!can(role, 'access_manager_ui', permissionContext)) {
+  const { user, role, siteId, permissionContext } = await getAuthenticatedUserWithRole()
+  if (!siteId || !can(role, 'access_manager_ui', permissionContext)) {
     redirect('/dashboard/staff')
   }
-  return user
+  return { user, siteId }
 }
 
 export async function closeAvailabilityWindowAction(formData: FormData) {
-  const user = await requireManager()
+  const { user, siteId } = await requireManager()
   const cycleId = getCycleId(formData)
   if (!cycleId) {
     redirect(buildAvailabilityUrl({ error: 'availability_window_failed' }))
@@ -34,13 +34,16 @@ export async function closeAvailabilityWindowAction(formData: FormData) {
   const admin = createAdminClient()
   const { data: cycle, error: cycleError } = await admin
     .from('schedule_cycles')
-    .select('id, published, status, archived_at, availability_closed_at, availability_reopened_at')
+    .select(
+      'id, published, status, archived_at, site_id, availability_closed_at, availability_reopened_at'
+    )
     .eq('id', cycleId)
     .maybeSingle()
 
   if (
     cycleError ||
     !cycle ||
+    cycle.site_id !== siteId ||
     cycle.published ||
     cycle.archived_at ||
     cycle.status === 'preliminary' ||
@@ -68,6 +71,7 @@ export async function closeAvailabilityWindowAction(formData: FormData) {
       availability_closed_by: user.id,
     })
     .eq('id', cycleId)
+    .eq('site_id', siteId)
 
   if (error) {
     console.error('Failed to close availability window:', error)
@@ -86,32 +90,25 @@ export async function closeAvailabilityWindowAction(formData: FormData) {
 }
 
 export async function reopenAvailabilityWindowAction(formData: FormData) {
-  const user = await requireManager()
+  const { user, siteId } = await requireManager()
   const cycleId = getCycleId(formData)
   if (!cycleId) {
     redirect(buildAvailabilityUrl({ error: 'availability_window_failed' }))
   }
 
   const admin = createAdminClient()
-  const [{ data: cycle, error: cycleError }, draftScheduleResult] = await Promise.all([
-    admin
-      .from('schedule_cycles')
-      .select(
-        'id, published, status, archived_at, availability_closed_at, availability_reopened_at'
-      )
-      .eq('id', cycleId)
-      .maybeSingle(),
-    admin
-      .from('shifts')
-      .select('id', { count: 'exact', head: true })
-      .eq('cycle_id', cycleId)
-      .limit(1),
-  ])
+  const { data: cycle, error: cycleError } = await admin
+    .from('schedule_cycles')
+    .select(
+      'id, published, status, archived_at, site_id, availability_closed_at, availability_reopened_at'
+    )
+    .eq('id', cycleId)
+    .maybeSingle()
 
   if (
     cycleError ||
-    draftScheduleResult.error ||
     !cycle ||
+    cycle.site_id !== siteId ||
     cycle.published ||
     cycle.archived_at ||
     cycle.status === 'preliminary' ||
@@ -119,6 +116,16 @@ export async function reopenAvailabilityWindowAction(formData: FormData) {
     cycle.status === 'offline' ||
     cycle.status === 'archived'
   ) {
+    redirect(buildAvailabilityUrl({ error: 'availability_window_failed', cycle: cycleId }))
+  }
+
+  const draftScheduleResult = await admin
+    .from('shifts')
+    .select('id', { count: 'exact', head: true })
+    .eq('cycle_id', cycleId)
+    .limit(1)
+
+  if (draftScheduleResult.error) {
     redirect(buildAvailabilityUrl({ error: 'availability_window_failed', cycle: cycleId }))
   }
 
@@ -138,6 +145,7 @@ export async function reopenAvailabilityWindowAction(formData: FormData) {
       availability_reopened_by: user.id,
     })
     .eq('id', cycleId)
+    .eq('site_id', siteId)
 
   if (error) {
     console.error('Failed to reopen availability window:', error)

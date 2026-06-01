@@ -804,6 +804,30 @@ describe('availability actions', () => {
     expect(admin.state.updates).toHaveLength(0)
   })
 
+  it('does not lock an availability window outside the manager site', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+    })
+    const admin = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+      cycleSiteId: 'site-b',
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+    const formData = new FormData()
+    formData.set('cycle_id', 'cycle-1')
+
+    await expect(closeAvailabilityWindowAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=availability_window_failed&cycle=cycle-1'
+    )
+    expect(admin.state.updates).toHaveLength(0)
+    expect(admin.state.inserts).toHaveLength(0)
+  })
+
   it('does not reopen an availability window that was not locked first', async () => {
     const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
     const admin = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
@@ -816,6 +840,31 @@ describe('availability actions', () => {
       'REDIRECT:/availability?error=availability_window_not_locked&cycle=cycle-1'
     )
     expect(admin.state.updates).toHaveLength(0)
+  })
+
+  it('does not reopen an availability window outside the manager site', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+    })
+    const admin = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+      cycleSiteId: 'site-b',
+      availabilityClosedAt: '2026-04-01T12:00:00.000Z',
+    })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+    const formData = new FormData()
+    formData.set('cycle_id', 'cycle-1')
+
+    await expect(reopenAvailabilityWindowAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=availability_window_failed&cycle=cycle-1'
+    )
+    expect(admin.state.updates).toHaveLength(0)
+    expect(admin.state.inserts).toHaveLength(0)
   })
 
   it('lets a manager clear planner dates for one therapist and mode', async () => {
