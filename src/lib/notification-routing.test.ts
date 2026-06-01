@@ -10,9 +10,44 @@ describe('resolveNotificationHref', () => {
       target_id: 'post-1',
     }
 
-    expect(resolveNotificationHref(item, 'manager')).toBe('/requests')
+    expect(resolveNotificationHref(item, 'manager')).toBe('/shift-board?tab=history')
+    expect(resolveNotificationHref(item, 'therapist')).toBe('/therapist/swaps?requestId=post-1')
+    expect(resolveNotificationHref(item, 'lead')).toBe('/therapist/swaps?requestId=post-1')
+  })
+
+  it('keeps active request notifications out of history routes', () => {
+    expect(
+      resolveNotificationHref(
+        {
+          event_type: 'direct_request_accepted',
+          target_type: 'shift_post',
+          target_id: 'post-2',
+        },
+        'manager'
+      )
+    ).toBe('/shift-board')
+
+    expect(
+      resolveNotificationHref(
+        {
+          event_type: 'direct_request_received',
+          target_type: 'shift_post',
+          target_id: 'post-3',
+        },
+        'therapist'
+      )
+    ).toBe('/therapist/swaps?requestId=post-3')
+  })
+
+  it('routes call-in alerts to open coverage request surfaces', () => {
+    const item = {
+      event_type: 'call_in_help_available',
+      target_type: 'shift' as const,
+      target_id: 'shift-1',
+    }
+
+    expect(resolveNotificationHref(item, 'manager')).toBe('/shift-board?tab=open-shifts')
     expect(resolveNotificationHref(item, 'therapist')).toBe('/therapist/swaps')
-    expect(resolveNotificationHref(item, 'lead')).toBe('/therapist/swaps')
   })
 
   it('deep-links preliminary shift notifications when a shift target is present', () => {

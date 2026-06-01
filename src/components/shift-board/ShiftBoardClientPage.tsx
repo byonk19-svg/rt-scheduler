@@ -46,12 +46,14 @@ import {
 } from './shift-board-model'
 
 export { ManagerRequestCard } from './ShiftBoardRequestCard'
-export { getRequestActionModel } from './shift-board-model'
+export { getRequestActionModel, resolveShiftBoardTab } from './shift-board-model'
 export type { ShiftBoardRequest } from './shift-board-model'
 
 export default function ShiftBoardClientPage({
+  initialTab = 'needs-action',
   initialSnapshot,
 }: {
+  initialTab?: ShiftBoardSection
   initialSnapshot: ShiftBoardInitialSnapshot
 }) {
   const router = useRouter()
@@ -71,7 +73,7 @@ export default function ShiftBoardClientPage({
   const [shiftFilter, setShiftFilter] = useState<ShiftFilter>('all')
   const [scope, setScope] = useState<'mine' | 'all'>('mine')
   const [search, setSearch] = useState('')
-  const [activeTab, setActiveTab] = useState<ShiftBoardSection>('needs-action')
+  const [activeTab, setActiveTab] = useState<ShiftBoardSection>(initialTab)
   const [savingState, setSavingState] = useState<Record<string, boolean>>({})
   const [requestErrors, setRequestErrors] = useState<Record<string, string>>({})
   const [therapists, setTherapists] = useState<ProfileLookupRow[]>(initialSnapshot.therapists)

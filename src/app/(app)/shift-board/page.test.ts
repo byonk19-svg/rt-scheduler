@@ -23,8 +23,14 @@ vi.mock('@/lib/shift-board-snapshot', () => ({
 }))
 
 vi.mock('@/components/shift-board/ShiftBoardClientPage', () => ({
-  default: ({ initialSnapshot }: { initialSnapshot: { currentUserId: string } }) =>
-    createElement('div', null, `Shift board for ${initialSnapshot.currentUserId}`),
+  default: ({
+    initialSnapshot,
+    initialTab,
+  }: {
+    initialSnapshot: { currentUserId: string }
+    initialTab: string
+  }) =>
+    createElement('div', null, `Shift board for ${initialSnapshot.currentUserId}:${initialTab}`),
 }))
 
 import ShiftBoardPage from '@/app/(app)/shift-board/page'
@@ -50,16 +56,40 @@ describe('shift-board page', () => {
       scheduledByCycleDateEntries: [],
     })
 
-    const html = renderToStaticMarkup(await ShiftBoardPage())
+    const html = renderToStaticMarkup(await ShiftBoardPage({}))
 
     expect(loadShiftBoardSnapshotMock).toHaveBeenCalledWith({ supabase, tab: 'open' })
-    expect(html).toContain('Shift board for therapist-1')
+    expect(html).toContain('Shift board for therapist-1:needs-action')
+  })
+
+  it('loads history when a terminal notification links to the history tab', async () => {
+    const supabase = { id: 'server-client' }
+    createClientMock.mockResolvedValue(supabase)
+    loadShiftBoardSnapshotMock.mockResolvedValue({
+      unauthorized: false,
+      role: 'manager',
+      requests: [],
+      metrics: { unfilled: 0, missingLead: 0 },
+      pendingCount: 0,
+      currentUserId: 'manager-1',
+      therapists: [],
+      employmentType: null,
+      scheduledByDateEntries: [],
+      scheduledByCycleDateEntries: [],
+    })
+
+    const html = renderToStaticMarkup(
+      await ShiftBoardPage({ searchParams: Promise.resolve({ tab: 'history' }) })
+    )
+
+    expect(loadShiftBoardSnapshotMock).toHaveBeenCalledWith({ supabase, tab: 'history' })
+    expect(html).toContain('Shift board for manager-1:history')
   })
 
   it('redirects unauthenticated users to login', async () => {
     createClientMock.mockResolvedValue({ id: 'server-client' })
     loadShiftBoardSnapshotMock.mockResolvedValue({ unauthorized: true })
 
-    await expect(ShiftBoardPage()).rejects.toThrow('REDIRECT:/login')
+    await expect(ShiftBoardPage({})).rejects.toThrow('REDIRECT:/login')
   })
 })

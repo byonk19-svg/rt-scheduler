@@ -115,7 +115,34 @@ describe('getNotificationDisplayCopy', () => {
       })
     ).toEqual({
       title: 'Request denied by manager',
-      message: 'The manager denied this coverage or trade request.',
+      message: 'The manager denied this coverage or trade request. No further action is needed.',
+    })
+  })
+
+  it('makes terminal direct request states read as closed outcomes', () => {
+    expect(
+      getNotificationDisplayCopy(
+        {
+          event_type: 'direct_request_withdrawn',
+          title: 'Direct request withdrawn',
+          message: 'The requester withdrew this direct request before final approval.',
+        },
+        'therapist'
+      )
+    ).toEqual({
+      title: 'Direct request withdrawn',
+      message: 'The requester withdrew the direct request. This request is closed.',
+    })
+
+    expect(
+      getNotificationDisplayCopy({
+        event_type: 'direct_request_approved',
+        title: 'Direct request approved',
+        message: 'Your direct request was approved by the manager.',
+      })
+    ).toEqual({
+      title: 'Direct request approved by manager',
+      message: 'The manager approved this direct request. No further action is needed.',
     })
   })
 

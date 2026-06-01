@@ -61,7 +61,7 @@ describe('resolveNotificationHref', () => {
         },
         'lead'
       )
-    ).toBe('/therapist/swaps')
+    ).toBe('/therapist/swaps?requestId=post-1')
   })
 
   it('routes call-in help alerts to the therapist swaps workflow', () => {
@@ -80,6 +80,24 @@ describe('resolveNotificationHref', () => {
         'therapist'
       )
     ).toBe('/therapist/swaps')
+  })
+
+  it('routes closed manager request notifications to Shift Board history', () => {
+    expect(
+      resolveNotificationHref(
+        {
+          id: 'n2c',
+          event_type: 'request_denied',
+          title: 'Request denied',
+          message: 'The manager denied this request.',
+          target_type: 'shift_post',
+          target_id: 'post-closed',
+          created_at: '2026-04-24T12:00:00.000Z',
+          read_at: null,
+        },
+        'manager'
+      )
+    ).toBe('/shift-board?tab=history')
   })
 
   it('keeps manager notifications on manager workflow routes', () => {
