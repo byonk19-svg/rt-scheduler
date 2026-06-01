@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
+import { writeAuditLog } from '@/lib/audit-log'
 import { resolveAvailabilityWindowState } from '@/lib/availability-window'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
@@ -73,6 +74,13 @@ export async function closeAvailabilityWindowAction(formData: FormData) {
     redirect(buildAvailabilityUrl({ error: 'availability_window_failed', cycle: cycleId }))
   }
 
+  await writeAuditLog(admin, {
+    userId: user.id,
+    action: 'availability_window_closed',
+    targetType: 'schedule_cycle',
+    targetId: cycleId,
+  })
+
   revalidateTherapistAvailabilitySurfaces()
   redirect(buildAvailabilityUrl({ success: 'availability_closed', cycle: cycleId }))
 }
@@ -135,6 +143,13 @@ export async function reopenAvailabilityWindowAction(formData: FormData) {
     console.error('Failed to reopen availability window:', error)
     redirect(buildAvailabilityUrl({ error: 'availability_window_failed', cycle: cycleId }))
   }
+
+  await writeAuditLog(admin, {
+    userId: user.id,
+    action: 'availability_window_reopened',
+    targetType: 'schedule_cycle',
+    targetId: cycleId,
+  })
 
   revalidateTherapistAvailabilitySurfaces()
   redirect(buildAvailabilityUrl({ success: 'availability_reopened', cycle: cycleId }))
