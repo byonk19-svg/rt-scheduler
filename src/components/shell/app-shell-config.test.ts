@@ -198,6 +198,21 @@ describe('app-shell-config', () => {
     expect(items.map((item) => item.label)).not.toContain('Access')
   })
 
+  it('promotes pending manager Access work into the mobile quick navigation', () => {
+    const items = getMobilePrimaryItems({ canAccessManagerUi: true, pendingCount: 3 })
+
+    expect(items.map((item) => item.label)).toEqual([
+      'Dashboard',
+      'Schedule',
+      'Availability',
+      'Access',
+    ])
+    const accessItem = items.find((item) => item.label === 'Access')
+    expect(accessItem?.href).toBe('/requests/user-access')
+    expect(accessItem?.badgeCount).toBe(3)
+    expect(accessItem?.active('/requests/user-access')).toBe(true)
+  })
+
   it('does not expose manager Access navigation to staff shell context', () => {
     const context = getShellContext({
       pathname: '/therapist/schedule',

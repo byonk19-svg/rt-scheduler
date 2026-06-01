@@ -318,7 +318,10 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
     [canAccessManagerUi, canAccessLeadTools, pathname, pendingCount]
   )
   const moreNavCurrent = !mobileQuickItems.some((item) => item.current)
-  const moreBadgeCount = canAccessManagerUi && pendingCount > 0 ? pendingCount : undefined
+  const moreBadgeCount =
+    canAccessManagerUi && pendingCount > 0 && !mobileQuickItems.some((item) => item.badgeCount)
+      ? pendingCount
+      : undefined
 
   useEffect(() => {
     function handleEsc(event: KeyboardEvent) {

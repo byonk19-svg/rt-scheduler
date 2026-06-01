@@ -254,6 +254,20 @@ export function getMobilePrimaryItems(args: {
   pendingCount: number
 }): readonly ShellNavItem[] {
   if (args.canAccessManagerUi) {
+    const fourthItem: ShellNavItem =
+      args.pendingCount > 0
+        ? {
+            href: '/requests/user-access',
+            label: 'Access',
+            active: (pathname) => pathname.startsWith('/requests/user-access'),
+            badgeCount: args.pendingCount,
+          }
+        : {
+            href: '/shift-board',
+            label: 'Shift Board',
+            active: (pathname) => pathname === '/shift-board' || pathname === '/swaps',
+          }
+
     return [
       {
         href: MANAGER_WORKFLOW_LINKS.dashboard,
@@ -271,11 +285,7 @@ export function getMobilePrimaryItems(args: {
         label: 'Availability',
         active: (pathname) => pathname === '/availability',
       },
-      {
-        href: '/shift-board',
-        label: 'Shift Board',
-        active: (pathname) => pathname === '/shift-board' || pathname === '/swaps',
-      },
+      fourthItem,
     ]
   }
 
