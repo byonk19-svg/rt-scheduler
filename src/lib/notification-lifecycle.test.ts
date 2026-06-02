@@ -41,6 +41,23 @@ describe('notification lifecycle matrix', () => {
     }
   })
 
+  it('keeps the matrix aligned exactly to the allowed notification event set', () => {
+    expect(Object.keys(NOTIFICATION_LIFECYCLE_MATRIX).sort()).toEqual(
+      [...ALLOWED_NOTIFICATION_EVENTS].sort()
+    )
+  })
+
+  it('defines ownership, recipient, dedupe, reversal, and audit policy for every event', () => {
+    for (const eventType of ALLOWED_NOTIFICATION_EVENTS) {
+      const policy = getNotificationLifecyclePolicy(eventType)
+      expect(policy?.owner, `${eventType} owner`).toBeTruthy()
+      expect(policy?.recipientPolicy, `${eventType} recipients`).toBeTruthy()
+      expect(policy?.duplicateGuard, `${eventType} duplicate guard`).toBeTruthy()
+      expect(policy?.reversalPolicy, `${eventType} reversal`).toBeTruthy()
+      expect(policy?.auditPolicy, `${eventType} audit`).toBeTruthy()
+    }
+  })
+
   it('separates active request work from terminal request history', () => {
     expect(NOTIFICATION_LIFECYCLE_MATRIX.direct_request_received.state).toBe('actionable')
     expect(NOTIFICATION_LIFECYCLE_MATRIX.direct_request_accepted.state).toBe('actionable')
@@ -69,5 +86,18 @@ describe('notification lifecycle matrix', () => {
       '/shift-board?tab=history'
     )
     expect(getRequestNotificationBaseHref('request_approved', 'therapist')).toBe('/therapist/swaps')
+  })
+
+  it('documents the highest-risk dedupe and reversal rules', () => {
+    expect(NOTIFICATION_LIFECYCLE_MATRIX.cycle_published.duplicateGuard).toContain('unique index')
+    expect(NOTIFICATION_LIFECYCLE_MATRIX.shift_reminder.duplicateGuard).toContain(
+      'shift_reminder_outbox'
+    )
+    expect(NOTIFICATION_LIFECYCLE_MATRIX.direct_request_withdrawn.reversalPolicy).toContain(
+      'closed'
+    )
+    expect(NOTIFICATION_LIFECYCLE_MATRIX.availability_due_date_changed.auditPolicy).toContain(
+      'audit-only'
+    )
   })
 })

@@ -169,6 +169,10 @@ Current operational guidance:
 ## 6) Notifications and Audit
 
 - `notifications`: in-app user feed (new request, approved/denied, publish events, assignments, shift reminders)
+- Notification lifecycle ownership is defined in `src/lib/notification-lifecycle.ts`.
+  - Every allowed event has an owner, recipient policy, route policy, duplicate guard, reversal policy, and audit policy.
+  - Request notifications distinguish actionable manager/recipient work from terminal history.
+  - Publish and shift reminders have explicit dedupe policy; schedule/request mutation events remain distinct when each change is meaningful.
 - Daily shift reminders also write `notifications` rows after successful delivery and are deduplicated through `shift_reminder_outbox`.
 - `audit_log`: manager operational events (assignment, publish, lead updates, etc.)
 
