@@ -64,6 +64,7 @@ type TestContext = {
   therapistIsActive?: boolean
   therapistArchivedAt?: string | null
   cycleSiteId?: string | null
+  cycleEndDate?: string
   therapistSubmissionExists?: boolean
   draftShiftCount?: number
   cyclePublished?: boolean
@@ -71,6 +72,7 @@ type TestContext = {
   cycleArchivedAt?: string | null
   availabilityClosedAt?: string | null
   availabilityReopenedAt?: string | null
+  availabilityDueAt?: string | null
   overrideRow?: Record<string, unknown> | null
 }
 
@@ -241,10 +243,11 @@ function createSupabaseMock(context: TestContext = {}) {
                 id: filters.get('id') ?? 'cycle-1',
                 label: 'Block 1',
                 start_date: '2026-03-22',
-                end_date: '2026-05-02',
+                end_date: context.cycleEndDate ?? '2099-05-02',
                 published: context.cyclePublished ?? false,
                 status: context.cycleStatus ?? 'draft',
                 archived_at: context.cycleArchivedAt ?? null,
+                availability_due_at: context.availabilityDueAt ?? '2099-01-01T23:59:59.000Z',
                 availability_closed_at: context.availabilityClosedAt ?? null,
                 availability_reopened_at: context.availabilityReopenedAt ?? null,
                 site_id: context.cycleSiteId ?? context.siteId ?? 'default',
@@ -1127,13 +1130,31 @@ describe('availability actions', () => {
     expect(supabase.state.updates).toHaveLength(0)
   })
 
+  it('blocks unsubmitted therapist grid saves after the availability deadline', async () => {
+    const supabase = createSupabaseMock({ userId: 'therapist-1', role: 'therapist' })
+    const admin = createSupabaseMock({ availabilityDueAt: '2000-01-01T00:00:00.000Z' })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(
+      submitTherapistAvailabilityGridAction(makeTherapistGridFormData())
+    ).rejects.toThrow('REDIRECT:/availability?error=submission_closed&cycle=cycle-1')
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(admin.state.inserts).toHaveLength(0)
+    expect(admin.state.updates).toHaveLength(0)
+  })
+
   it('updates last_edited_at when resubmitting an existing official submission', async () => {
     const supabase = createSupabaseMock({
       userId: 'therapist-1',
       role: 'therapist',
       therapistSubmissionExists: true,
     })
-    const admin = createSupabaseMock({ therapistSubmissionExists: true })
+    const admin = createSupabaseMock({
+      availabilityDueAt: '2000-01-01T00:00:00.000Z',
+      therapistSubmissionExists: true,
+    })
     createClientMock.mockResolvedValue(supabase)
     createAdminClientMock.mockReturnValue(admin)
 

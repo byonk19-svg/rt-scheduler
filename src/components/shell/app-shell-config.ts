@@ -515,7 +515,7 @@ export function getWorkflowContext(args: {
     return {
       workflow: 'Availability',
       context: 'Need Off and Need to Work',
-      state: 'Editable while the window is open',
+      state: 'Open or read-only by Schedule Block',
       permission: 'Your exceptions',
     }
   }

@@ -392,6 +392,17 @@ describe('staff nav items', () => {
     expect(getWorkflowContext({ pathname: '/profile', canAccessManagerUi: false })).toBeNull()
   })
 
+  it('uses truthful staff availability workflow context for open and read-only blocks', () => {
+    expect(
+      getWorkflowContext({ pathname: '/therapist/availability', canAccessManagerUi: false })
+    ).toEqual({
+      workflow: 'Availability',
+      context: 'Need Off and Need to Work',
+      state: 'Open or read-only by Schedule Block',
+      permission: 'Your exceptions',
+    })
+  })
+
   it('returns lead workflow context for operational schedule tools', () => {
     expect(
       getWorkflowContext({

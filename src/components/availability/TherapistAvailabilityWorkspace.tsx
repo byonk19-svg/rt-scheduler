@@ -35,7 +35,6 @@ import {
   buildStatusMap,
   clearAvailabilityDraft,
   getDisplayState,
-  getDisplayStateLabel,
   hasAvailabilityDayDraftChanges,
   hasAvailabilityDraftChanges,
   summarizeBaseline,
@@ -54,6 +53,22 @@ type Cycle = {
   availability_due_at?: string | null
 }
 
+type AvailabilityLockReason =
+  | 'archived'
+  | 'published'
+  | 'offline'
+  | 'preliminary'
+  | 'manager_closed'
+  | 'schedule_building_started'
+  | 'deadline_passed'
+  | 'cycle_ended'
+  | null
+
+type AvailabilityWindowByCycleId = Record<
+  string,
+  { locked: boolean; reason: AvailabilityLockReason }
+>
+
 type Props = {
   cycles: Cycle[]
   availabilityRows: AvailabilityEntryTableRow[]
@@ -67,7 +82,8 @@ type Props = {
   submissionsByCycleId: Record<string, { submittedAt: string; lastEditedAt: string }>
   regularShiftType?: 'day' | 'night'
   availabilityLocked?: boolean
-  availabilityLockedReason?: string | null
+  availabilityLockedReason?: AvailabilityLockReason
+  availabilityWindowByCycleId?: AvailabilityWindowByCycleId
   submitTherapistAvailabilityGridAction: (formData: FormData) => void | Promise<void>
   returnToPath?: '/availability' | '/therapist/availability'
 }
@@ -148,6 +164,21 @@ function dayOfMonthFromIsoDate(isoDate: string): number {
   return Number.parseInt(isoDate.slice(8, 10), 10)
 }
 
+function getCalendarDayPillLabel(displayState: ReturnType<typeof getDisplayState>): string | null {
+  switch (displayState) {
+    case 'normal_work':
+      return 'Working'
+    case 'normal_off':
+      return 'Off'
+    case 'can_work':
+      return 'Need to Work'
+    case 'cannot_work':
+      return 'Need Off'
+    default:
+      return null
+  }
+}
+
 export function TherapistAvailabilityWorkspace({
   cycles,
   availabilityRows,
@@ -159,8 +190,9 @@ export function TherapistAvailabilityWorkspace({
   generatedBaselineByCycleId,
   submissionsByCycleId,
   regularShiftType = 'day',
-  availabilityLocked = false,
-  availabilityLockedReason = null,
+  availabilityLocked: availabilityLockedFallback = false,
+  availabilityLockedReason: availabilityLockedReasonFallback = null,
+  availabilityWindowByCycleId,
   submitTherapistAvailabilityGridAction,
   returnToPath = '/availability',
 }: Props) {
@@ -238,6 +270,11 @@ export function TherapistAvailabilityWorkspace({
   }
 
   const serverSubmission = submissionsByCycleId[selectedCycleId]
+  const selectedAvailabilityWindow = availabilityWindowByCycleId?.[selectedCycleId] ?? {
+    locked: availabilityLockedFallback,
+    reason: availabilityLockedReasonFallback,
+  }
+  const availabilityLocked = selectedAvailabilityWindow.locked
   const submissionUi = useMemo(
     () =>
       buildTherapistSubmissionUiState(
@@ -361,7 +398,9 @@ export function TherapistAvailabilityWorkspace({
       ? `${rangeDates.length} ${rangeDates.length === 1 ? 'day' : 'days'} selected`
       : selectedDate
         ? formatDateLabel(selectedDate)
-        : 'Select a day to make a change.'
+        : availabilityLocked
+          ? 'Select a day to review'
+          : 'Select a day to make a change.'
   const dueDateLabel = selectedCycle?.availability_due_at
     ? formatDateLabel(selectedCycle.availability_due_at.slice(0, 10))
     : null
@@ -371,29 +410,45 @@ export function TherapistAvailabilityWorkspace({
   const reviewBlockLabel = selectedCycle
     ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
     : 'No Schedule Block selected'
-  const reviewWindowLabel = submissionUi.isSubmitted
-    ? 'Submitted availability'
-    : (deadlinePresentation?.deadlineHeadline ?? 'Availability open')
-  const submissionStatusDetail = submissionUi.isSubmitted
-    ? hasCycleSpecificChanges
-      ? 'Submitted with changes for this Schedule Block.'
-      : hasSavedRecurringPattern
-        ? 'Submitted with no Schedule Block changes. Your normal schedule is your current response.'
-        : 'Submitted with no day-level changes. This Schedule Block is currently blank unless you add dates.'
-    : dueDateLabel
-      ? `Due ${dueDateLabel}`
-      : (deadlinePresentation?.deadlineHeadline ?? 'Save progress until you are ready to submit.')
-  const availabilityLockedMessage =
-    availabilityLockedReason === 'schedule_building_started'
-      ? 'Schedule building has started. Ask a manager to reopen availability if you need to make a late change.'
-      : availabilityLockedReason === 'manager_closed'
-        ? 'Availability is locked for this Schedule Block. Ask a manager to reopen it if you need to make a late change.'
-        : availabilityLocked
-          ? 'Availability changes are locked for this Schedule Block.'
-          : null
-  const lockedDraftControlsMessage = availabilityLocked
-    ? 'Availability is locked, so Schedule Block availability changes are disabled.'
-    : null
+  const reviewWindowLabel = availabilityLocked
+    ? 'Closed for this Schedule Block'
+    : submissionUi.isSubmitted
+      ? 'Submitted availability'
+      : (deadlinePresentation?.deadlineHeadline ?? 'Availability open')
+  const quickEditHelperText = availabilityLocked
+    ? 'This Schedule Block is read-only because the availability window is closed. Select a day below to review its schedule status.'
+    : 'Select one day or several days, then choose a state.'
+  const reviewHeading = availabilityLocked ? 'Schedule Block Summary' : 'Review before submitting'
+  const reviewEmptyCopy = availabilityLocked
+    ? 'No exceptions were submitted for this Schedule Block.'
+    : 'No exceptions selected for this Schedule Block. Your normal schedule will be used unless you mark Need Off or Need to Work.'
+  const submissionStatusLines = submissionUi.isSubmitted
+    ? [
+        hasCycleSpecificChanges
+          ? 'Submitted with changes for this Schedule Block.'
+          : hasSavedRecurringPattern
+            ? 'Submitted with no Schedule Block changes. Your normal schedule is your current response.'
+            : 'Submitted with no day-level changes. This Schedule Block is currently blank unless you add dates.',
+      ]
+    : availabilityLocked
+      ? [
+          'Availability is closed for this Schedule Block.',
+          'Your normal schedule will be used because no exceptions were submitted.',
+          'Ask a manager to reopen availability if you need a late change.',
+        ]
+      : [
+          deadlinePresentation?.deadlineHeadline ??
+            (dueDateLabel ? `Due ${dueDateLabel}` : 'Save progress until you are ready to submit.'),
+        ]
+  const selectedDayEmptyCopy = availabilityLocked
+    ? 'Click a day to review its schedule status.'
+    : 'Click a day to review it and make a change.'
+  const selectedDayReviewStatus =
+    availabilityLocked && selectedDate
+      ? (getCalendarDayPillLabel(
+          getDisplayState(selectedDate, draftStatusByDate, baselineByDate)
+        ) ?? 'Unmarked')
+      : null
   const selectedDayOptionClass = (active: boolean, tone: 'can' | 'cant' | 'neutral') =>
     cn(
       'flex min-h-10 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
@@ -447,25 +502,33 @@ export function TherapistAvailabilityWorkspace({
             >
               {submissionUi.isSubmitted ? 'Submitted' : 'Not submitted'}
             </span>
-            <p
+            <div
               className={cn(
-                'mt-2.5 text-sm',
+                'mt-2.5 space-y-1 text-sm',
                 !submissionUi.isSubmitted &&
+                  !availabilityLocked &&
                   deadlinePresentation?.emphasis === 'past' &&
                   'text-[var(--error-text)]',
                 !submissionUi.isSubmitted &&
+                  !availabilityLocked &&
                   deadlinePresentation?.emphasis === 'urgent' &&
                   'text-[var(--warning-text)]',
-                (!deadlinePresentation || deadlinePresentation.emphasis === 'neutral') &&
+                (availabilityLocked ||
+                  !deadlinePresentation ||
+                  deadlinePresentation.emphasis === 'neutral') &&
                   'text-muted-foreground'
               )}
             >
-              {submissionStatusDetail}
-            </p>
+              {submissionStatusLines.map((line, index) => (
+                <p key={line} className={index === 0 && availabilityLocked ? 'font-medium' : ''}>
+                  {line}
+                </p>
+              ))}
+            </div>
           </section>
         </div>
 
-        <section className="rounded-[1.25rem] border border-border/70 bg-card px-5 py-4 shadow-tw-2xs-soft">
+        <section className="rounded-[1.25rem] border border-border/70 bg-card px-4 py-3.5 shadow-tw-2xs-soft sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--success-subtle)_55%,white)] text-[var(--primary)]">
@@ -493,7 +556,7 @@ export function TherapistAvailabilityWorkspace({
 
             <Button asChild variant="outline" size="sm" className="min-h-11 px-4">
               <Link href="/therapist/recurring-pattern">
-                {hasSavedRecurringPattern ? 'Edit recurring pattern' : 'Set recurring pattern'}
+                {hasSavedRecurringPattern ? 'Review normal schedule' : 'Set normal schedule'}
               </Link>
             </Button>
           </div>
@@ -502,12 +565,6 @@ export function TherapistAvailabilityWorkspace({
 
       {conflicts.length > 0 ? (
         <ScheduledConflictBanner conflicts={conflicts} onDismiss={() => {}} />
-      ) : null}
-
-      {availabilityLockedMessage ? (
-        <section className="rounded-[1.1rem] border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-4 py-3 text-sm font-medium text-[var(--warning-text)]">
-          {availabilityLockedMessage}
-        </section>
       ) : null}
 
       <form
@@ -524,9 +581,9 @@ export function TherapistAvailabilityWorkspace({
           <input key={`cannot-${date}`} type="hidden" name="cannot_work_dates" value={date} />
         ))}
 
-        <div className="space-y-2 border-b border-border/60 bg-[color:color-mix(in_srgb,var(--background)_42%,white)] px-5 py-3 sm:px-6">
+        <div className="space-y-2 border-b border-border/60 bg-[color:color-mix(in_srgb,var(--background)_42%,white)] px-4 py-3 sm:px-5">
           <div className="grid overflow-hidden rounded-[1rem] border border-border/70 bg-background xl:grid-cols-[15.5rem_minmax(0,1fr)]">
-            <section className="px-3.5 py-3">
+            <section className="px-3 py-2.5">
               <Label
                 htmlFor="therapist_cycle_id"
                 className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
@@ -547,146 +604,124 @@ export function TherapistAvailabilityWorkspace({
               </select>
             </section>
 
-            <section className="border-t border-border/70 px-3.5 py-3 xl:border-l xl:border-t-0">
+            <section className="border-t border-border/70 px-3 py-2.5 xl:border-l xl:border-t-0">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-[13rem]">
                   <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Quick edit
+                    {availabilityLocked ? 'Review Availability' : 'Quick edit'}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Select one day or several days, then choose a state.
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{quickEditHelperText}</p>
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <p className="rounded-full bg-muted/50 px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                    {activeSelectionSummary}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!hasActiveSelection || availabilityLocked}
-                    onClick={() => applySelection('force_on')}
-                    className="min-h-9 rounded-xl border-[var(--success-border)] bg-[var(--success-subtle)]/35 px-3 text-[var(--success-text)] hover:bg-[var(--success-subtle)]"
-                  >
-                    <CalendarCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                    Need to Work
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!hasActiveSelection || availabilityLocked}
-                    onClick={() => applySelection('force_off')}
-                    className="min-h-9 rounded-xl border-[var(--error-border)] bg-[var(--error-subtle)]/35 px-3 text-[var(--error-text)] hover:bg-[var(--error-subtle)]"
-                  >
-                    <CalendarX2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                    Need Off
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!hasActiveSelection || availabilityLocked}
-                    onClick={() => applySelection(null)}
-                    className="min-h-9 rounded-xl px-3"
-                  >
-                    Clear
-                  </Button>
-                </div>
+                {!availabilityLocked ? (
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <p className="rounded-full bg-muted/50 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                      {activeSelectionSummary}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!hasActiveSelection}
+                      onClick={() => applySelection('force_on')}
+                      className="min-h-9 rounded-xl border-[var(--success-border)] bg-[var(--success-subtle)]/35 px-3 text-[var(--success-text)] hover:bg-[var(--success-subtle)]"
+                    >
+                      <CalendarCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                      Need to Work
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!hasActiveSelection}
+                      onClick={() => applySelection('force_off')}
+                      className="min-h-9 rounded-xl border-[var(--error-border)] bg-[var(--error-subtle)]/35 px-3 text-[var(--error-text)] hover:bg-[var(--error-subtle)]"
+                    >
+                      <CalendarX2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                      Need Off
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!hasActiveSelection}
+                      onClick={() => applySelection(null)}
+                      className="min-h-9 rounded-xl px-3"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </section>
           </div>
 
-          <details className="rounded-[0.95rem] border border-border/60 bg-background px-3.5 py-2.5">
-            <summary className="cursor-pointer text-sm font-semibold text-foreground">
-              Edit several days
-            </summary>
-            {lockedDraftControlsMessage ? (
-              <p
-                id="locked-availability-draft-controls"
-                className="mt-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-xs font-medium text-muted-foreground"
-              >
-                {lockedDraftControlsMessage}
-              </p>
-            ) : null}
-            <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="range-start">Start date</Label>
-                  <input
-                    id="range-start"
-                    type="date"
-                    min={selectedCycle?.start_date}
-                    max={selectedCycle?.end_date}
-                    value={rangeStart}
-                    onChange={(event) => setRangeStart(event.target.value)}
-                    disabled={availabilityLocked}
-                    aria-describedby={
-                      availabilityLocked ? 'locked-availability-draft-controls' : undefined
-                    }
-                    title={lockedDraftControlsMessage ?? undefined}
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                  />
+          {!availabilityLocked ? (
+            <details className="rounded-[0.95rem] border border-border/60 bg-background px-3.5 py-2.5">
+              <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                Edit several days
+              </summary>
+              <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="range-start">Start date</Label>
+                    <input
+                      id="range-start"
+                      type="date"
+                      min={selectedCycle?.start_date}
+                      max={selectedCycle?.end_date}
+                      value={rangeStart}
+                      onChange={(event) => setRangeStart(event.target.value)}
+                      disabled={availabilityLocked}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="range-end">End date</Label>
+                    <input
+                      id="range-end"
+                      type="date"
+                      min={selectedCycle?.start_date}
+                      max={selectedCycle?.end_date}
+                      value={rangeEnd}
+                      onChange={(event) => setRangeEnd(event.target.value)}
+                      disabled={availabilityLocked}
+                      className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="range-end">End date</Label>
-                  <input
-                    id="range-end"
-                    type="date"
-                    min={selectedCycle?.start_date}
-                    max={selectedCycle?.end_date}
-                    value={rangeEnd}
-                    onChange={(event) => setRangeEnd(event.target.value)}
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs text-muted-foreground lg:max-w-[16rem]">
+                    Dates selected here use the quick edit buttons above.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={copyPreviousCycleOverrides}
                     disabled={availabilityLocked}
-                    aria-describedby={
-                      availabilityLocked ? 'locked-availability-draft-controls' : undefined
-                    }
-                    title={lockedDraftControlsMessage ?? undefined}
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                  />
+                    className="min-h-9 rounded-xl px-3"
+                  >
+                    Use previous Schedule Block
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={clearOverrides}
+                    disabled={availabilityLocked}
+                    className="min-h-9 rounded-xl px-3"
+                  >
+                    Clear block changes
+                  </Button>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-xs text-muted-foreground lg:max-w-[16rem]">
-                  Dates selected here use the quick edit buttons above.
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={copyPreviousCycleOverrides}
-                  disabled={availabilityLocked}
-                  aria-describedby={
-                    availabilityLocked ? 'locked-availability-draft-controls' : undefined
-                  }
-                  title={lockedDraftControlsMessage ?? undefined}
-                  className="min-h-9 rounded-xl px-3"
-                >
-                  Use previous Schedule Block
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={clearOverrides}
-                  disabled={availabilityLocked}
-                  aria-describedby={
-                    availabilityLocked ? 'locked-availability-draft-controls' : undefined
-                  }
-                  title={lockedDraftControlsMessage ?? undefined}
-                  className="min-h-9 rounded-xl px-3"
-                >
-                  Clear block changes
-                </Button>
-              </div>
-            </div>
-          </details>
+            </details>
+          ) : null}
         </div>
 
         <div
           data-slot="availability-workspace-split"
-          className="grid items-start gap-4 px-5 py-4 sm:px-6 xl:grid-cols-[minmax(0,1fr)_19rem]"
+          className="grid items-start gap-4 px-4 py-3.5 sm:px-5 xl:grid-cols-[minmax(0,1fr)_19rem]"
         >
           <div className="min-w-0 space-y-3">
             <div className="hidden grid-cols-[5.4rem_repeat(7,minmax(0,1fr))] gap-1.5 text-center text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground sm:grid">
@@ -696,11 +731,11 @@ export function TherapistAvailabilityWorkspace({
               ))}
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {weeks.map((week, weekIndex) => (
                 <div
                   key={`week-${weekIndex}`}
-                  className="rounded-[1rem] border border-border/55 bg-card p-2.5 sm:grid sm:grid-cols-[5.4rem_repeat(7,minmax(0,1fr))] sm:gap-1.5"
+                  className="rounded-[1rem] border border-border/55 bg-card p-2 sm:grid sm:grid-cols-[5.4rem_repeat(7,minmax(0,1fr))] sm:gap-1.5"
                 >
                   <div className="mb-3 flex items-end justify-between sm:mb-0 sm:block sm:pr-2">
                     <div>
@@ -716,8 +751,7 @@ export function TherapistAvailabilityWorkspace({
                   <div className="grid grid-cols-7 gap-1.5 sm:col-span-7 sm:contents">
                     {week.map((date) => {
                       const displayState = getDisplayState(date, draftStatusByDate, baselineByDate)
-                      const showStatusLabel =
-                        displayState === 'can_work' || displayState === 'cannot_work'
+                      const statusLabel = getCalendarDayPillLabel(displayState)
                       const dayIndex = cycleDays.indexOf(date)
                       const monthRibbon = monthRibbonLabel(
                         date,
@@ -747,7 +781,6 @@ export function TherapistAvailabilityWorkspace({
                           aria-label={dayLabel}
                           aria-pressed={selectedDate === date}
                           title={dayLabel}
-                          disabled={availabilityLocked}
                           onClick={() => {
                             setSelectedDate(date)
                             setRangeStart('')
@@ -755,7 +788,7 @@ export function TherapistAvailabilityWorkspace({
                             requestAnimationFrame(() => noteTextareaRef.current?.focus())
                           }}
                           className={cn(
-                            'flex min-h-[4.25rem] flex-col items-start justify-between rounded-[0.85rem] border px-1.5 py-1.5 text-left transition-all duration-150 hover:-translate-y-px hover:shadow-tw-day-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-[4.95rem] sm:px-2.5',
+                            'flex min-h-[3.9rem] flex-col items-start justify-between rounded-[0.85rem] border px-1.5 py-1.5 text-left transition-all duration-150 hover:-translate-y-px hover:shadow-tw-day-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-[4.4rem] sm:px-2',
                             displayState === 'can_work'
                               ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)] hover:border-[var(--success-text)]'
                               : displayState === 'cannot_work'
@@ -782,22 +815,26 @@ export function TherapistAvailabilityWorkspace({
                               {dayNum}
                             </span>
                           </div>
-                          {showStatusLabel ? (
+                          {statusLabel ? (
                             <span
                               className={cn(
-                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.58rem] font-semibold tracking-[0.04em]',
+                                'inline-flex max-w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-[0.56rem] font-semibold',
+                                displayState === 'normal_work' &&
+                                  'bg-[color:color-mix(in_srgb,var(--success-subtle)_30%,white)] text-[var(--success-text)]',
+                                displayState === 'normal_off' &&
+                                  'bg-[color:color-mix(in_srgb,var(--muted)_45%,white)] text-muted-foreground',
                                 displayState === 'can_work' &&
                                   'bg-[color:color-mix(in_srgb,var(--success-subtle)_80%,white)] text-[var(--success-text)]',
                                 displayState === 'cannot_work' &&
                                   'bg-[color:color-mix(in_srgb,var(--error-subtle)_80%,white)] text-[var(--error-text)]'
                               )}
                             >
-                              {displayState === 'can_work' ? (
+                              {displayState === 'can_work' || displayState === 'normal_work' ? (
                                 <Check className="h-3 w-3" aria-hidden />
                               ) : (
                                 <X className="h-3 w-3" aria-hidden />
                               )}
-                              {getDisplayStateLabel(displayState)}
+                              <span className="truncate">{statusLabel}</span>
                             </span>
                           ) : null}
                         </button>
@@ -807,67 +844,67 @@ export function TherapistAvailabilityWorkspace({
                 </div>
               ))}
             </div>
+          </div>
 
-            <div className="flex flex-col gap-3 rounded-[1rem] border border-border/55 bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">
-                  Save progress keeps this as a draft.
+          <aside className="flex flex-col gap-3 xl:self-start">
+            {!availabilityLocked ? (
+              <section className="order-1 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm xl:sticky xl:top-4">
+                <h3 className="text-[0.95rem] font-semibold text-foreground">Actions</h3>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {submissionUi.isSubmitted
+                    ? 'Save changes updates your submitted response for this Schedule Block.'
+                    : 'Save progress keeps a draft. Submit availability sends this Schedule Block to managers.'}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Submit availability sends this Schedule Block to managers.
-                </p>
-              </div>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
-                {!submissionUi.isSubmitted ? (
-                  <>
-                    <FormSubmitButton
-                      type="submit"
-                      name="workflow"
-                      value="draft"
-                      variant="ghost"
-                      size="sm"
-                      disabled={availabilityLocked}
-                      pendingText="Saving..."
-                      className="min-h-10 rounded-xl px-4 font-semibold text-muted-foreground hover:text-foreground sm:min-w-[9rem]"
-                    >
-                      Save progress
-                    </FormSubmitButton>
+                <div className="mt-3 flex flex-col gap-2">
+                  {!submissionUi.isSubmitted ? (
+                    <>
+                      <FormSubmitButton
+                        type="submit"
+                        name="workflow"
+                        value="draft"
+                        variant="ghost"
+                        size="sm"
+                        pendingText="Saving..."
+                        className="min-h-10 rounded-xl px-4 font-semibold text-muted-foreground hover:text-foreground"
+                      >
+                        Save progress
+                      </FormSubmitButton>
+                      <FormSubmitButton
+                        type="submit"
+                        name="workflow"
+                        value="submit"
+                        size="sm"
+                        pendingText="Submitting..."
+                        className="min-h-11 gap-2 rounded-xl px-5 font-semibold shadow-sm"
+                      >
+                        <Send className="h-3.5 w-3.5" aria-hidden />
+                        Submit availability
+                      </FormSubmitButton>
+                    </>
+                  ) : (
                     <FormSubmitButton
                       type="submit"
                       name="workflow"
                       value="submit"
                       size="sm"
-                      disabled={availabilityLocked}
-                      pendingText="Submitting..."
-                      className="min-h-11 gap-2 rounded-xl px-5 font-semibold shadow-sm sm:min-w-[11.5rem]"
+                      pendingText="Saving changes..."
+                      className="min-h-11 gap-2 rounded-xl px-5 font-semibold shadow-sm"
                     >
                       <Send className="h-3.5 w-3.5" aria-hidden />
-                      Submit availability
+                      Save changes
                     </FormSubmitButton>
-                  </>
-                ) : (
-                  <FormSubmitButton
-                    type="submit"
-                    name="workflow"
-                    value="submit"
-                    size="sm"
-                    disabled={availabilityLocked}
-                    pendingText="Saving changes..."
-                    className="min-h-11 gap-2 rounded-xl px-5 font-semibold shadow-sm"
-                  >
-                    <Send className="h-3.5 w-3.5" aria-hidden />
-                    Save changes
-                  </FormSubmitButton>
-                )}
-              </div>
-            </div>
-          </div>
+                  )}
+                </div>
+              </section>
+            ) : null}
 
-          <aside className="flex flex-col gap-3 xl:self-start">
-            <section className="order-2 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm xl:order-1">
-              <h3 className="text-[0.95rem] font-semibold text-foreground">
-                Review before submitting
-              </h3>
+            <section
+              className={cn(
+                'rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm',
+                availabilityLocked ? 'order-1' : 'order-3'
+              )}
+            >
+              <h3 className="text-[0.95rem] font-semibold text-foreground">{reviewHeading}</h3>
               <dl className="mt-3 space-y-3 text-sm">
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -902,12 +939,17 @@ export function TherapistAvailabilityWorkspace({
               </dl>
               {!hasCycleSpecificChanges ? (
                 <p className="mt-3 rounded-xl border border-border/60 bg-background px-3 py-2 text-xs text-muted-foreground">
-                  No exceptions selected for this Schedule Block.
+                  {reviewEmptyCopy}
                 </p>
               ) : null}
             </section>
 
-            <section className="order-3 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm xl:order-2">
+            <section
+              className={cn(
+                'rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm',
+                availabilityLocked ? 'order-3' : 'order-4'
+              )}
+            >
               <h3 className="text-[0.95rem] font-semibold text-foreground">
                 Current starting point
               </h3>
@@ -928,7 +970,7 @@ export function TherapistAvailabilityWorkspace({
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="inline-flex items-center gap-3 text-muted-foreground">
-                    <span className="h-6 w-0.5 rounded-full bg-[var(--error-text)]" />
+                    <span className="h-6 w-0.5 rounded-full bg-border" />
                     Normally off
                   </span>
                   <span className="font-semibold tabular-nums text-foreground">
@@ -978,28 +1020,44 @@ export function TherapistAvailabilityWorkspace({
                 <h3 className="text-[0.95rem] font-semibold text-foreground">Legend</h3>
                 <Info className="h-4 w-4 text-muted-foreground" aria-hidden />
               </div>
-              <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[var(--success-text)]" />
-                  <span>Need to Work</span>
+              <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+                <div className="space-y-1.5">
+                  <p className="text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Normal schedule
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[var(--success-text)]" />
+                    <span>Working</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-border" />
+                    <span>Off</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[var(--error-text)]" />
-                  <span>Need Off</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-border" />
-                  <span>Unmarked</span>
+                <div className="space-y-1.5">
+                  <p className="text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Your changes
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[var(--success-text)]" />
+                    <span>Need to Work</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[var(--error-text)]" />
+                    <span>Need Off</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-border" />
+                    <span>Unmarked</span>
+                  </div>
                 </div>
               </div>
             </section>
 
-            <section className="order-1 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm xl:order-3">
+            <section className="order-2 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm">
               <h3 className="text-[0.95rem] font-semibold text-foreground">Selected day</h3>
               {!selectedDate ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Click a day to review it and make a change.
-                </p>
+                <p className="mt-2 text-sm text-muted-foreground">{selectedDayEmptyCopy}</p>
               ) : (
                 <div className="mt-3 space-y-4">
                   <div>
@@ -1008,82 +1066,93 @@ export function TherapistAvailabilityWorkspace({
                     </p>
                   </div>
 
-                  <div className="overflow-hidden rounded-xl border border-border/70 bg-background">
-                    <button
-                      type="button"
-                      onClick={() => setOverride(selectedDate, 'force_on')}
-                      disabled={availabilityLocked}
-                      className={selectedDayOptionClass(selectedOverride === 'force_on', 'can')}
-                    >
-                      <span className="flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]">
-                        {selectedOverride === 'force_on' ? (
-                          <Check className="h-3 w-3" aria-hidden />
-                        ) : null}
-                      </span>
-                      <span className="text-sm font-medium text-foreground">Need to Work</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setOverride(selectedDate, 'force_off')}
-                      disabled={availabilityLocked}
-                      className={cn(
-                        selectedDayOptionClass(selectedOverride === 'force_off', 'cant'),
-                        'border-t border-border/70'
-                      )}
-                    >
-                      <span className="flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full border border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]">
-                        {selectedOverride === 'force_off' ? (
-                          <X className="h-3 w-3" aria-hidden />
-                        ) : null}
-                      </span>
-                      <span className="text-sm font-medium text-foreground">Need Off</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setOverride(selectedDate, null)}
-                      disabled={availabilityLocked}
-                      className={cn(
-                        selectedDayOptionClass(selectedOverride === null, 'neutral'),
-                        'border-t border-border/70'
-                      )}
-                    >
-                      <span className="flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full border border-border/70 bg-background">
-                        {selectedOverride === null ? (
-                          <span className="h-2 w-2 rounded-full bg-primary" />
-                        ) : null}
-                      </span>
-                      <span className="text-sm font-medium text-foreground">Unmarked</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor={`therapist-day-note-${selectedDate}`} className="text-sm">
-                        Add a note (optional)
-                      </Label>
-                      <span className="text-xs text-muted-foreground">
-                        {selectedNote.length} / 200
-                      </span>
-                    </div>
-                    {/* Persisted notes only exist for days you change for this Schedule Block. */}
-                    <textarea
-                      id={`therapist-day-note-${selectedDate}`}
-                      ref={noteTextareaRef}
-                      value={selectedNote}
-                      maxLength={200}
-                      onChange={(event) => updateSelectedDateNote(event.target.value)}
-                      placeholder="Add a note for this day..."
-                      disabled={!selectedOverride || availabilityLocked}
-                      className="min-h-[86px] w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                    />
-                    {!selectedOverride ? (
-                      <p className="text-xs text-muted-foreground">
-                        Notes are only saved for days you change for this Schedule Block.
+                  {availabilityLocked ? (
+                    <div className="rounded-xl border border-border/70 bg-background px-3 py-2 text-sm">
+                      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                        Schedule status
                       </p>
-                    ) : null}
-                  </div>
+                      <p className="mt-1 font-medium text-foreground">{selectedDayReviewStatus}</p>
+                      {selectedNote ? (
+                        <p className="mt-2 text-xs text-muted-foreground">{selectedNote}</p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="overflow-hidden rounded-xl border border-border/70 bg-background">
+                        <button
+                          type="button"
+                          onClick={() => setOverride(selectedDate, 'force_on')}
+                          className={selectedDayOptionClass(selectedOverride === 'force_on', 'can')}
+                        >
+                          <span className="flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]">
+                            {selectedOverride === 'force_on' ? (
+                              <Check className="h-3 w-3" aria-hidden />
+                            ) : null}
+                          </span>
+                          <span className="text-sm font-medium text-foreground">Need to Work</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setOverride(selectedDate, 'force_off')}
+                          className={cn(
+                            selectedDayOptionClass(selectedOverride === 'force_off', 'cant'),
+                            'border-t border-border/70'
+                          )}
+                        >
+                          <span className="flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full border border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]">
+                            {selectedOverride === 'force_off' ? (
+                              <X className="h-3 w-3" aria-hidden />
+                            ) : null}
+                          </span>
+                          <span className="text-sm font-medium text-foreground">Need Off</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setOverride(selectedDate, null)}
+                          className={cn(
+                            selectedDayOptionClass(selectedOverride === null, 'neutral'),
+                            'border-t border-border/70'
+                          )}
+                        >
+                          <span className="flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full border border-border/70 bg-background">
+                            {selectedOverride === null ? (
+                              <span className="h-2 w-2 rounded-full bg-primary" />
+                            ) : null}
+                          </span>
+                          <span className="text-sm font-medium text-foreground">Unmarked</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor={`therapist-day-note-${selectedDate}`} className="text-sm">
+                            Add a note (optional)
+                          </Label>
+                          <span className="text-xs text-muted-foreground">
+                            {selectedNote.length} / 200
+                          </span>
+                        </div>
+                        {/* Persisted notes only exist for days you change for this Schedule Block. */}
+                        <textarea
+                          id={`therapist-day-note-${selectedDate}`}
+                          ref={noteTextareaRef}
+                          value={selectedNote}
+                          maxLength={200}
+                          onChange={(event) => updateSelectedDateNote(event.target.value)}
+                          placeholder="Add a note for this day..."
+                          disabled={!selectedOverride}
+                          className="min-h-[86px] w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                        />
+                        {!selectedOverride ? (
+                          <p className="text-xs text-muted-foreground">
+                            Notes are only saved for days you change for this Schedule Block.
+                          </p>
+                        ) : null}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </section>
