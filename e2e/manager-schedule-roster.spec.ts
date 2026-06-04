@@ -476,6 +476,11 @@ test.describe.serial('unified schedule grid route', () => {
     })
     await gotoWithRetry(page, `/schedule?cycle=${smoke.draftCycle.id}&shift=day`)
     await expect(requestedOffCell).toHaveText('1*', { timeout: 30_000 })
+    await expect(page.getByText('Select actionable cells to edit draft coverage.')).toBeVisible()
+    await expect(page.getByText('On call', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Cancelled', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Call in', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Left early', { exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Assign anyway' })).toHaveCount(0, {
       timeout: 30_000,
     })

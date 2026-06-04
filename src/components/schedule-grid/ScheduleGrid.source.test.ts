@@ -99,7 +99,8 @@ describe('ScheduleGrid source invariants', () => {
 
     expect(code).toContain('function getScheduleInteractionHint')
     expect(code).toContain("case 'manager_edit'")
-    expect(code).toContain('Select actionable cells to edit coverage or update shift status.')
+    expect(code).toContain('Select actionable cells to edit coverage or update live shift status.')
+    expect(code).toContain('Select actionable cells to edit draft coverage.')
     expect(code).toContain("case 'lead_status'")
     expect(code).toContain(
       'Select assigned published shifts to update live status. Off cells are read-only.'
@@ -114,8 +115,12 @@ describe('ScheduleGrid source invariants', () => {
     const code = source()
 
     expect(code).toContain('const interactionHint = getScheduleInteractionHint(interactionMode)')
+    expect(code).toContain(
+      'const visibleLegendItems = getVisibleScheduleLegendItems(interactionMode)'
+    )
     expect(code).toContain('aria-label="Schedule legend"')
     expect(code).toContain('{interactionHint}')
+    expect(code).toContain('visibleLegendItems.map')
     expect(code).toContain('border-l border-border/60')
   })
 

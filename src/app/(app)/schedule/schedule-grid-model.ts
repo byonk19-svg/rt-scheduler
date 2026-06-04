@@ -80,7 +80,7 @@ export function resolveScheduleInteractionMode({
       canAssignShifts: true,
       canUnassignShifts: true,
       canDesignateLead: true,
-      canUpdateAssignmentStatus: true,
+      canUpdateAssignmentStatus: canUpdateAssignmentStatus && isPublished,
     }
   }
 

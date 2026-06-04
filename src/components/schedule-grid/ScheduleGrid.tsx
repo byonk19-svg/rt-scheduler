@@ -158,7 +158,9 @@ const MAX_VISIBLE_PREFLIGHT_ISSUES = 6
 function getScheduleInteractionHint(interactionMode: ScheduleInteractionMode): string {
   switch (interactionMode.kind) {
     case 'manager_edit':
-      return 'Select actionable cells to edit coverage or update shift status.'
+      return interactionMode.canUpdateAssignmentStatus
+        ? 'Select actionable cells to edit coverage or update live shift status.'
+        : 'Select actionable cells to edit draft coverage.'
     case 'lead_status':
       return 'Select assigned published shifts to update live status. Off cells are read-only.'
     case 'combined_readonly':
@@ -166,6 +168,18 @@ function getScheduleInteractionHint(interactionMode: ScheduleInteractionMode): s
     case 'staff_view':
       return 'Read-only team schedule. Your row is highlighted for quick reference.'
   }
+}
+
+function getVisibleScheduleLegendItems(interactionMode: ScheduleInteractionMode) {
+  if (interactionMode.canUpdateAssignmentStatus) return SCHEDULE_LEGEND_ITEMS
+
+  return SCHEDULE_LEGEND_ITEMS.filter(
+    (item) =>
+      item.label !== 'On call' &&
+      item.label !== 'Cancelled' &&
+      item.label !== 'Call in' &&
+      item.label !== 'Left early'
+  )
 }
 
 function getReadinessSeverityClass(
@@ -436,6 +450,7 @@ export function ScheduleGrid({
   const sheetTitle = loadedShiftTab === 'Night' ? 'Night shift schedule' : 'Day shift schedule'
   const sheetDayCount = `${initialDataset.cycleDates.length} days`
   const interactionHint = getScheduleInteractionHint(interactionMode)
+  const visibleLegendItems = getVisibleScheduleLegendItems(interactionMode)
   const visiblePreFlightIssues =
     preFlightSummary?.readinessIssues.slice(0, MAX_VISIBLE_PREFLIGHT_ISSUES) ?? []
   const hiddenPreFlightIssueCount =
@@ -606,7 +621,7 @@ export function ScheduleGrid({
             className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/55 bg-[color-mix(in_srgb,var(--print-paper)_94%,var(--muted))] px-5 py-1.5 text-[9px] text-[var(--print-ink-muted)]"
           >
             <span className="font-black uppercase tracking-[0.1em]">Legend</span>
-            {SCHEDULE_LEGEND_ITEMS.map((item) => (
+            {visibleLegendItems.map((item) => (
               <span key={item.label} className="inline-flex items-center gap-1.5">
                 <span
                   className={cn(

@@ -126,4 +126,21 @@ describe('StatusCellPopover', () => {
     expect(html).not.toContain('Unassign')
     expect(html).not.toContain('Designate as lead')
   })
+
+  it('keeps draft structural controls separate from live status options', () => {
+    const html = renderPopover({
+      allowStatusChange: false,
+      canUnassign: true,
+      canDesignateLead: true,
+    })
+
+    expect(html).not.toContain('On call')
+    expect(html).not.toContain('Cancelled')
+    expect(html).not.toContain('Call-in')
+    expect(html).not.toContain('Left early')
+    expect(html).not.toContain('Choose a status')
+    expect(html).toContain('Lead eligible')
+    expect(html).toContain('Designate as lead')
+    expect(html).toContain('Unassign')
+  })
 })
