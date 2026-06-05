@@ -394,11 +394,11 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
           }
           primaryNav={
             <>
-              <p className="truncate text-center text-sm font-bold text-sidebar-primary md:hidden">
+              <p className="truncate text-center text-sm font-bold text-sidebar-primary xl:hidden">
                 {mobileTitle}
               </p>
               <nav
-                className="ml-2 hidden items-center gap-0.5 overflow-x-auto md:flex"
+                className="no-scrollbar ml-2 hidden items-center gap-0.5 overflow-x-auto overscroll-x-contain xl:flex"
                 aria-label="Main navigation"
               >
                 {primaryItems.map((item) => (
@@ -406,7 +406,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      'relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2.5 text-sm font-medium transition-colors duration-150 lg:px-4 lg:text-base',
+                      'relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors duration-150 lg:px-3',
                       item.current
                         ? 'bg-sidebar-accent/70 text-sidebar-primary shadow-tw-2xs after:absolute after:bottom-[-10px] after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-[var(--attention)]'
                         : 'text-sidebar-foreground hover:text-sidebar-accent-foreground'
@@ -449,7 +449,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
           }
         />
 
-        <div className="min-h-screen pb-20 pt-16 md:pb-0">
+        <div className="min-h-screen pb-20 pt-16 xl:pb-0">
           {workflowContext && !hideWorkflowContext ? (
             <WorkflowContextStrip context={workflowContext} />
           ) : null}
@@ -481,7 +481,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
         </div>
 
         <nav
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-sidebar-border/80 bg-sidebar/95 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 text-sidebar-foreground shadow-[0_-8px_24px_rgba(0,0,0,0.16)] backdrop-blur md:hidden"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-sidebar-border/80 bg-sidebar/95 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 text-sidebar-foreground shadow-[0_-8px_24px_rgba(0,0,0,0.16)] backdrop-blur xl:hidden"
           aria-label="Mobile primary navigation"
         >
           <div className="mx-auto grid max-w-md grid-cols-5 items-center gap-1">
@@ -534,7 +534,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
         <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <DialogContent
             showCloseButton={false}
-            className="app-shell-chrome-primary left-0 top-0 z-40 flex h-dvh max-h-dvh w-[85vw] max-w-[20rem] translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 border-r border-sidebar-border p-0 text-sidebar-foreground shadow-tw-app-chrome-sub md:hidden sm:max-w-none"
+            className="app-shell-chrome-primary left-0 top-0 z-40 flex h-dvh max-h-dvh w-[85vw] max-w-[20rem] translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 border-r border-sidebar-border p-0 text-sidebar-foreground shadow-tw-app-chrome-sub xl:hidden sm:max-w-none"
           >
             <DialogHeader className="sr-only">
               <DialogTitle>Navigation menu</DialogTitle>

@@ -457,6 +457,15 @@ html {
     0 1px 2px color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .shadow-tw-double-panel {
   box-shadow:
     0 1px 3px color-mix(in srgb, var(--foreground) 8%, transparent),
