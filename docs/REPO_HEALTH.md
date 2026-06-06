@@ -1,57 +1,66 @@
-# Repository Health Snapshot (May 20, 2026)
+# Repository Health Snapshot
+
+Date: June 6, 2026
+Branch: `main`
+Commit: `a3c0407214cba2fd1934b02b2eb6d1545b724aad`
+
+This file is a point-in-time snapshot for future maintainers and Codex runs. It is not a guarantee that every workflow is production-ready.
 
 ## Current Shape
 
-- Single-package Next.js App Router app with TypeScript.
-- Supabase-backed auth/data model with manager, lead, therapist, and pending-access flows.
-- Core manager surfaces: unified Schedule grid, availability, team, approvals, publish, shift board.
-- Core therapist surfaces: read-only shared schedule on `/schedule`, therapist availability grid, swaps.
+RT Scheduler is a single-package Next.js App Router app written in TypeScript. Supabase backs authentication, database access, RLS-sensitive server reads and writes, and seeded test workflows.
 
-## Architecture Highlights
+The core scheduling surface is `/schedule`. It serves the live shared schedule grid for managers, leads, therapists, and staff-facing schedule views. Manager workflows also include availability collection, team management, approvals, publish history, shift board, and schedule planning.
+
+Recent stabilization work on `main` includes:
+
+- CI now runs `npm audit --omit=dev`.
+- CI now has a separate `Unit Tests` job that runs `npm run test:unit`.
+- CI E2E now waits for quality, unit, and security regression jobs.
+- A small cleanup removed an unreachable published-schedule filter branch.
+- A small cleanup removed an unused auth context field without changing permission behavior.
+
+## Architecture Notes
 
 - Planning data in `shifts` is intentionally separate from live operational state in `shift_operational_entries`.
-- Scheduling mutation APIs enforce both role checks and trusted-request origin checks.
-- Schedule mutations live under `src/app/api/schedule/*` with shared legacy coverage-domain logic in `src/lib/coverage/*`.
+- Schedule mutation APIs are business-critical and should preserve role checks, site scope, trusted-request checks, lifecycle state, notifications, and audit behavior.
+- `src/app/api/schedule/drag-drop/route.ts` is high-risk because it changes schedule assignments and audit-sensitive state.
+- `src/components/schedule-grid/ScheduleGrid.tsx` is complex; prefer small, tested extractions instead of broad rewrites.
 - Therapist availability submission state is explicit in `therapist_availability_submissions`, not inferred from override rows alone.
-- Publish history (`/publish`) remains distinct from schedule-cycle state.
-- Schedule post-publish audit logging is derived server-side from slot state instead of client request flags.
 
-## Quality Status
+## Current Verification
 
-Last verified on branch `codex/schedule-block-planning`:
+The following commands were run for this snapshot:
 
-- `npm audit --omit=dev` passed (`0` vulnerabilities)
-- `npm run format:check` passed
-- `npm run lint` passed
-- `npm run typecheck` passed
-- `npm run build` passed
-- `npm run test:e2e -- e2e/auth-redirect.spec.ts e2e/public-pages.spec.ts` passed (`9` tests)
-- `npm run test:e2e -- e2e/schedule-block-planning.spec.ts` passed (`1` seeded schedule smoke)
-- `npx playwright test e2e/requests-workflow.spec.ts --project=chromium --workers=1` passed (`6` tests, `1` seeded Teamwise case skipped)
-- `npx playwright test e2e/pickup-interest-concurrency.spec.ts --project=chromium --workers=1` passed (`3` seeded DB-backed pickup concurrency tests)
+- Passed: `npm run format:check`
+- Passed: `npm run lint`
+- Passed: `npm run typecheck`
+- Passed: `npm run test:unit` (`242` parallel test files / `1482` tests, plus `2` browser-backed test files / `5` tests)
+- Passed: `npm audit --omit=dev` (`0` vulnerabilities)
+- Passed: `npm run build`
 
-Dependency security refresh:
+Local Playwright E2E was not run for this docs-only update. Seeded E2E requires the appropriate Supabase/test environment.
 
-- `next`, `@next/env`, and `eslint-config-next` are on `16.2.6`.
-- `@sentry/nextjs` is on `10.53.1`.
-- `@supabase/supabase-js` is on `2.106.1`.
-- A targeted `fast-uri` `3.1.2` override resolves the remaining transitive production advisory.
+## Known Limitations / Risk Notes
 
-## Known Exceptions / Gaps
+- This is still demo-stage unless production deployment, secrets, Supabase project config, cron, webhooks, backups, and UAT are verified.
+- Schedule mutation logic remains business-critical and should be changed carefully.
+- Seeded E2E coverage depends on Supabase secrets and service-role access.
+- `docs/REPO_HEALTH.md` is a snapshot, not a guarantee.
+- Dependency audit results are time-sensitive. Rerun `npm audit --omit=dev` after lockfile or package changes.
 
-- `e2e/directory-date-override.spec.ts` remains intentionally removed because `/directory` is now a redirect to the team-management surface.
-- Unified Schedule grid has focused authenticated browser coverage in `e2e/manager-schedule-roster.spec.ts` for manager redirects, draft assign/unassign, lead designation, published status updates, and therapist read-only pinned rows.
-- Pickup interest primary/backup promotion now has DB-backed coverage in `e2e/pickup-interest-concurrency.spec.ts` for simultaneous interest submissions, selected claimant withdrawal, deterministic backup promotion, manager claimant denial, and clearing stale selected/pending state.
+## Demo Validation Flow
 
-## Risk Notes
+Use this sequence when preparing a local demo from a fresh checkout:
 
-- E2E tests depend on a live app server; seeded suites also depend on Supabase service-role env.
-- Playwright now starts through `scripts/playwright-web-server.mjs`, which cleans generated artifacts and refuses to reuse an already-running server unless `PLAYWRIGHT_REUSE_EXISTING_SERVER=1` is set.
-- Mutation trust boundaries depend on origin/referer checks; loopback alias handling (`localhost`, `127.0.0.1`, `[::1]`) should stay covered by tests.
-- If `src/app/api/schedule/drag-drop/route.ts` changes again, preserve the regression tests that prove clients cannot force or suppress post-publish audit logging.
+1. `npm install`
+2. `npm run format:check`
+3. `npm run lint`
+4. `npm run typecheck`
+5. `npm run test:unit`
+6. `npm audit --omit=dev`
+7. `npm run build`
+8. `npm run start:prod:local`
+9. Manually validate the app in a browser at `http://127.0.0.1:3001`.
 
-## Suggested Next Maintenance Steps
-
-1. Keep route ownership and workflow docs aligned as manager surfaces evolve.
-2. Preserve dependency hygiene on the Next.js patch line; rerun `npm audit --omit=dev` after lockfile updates.
-3. Run broader seeded E2E coverage before claiming full workflow coverage.
+Seeded or production-like validation needs the correct Supabase environment variables and test data. Do not treat a local demo pass as production approval.
