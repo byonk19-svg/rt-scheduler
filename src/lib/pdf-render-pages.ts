@@ -61,6 +61,24 @@ function cropZoneCanvas(source: Canvas, zone: (typeof FORM_ZONES)[number]): Canv
   return canvas
 }
 
+function rotateCanvas(source: Canvas, degrees: 90 | 180 | 270): Canvas {
+  const quarterTurn = degrees === 90 || degrees === 270
+  const canvas = createCanvas(
+    quarterTurn ? source.height : source.width,
+    quarterTurn ? source.width : source.height
+  )
+  const context = canvas.getContext('2d')
+
+  if (!context) {
+    throw new Error('Canvas context unavailable while rotating OCR page image.')
+  }
+
+  context.translate(canvas.width / 2, canvas.height / 2)
+  context.rotate((degrees * Math.PI) / 180)
+  context.drawImage(source, -source.width / 2, -source.height / 2)
+  return canvas
+}
+
 function applyContrastVariant(
   source: Canvas,
   options: {
@@ -151,6 +169,29 @@ export async function createOcrImageVariants(pageBuffer: Buffer): Promise<OcrIma
     contentType: 'image/png',
     base64: toPngBase64(fullPageGrayscale),
   })
+  for (const degrees of [90, 270] as const) {
+    const rotated = rotateCanvas(baseCanvas, degrees)
+    const rotatedGrayscale = applyContrastVariant(rotated, {
+      grayscale: true,
+      contrast: 1.45,
+      brightness: 1.05,
+    })
+
+    variants.push(
+      {
+        label: `rotated_${degrees}`,
+        zoneLabel: 'full_page',
+        contentType: 'image/png',
+        base64: toPngBase64(rotated),
+      },
+      {
+        label: `rotated_${degrees}_grayscale`,
+        zoneLabel: 'full_page',
+        contentType: 'image/png',
+        base64: toPngBase64(rotatedGrayscale),
+      }
+    )
+  }
   for (const zone of FORM_ZONES) {
     const zoneCanvas = cropZoneCanvas(baseCanvas, zone)
     const grayscale = applyContrastVariant(zoneCanvas, {
@@ -158,6 +199,17 @@ export async function createOcrImageVariants(pageBuffer: Buffer): Promise<OcrIma
       contrast: 1.65,
       brightness: 1.08,
     })
+    const rotatedZoneCanvas =
+      baseCanvas.width > baseCanvas.height
+        ? cropZoneCanvas(rotateCanvas(baseCanvas, 90), zone)
+        : null
+    const rotatedZoneGrayscale = rotatedZoneCanvas
+      ? applyContrastVariant(rotatedZoneCanvas, {
+          grayscale: true,
+          contrast: 1.65,
+          brightness: 1.08,
+        })
+      : null
 
     variants.push(
       {
@@ -173,6 +225,22 @@ export async function createOcrImageVariants(pageBuffer: Buffer): Promise<OcrIma
         base64: toPngBase64(grayscale),
       }
     )
+    if (rotatedZoneCanvas && rotatedZoneGrayscale) {
+      variants.push(
+        {
+          label: 'rotated_90',
+          zoneLabel: zone.label,
+          contentType: 'image/png',
+          base64: toPngBase64(rotatedZoneCanvas),
+        },
+        {
+          label: 'rotated_90_grayscale',
+          zoneLabel: zone.label,
+          contentType: 'image/png',
+          base64: toPngBase64(rotatedZoneGrayscale),
+        }
+      )
+    }
   }
 
   return variants
