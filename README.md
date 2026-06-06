@@ -24,6 +24,8 @@ Web app for respiratory therapy scheduling with role-based workflows:
 
 Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEALTH.md)
 
+Demo readiness checklist: [`docs/DEMO_CHECKLIST.md`](docs/DEMO_CHECKLIST.md)
+
 ## Cycle Workflow
 
 - [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is the live schedule grid for all roles. It uses [`schedule-grid-data.ts`](<./src/app/(app)/schedule/schedule-grid-data.ts>) to load cycles, shifts, force-off markers, operational status, pre-flight data, and role permissions.
