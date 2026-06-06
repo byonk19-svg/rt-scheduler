@@ -1,11 +1,12 @@
 import type { createClient } from '@/lib/supabase/server'
+import type { NotificationEventType } from '@/lib/notification-lifecycle'
 
 type NotificationTargetType = 'schedule_cycle' | 'shift' | 'shift_post' | 'system'
 type NotificationChannel = 'in_app' | 'email'
 
 type NotificationPayload = {
   userId: string
-  eventType: string
+  eventType: NotificationEventType
   title: string
   message: string
   targetType?: NotificationTargetType
@@ -73,7 +74,7 @@ export async function notifyUsers(
   supabase: ServerSupabaseClient,
   params: {
     userIds: string[]
-    eventType: string
+    eventType: NotificationEventType
     title: string
     message: string
     targetType?: NotificationTargetType

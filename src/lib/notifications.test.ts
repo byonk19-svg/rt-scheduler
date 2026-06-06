@@ -40,7 +40,7 @@ describe('notifyUsers', () => {
 
     await notifyUsers(client as never, {
       userIds: ['user-1', 'user-1', '', 'user-2', 'user-3'],
-      eventType: 'shift_post_updated',
+      eventType: 'shift_post_claimed',
       title: 'Request updated',
       message: 'A request changed.',
       targetType: 'shift_post',
@@ -50,7 +50,7 @@ describe('notifyUsers', () => {
     expect(insertMock).toHaveBeenCalledWith([
       {
         user_id: 'user-1',
-        event_type: 'shift_post_updated',
+        event_type: 'shift_post_claimed',
         title: 'Request updated',
         message: 'A request changed.',
         target_type: 'shift_post',
@@ -58,7 +58,7 @@ describe('notifyUsers', () => {
       },
       {
         user_id: 'user-3',
-        event_type: 'shift_post_updated',
+        event_type: 'shift_post_claimed',
         title: 'Request updated',
         message: 'A request changed.',
         target_type: 'shift_post',
@@ -74,7 +74,7 @@ describe('notifyUsers', () => {
 
     await notifyUsers(client as never, {
       userIds: ['user-1'],
-      eventType: 'shift_post_updated',
+      eventType: 'shift_post_claimed',
       title: 'Request updated',
       message: 'A request changed.',
     })

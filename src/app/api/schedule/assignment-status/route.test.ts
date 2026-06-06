@@ -328,7 +328,7 @@ describe('assignment status API', () => {
         date: '2026-02-23',
         shift_type: 'day',
         user_id: 'therapist-1',
-        published: false,
+        published: true,
       },
     })
     const admin = makeAdminClientMock({})
@@ -370,7 +370,17 @@ describe('assignment status API', () => {
         }),
       })
     )
-    expect(notifyPublishedShiftStatusChangedMock).not.toHaveBeenCalled()
+    expect(notifyPublishedShiftStatusChangedMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        cyclePublished: true,
+        userId: 'therapist-1',
+        date: '2026-02-23',
+        shiftType: 'day',
+        nextStatus: 'on_call',
+        targetId: 'shift-1',
+      })
+    )
   })
 
   it('denies staff from updating status', async () => {
@@ -505,7 +515,7 @@ describe('assignment status API', () => {
     expect(createAdminClientMock).not.toHaveBeenCalled()
   })
 
-  it('blocks operational statuses before the Schedule Block is published', async () => {
+  it('blocks all assignment status changes before the Schedule Block is published', async () => {
     const supabase = makeSupabaseMock({
       role: 'manager',
       userId: 'manager-1',
@@ -526,7 +536,7 @@ describe('assignment status API', () => {
         headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           assignmentId: 'shift-1',
-          status: 'call_in',
+          status: 'on_call',
         }),
       })
     )
@@ -853,7 +863,7 @@ describe('assignment status API', () => {
         date: '2026-02-23',
         shift_type: 'day',
         user_id: 'therapist-1',
-        published: false,
+        published: true,
       },
     })
     const admin = makeAdminClientMock({

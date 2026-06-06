@@ -25,6 +25,8 @@
     "cleanup:local": "node scripts/cleanup-local-artifacts.mjs",
     "sync:roster": "node --env-file=.env.local scripts/sync-team-roster.mjs",
     "verify:publish": "node --env-file=.env.local scripts/verify-publish-readiness.mjs",
+    "ocr:benchmark:current": "node --env-file=.env.local scripts/ocr-benchmark/run-current-ocr.mjs",
+    "ocr:benchmark:score": "node scripts/ocr-benchmark/score-results.mjs",
     "ci:local": "node scripts/local-ci-fallback.mjs",
     "ci:local:quick": "node scripts/local-ci-fallback.mjs --quick",
     "ci:local:e2e": "node scripts/local-ci-fallback.mjs --e2e",

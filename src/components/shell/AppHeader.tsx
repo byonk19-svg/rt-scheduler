@@ -31,7 +31,7 @@ export function AppHeader({
         <div className="shrink-0">{brand}</div>
         <div className="min-w-0 flex-1">{primaryNav}</div>
         <div className="ml-auto flex items-center gap-1">{utilityActions}</div>
-        <div className="md:hidden">{mobileToggle}</div>
+        <div className="xl:hidden">{mobileToggle}</div>
       </div>
     </header>
   )

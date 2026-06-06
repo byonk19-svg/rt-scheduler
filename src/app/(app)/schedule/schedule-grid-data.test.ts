@@ -1121,7 +1121,7 @@ describe('loadScheduleGridData visibility', () => {
 })
 
 describe('schedule grid model helpers', () => {
-  it('resolves manager mode with structural and status actions enabled', () => {
+  it('resolves manager mode with draft structural actions but live-only status actions', () => {
     expect(
       resolveScheduleInteractionMode({
         canManageCoverage: true,
@@ -1134,7 +1134,7 @@ describe('schedule grid model helpers', () => {
       canAssignShifts: true,
       canUnassignShifts: true,
       canDesignateLead: true,
-      canUpdateAssignmentStatus: true,
+      canUpdateAssignmentStatus: false,
     })
 
     expect(
@@ -1142,8 +1142,14 @@ describe('schedule grid model helpers', () => {
         canManageCoverage: true,
         canUpdateAssignmentStatus: true,
         isPublished: true,
-      }).kind
-    ).toBe('manager_edit')
+      })
+    ).toMatchObject({
+      kind: 'manager_edit',
+      canAssignShifts: true,
+      canUnassignShifts: true,
+      canDesignateLead: true,
+      canUpdateAssignmentStatus: true,
+    })
   })
 
   it('resolves lead status mode only for published schedules', () => {

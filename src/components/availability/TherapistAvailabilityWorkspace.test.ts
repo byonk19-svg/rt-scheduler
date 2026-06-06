@@ -78,8 +78,9 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Changes here stay in this Schedule Block only.')
     expect(html).toContain('Works Mon, Tue, Thu, Fri. Every other weekend starting May 2, 2026.')
     expect(html).toContain('Submit availability')
-    expect(html).toContain('Save progress keeps this as a draft.')
-    expect(html).toContain('Submit availability sends this Schedule Block to managers.')
+    expect(html).toContain(
+      'Save progress keeps a draft. Submit availability sends this Schedule Block to managers.'
+    )
     expect(html).toContain('id="therapist-availability-workspace"')
     expect(html).toContain('Not submitted')
     expect(html).toContain('Schedule Block:')
@@ -95,6 +96,8 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Mar 24 (Vacation)')
     expect(html).toContain('Need to Work')
     expect(html).toContain('Legend')
+    expect(html).toContain('Normal schedule')
+    expect(html).toContain('Your changes')
     expect(html).toContain('Selected day')
     expect(html).toContain('Starting point')
     expect(html).toContain('This Schedule Block changes')
@@ -102,6 +105,8 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Need Off')
     expect(html).toContain('Normally working')
     expect(html).toContain('Normally off')
+    expect(html).toContain('Working')
+    expect(html).toContain('Off')
     expect(html).toContain('Clear')
     expect(html).toContain('Unmarked')
     expect(html).not.toContain('Normal work')
@@ -209,7 +214,7 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).not.toContain('Request to Work')
   })
 
-  it('disables locked local draft controls that would create unsavable changes', () => {
+  it('renders closed Schedule Blocks as review mode instead of disabled edit mode', () => {
     const html = renderToStaticMarkup(
       createElement(TherapistAvailabilityWorkspace, {
         cycles: [
@@ -229,22 +234,51 @@ describe('TherapistAvailabilityWorkspace', () => {
         recurringPatternSummary: 'No normal schedule saved yet.',
         generatedBaselineByCycleId: { 'cycle-1': {} },
         submissionsByCycleId: {},
-        availabilityLocked: true,
-        availabilityLockedReason: 'manager_closed',
+        availabilityWindowByCycleId: {
+          'cycle-1': { locked: true, reason: 'manager_closed' },
+        },
         submitTherapistAvailabilityGridAction: async () => {},
       })
     )
 
+    expect(html).toContain('Review Availability')
     expect(html).toContain(
-      'Availability is locked, so Schedule Block availability changes are disabled.'
+      'This Schedule Block is read-only because the availability window is closed. Select a day below to review its schedule status.'
     )
-    expect(html).toMatch(/id="range-start"[\s\S]*?disabled=""/)
-    expect(html).toMatch(/id="range-end"[\s\S]*?disabled=""/)
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Use previous Schedule Block<\/button>/)
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Clear block changes<\/button>/)
-    expect(html).toContain('aria-describedby="locked-availability-draft-controls"')
+    expect(html).toContain('Click a day to review its schedule status.')
+    expect(html).toContain('Availability is closed for this Schedule Block.')
+    expect(html).toContain(
+      'Your normal schedule will be used because no exceptions were submitted.'
+    )
+    expect(html).toContain('Ask a manager to reopen availability if you need a late change.')
+    expect(html).toContain('Schedule Block Summary')
+    expect(html).toContain('Closed for this Schedule Block')
+    expect(html).toContain('Current starting point')
+    expect(html).toContain('Normal schedule')
+    expect(html).toContain('Your changes')
+    expect(html).not.toContain('Quick edit')
+    expect(html).not.toContain('Review before submitting')
+    expect(html).not.toContain('Select one day or several days, then choose a state.')
+    expect(html).not.toContain('Select a day to review')
+    expect(html).not.toContain('Select a day to make a change.')
+    expect(html).not.toContain('Click a day to review it and make a change.')
+    expect(html).not.toContain('Actions')
+    expect(html).not.toContain('Submit availability</button>')
+    expect(html).not.toContain('Save progress</button>')
+    expect(html).not.toContain('lucide-calendar-check')
+    expect(html).not.toContain('lucide-calendar-x-2')
+    expect(html).not.toContain('>Clear</button>')
+    expect(html).not.toContain('Edit several days')
+    expect(html).not.toContain('id="range-start"')
+    expect(html).not.toContain('Use previous Schedule Block')
+    expect(html).not.toContain('Clear block changes')
+    expect(html).not.toContain('locked-availability-draft-controls')
+    expect(html.match(/Availability is closed for this Schedule Block\./g) ?? []).toHaveLength(1)
     expect(html).toContain(
       'aria-label="Apr 24, 2026. Unmarked day. No baseline availability. Response not submitted. Read-only because availability is locked"'
+    )
+    expect(html).not.toMatch(
+      /aria-label="Apr 24, 2026[\s\S]*?Read-only because availability is locked"[^>]*disabled=""/
     )
   })
 
@@ -273,7 +307,7 @@ describe('TherapistAvailabilityWorkspace', () => {
     )
 
     expect(html).not.toContain(
-      'Availability is locked, so Schedule Block availability changes are disabled.'
+      'Availability is closed, so Schedule Block availability changes are disabled.'
     )
     expect(html).not.toMatch(/id="range-start"[\s\S]*?disabled=""/)
     expect(html).not.toMatch(/id="range-end"[\s\S]*?disabled=""/)
@@ -322,6 +356,48 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Submitted availability')
   })
 
+  it('uses summary language for closed submitted Schedule Blocks', () => {
+    const html = renderToStaticMarkup(
+      createElement(TherapistAvailabilityWorkspace, {
+        cycles: [
+          {
+            id: 'cycle-1',
+            label: 'May 2026',
+            start_date: '2026-05-03',
+            end_date: '2026-05-09',
+            published: false,
+          },
+        ],
+        availabilityRows: [],
+        conflicts: [],
+        initialCycleId: 'cycle-1',
+        todayKey: '2026-05-03',
+        hasSavedRecurringPattern: true,
+        recurringPatternSummary: 'Works Mon, Tue.',
+        generatedBaselineByCycleId: { 'cycle-1': {} },
+        submissionsByCycleId: {
+          'cycle-1': {
+            submittedAt: '2026-05-01T12:00:00.000Z',
+            lastEditedAt: '2026-05-01T12:00:00.000Z',
+          },
+        },
+        availabilityWindowByCycleId: {
+          'cycle-1': { locked: true, reason: 'deadline_passed' },
+        },
+        submitTherapistAvailabilityGridAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('Submitted')
+    expect(html).toContain('Review Availability')
+    expect(html).toContain('Schedule Block Summary')
+    expect(html).toContain('Closed for this Schedule Block')
+    expect(html).not.toContain('Review before submitting')
+    expect(html).not.toContain('Actions')
+    expect(html).not.toContain('Save changes')
+    expect(html).not.toContain('Submit availability</button>')
+  })
+
   it('keeps blank-start copy when onboarding only saved never-work blocks', () => {
     const html = renderToStaticMarkup(
       createElement(TherapistAvailabilityWorkspace, {
@@ -357,7 +433,7 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('No normal schedule saved yet.')
     expect(html).toContain('This Schedule Block starts blank.')
     expect(html).toContain('Add days you Need to Work or Need Off.')
-    expect(html).toContain('Set recurring pattern')
+    expect(html).toContain('Set normal schedule')
     expect(html).not.toContain('Edit recurring pattern')
     expect(html).not.toContain('We used your normal schedule to fill this cycle.')
     expect(html).not.toContain('We used your normal schedule to fill this Schedule Block.')
@@ -387,25 +463,39 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(src).toContain(
       'Submitted with no day-level changes. This Schedule Block is currently blank unless you add dates.'
     )
-    expect(src).toContain("displayState === 'can_work' || displayState === 'cannot_work'")
-    expect(src).toContain('{showStatusLabel ? (')
+    expect(src).toContain("return 'Working'")
+    expect(src).toContain("return 'Off'")
+    expect(src).toContain('{statusLabel ? (')
     expect(src).toContain('Notes are only saved for days you change for this Schedule Block.')
     expect(src).toContain('Review before submitting')
+    expect(src).toContain('Review Availability')
+    expect(src).toContain('Schedule Block Summary')
+    expect(src).toContain('Normal schedule')
+    expect(src).toContain('Your changes')
+    expect(src).toContain(
+      'This Schedule Block is read-only because the availability window is closed. Select a day below to review its schedule status.'
+    )
+    expect(src).toContain('submissionStatusLines')
+    expect(src).toContain('Your normal schedule will be used because no exceptions were submitted.')
+    expect(src).toContain('Ask a manager to reopen availability if you need a late change.')
+    expect(src).toContain('selectedDayReviewStatus')
     expect(src).toContain('formatReviewDateWithNote')
     expect(src).toContain('No exceptions selected for this Schedule Block.')
+    expect(src).toContain('No exceptions were submitted for this Schedule Block.')
     expect(src).toContain('Edit several days')
     expect(src).toContain('rounded-[0.95rem] border border-border/60 bg-background px-3.5 py-2.5')
     expect(src).toContain('xl:border-l xl:border-t-0')
     expect(src).toContain('xl:grid-cols-[minmax(0,1fr)_19rem]')
     expect(src).toContain('flex flex-col gap-3 xl:self-start')
     expect(src).toContain('order-1 rounded-[1.1rem]')
-    expect(src).toContain('xl:order-3')
+    expect(src).toContain('xl:sticky xl:top-4')
     expect(src).toContain('ring-primary/35')
     expect(src).toContain('value="draft"')
     expect(src).toContain('variant="ghost"')
     expect(src).toContain('value="submit"')
     expect(src).toContain('pendingText="Submitting..."')
     expect(src).toContain('Submit availability sends this Schedule Block to managers.')
+    expect(src).toContain('Availability is closed for this Schedule Block.')
     expect(src).toContain('todayKey: string')
     expect(src).not.toContain('const todayKey = toIsoDate(new Date())')
     expect(src).toContain('function dayOfMonthFromIsoDate(isoDate: string): number')
@@ -418,6 +508,8 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(src).toContain('COPY_PREVIOUS_AVAILABILITY_CONFIRMATION')
     expect(src).toContain('CLEAR_AVAILABILITY_CONFIRMATION')
     expect(src).toContain('disabled={availabilityLocked}')
-    expect(src).toContain('locked-availability-draft-controls')
+    expect(src).toContain('availabilityWindowByCycleId')
+    expect(src).toContain('Select a day to review')
+    expect(src).toContain('Click a day to review its schedule status.')
   })
 })

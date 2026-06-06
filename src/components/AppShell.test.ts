@@ -22,6 +22,10 @@ const localSectionNavSource = fs.readFileSync(
   path.join(process.cwd(), 'src/components/shell/LocalSectionNav.tsx'),
   'utf8'
 )
+const appHeaderSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/shell/AppHeader.tsx'),
+  'utf8'
+)
 
 describe('AppShell exported constants', () => {
   it('keeps legacy sidebar class export for test compatibility', () => {
@@ -205,9 +209,18 @@ describe('AppShell navigation structure', () => {
   })
 
   it('keeps expanded manager desktop navigation from wrapping on narrow desktop widths', () => {
-    expect(appShellSource).toContain('overflow-x-auto md:flex')
+    expect(appShellSource).toContain('overflow-x-auto overscroll-x-contain xl:flex')
+    expect(appShellSource).toContain('no-scrollbar')
     expect(appShellSource).toContain('whitespace-nowrap')
     expect(appShellSource).toContain('shrink-0')
+  })
+
+  it('uses mobile navigation through tablet widths instead of clipping desktop nav', () => {
+    expect(appShellSource).toContain('text-sidebar-primary xl:hidden')
+    expect(appShellSource).toContain('Mobile primary navigation')
+    expect(appShellSource).toContain('backdrop-blur xl:hidden')
+    expect(appShellSource).toContain('xl:pb-0')
+    expect(appHeaderSource).toContain('xl:hidden')
   })
 
   it('allows the shared local section nav to scroll horizontally on narrow screens', () => {

@@ -14,9 +14,9 @@ import {
 import { buildEmailIntakeAvailabilityUrl, getAuthenticatedUserWithRole } from './_actions/shared'
 
 export async function applyEmailAvailabilityImportAction(formData: FormData) {
-  const { supabase, user, role, permissionContext } = await getAuthenticatedUserWithRole()
+  const { supabase, user, role, siteId, permissionContext } = await getAuthenticatedUserWithRole()
 
-  if (!can(role, 'access_manager_ui', permissionContext)) {
+  if (!siteId || !can(role, 'access_manager_ui', permissionContext)) {
     redirect('/availability')
   }
 
@@ -30,6 +30,7 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
   const result = await applyAvailabilityEmailImport({
     supabase,
     userId: user.id,
+    managerSiteId: siteId,
     itemId,
     intakeId,
   })
@@ -47,9 +48,9 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
 }
 
 export async function updateEmailIntakeTherapistAction(formData: FormData) {
-  const { supabase, role, permissionContext } = await getAuthenticatedUserWithRole()
+  const { supabase, role, siteId, permissionContext } = await getAuthenticatedUserWithRole()
 
-  if (!can(role, 'access_manager_ui', permissionContext)) {
+  if (!siteId || !can(role, 'access_manager_ui', permissionContext)) {
     redirect('/availability')
   }
 
@@ -64,6 +65,7 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
 
   const result = await updateEmailIntakeTherapistMatch({
     supabase,
+    managerSiteId: siteId,
     itemId,
     intakeId,
     therapistId,

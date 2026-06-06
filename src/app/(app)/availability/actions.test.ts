@@ -64,6 +64,7 @@ type TestContext = {
   therapistIsActive?: boolean
   therapistArchivedAt?: string | null
   cycleSiteId?: string | null
+  cycleEndDate?: string
   therapistSubmissionExists?: boolean
   draftShiftCount?: number
   cyclePublished?: boolean
@@ -71,6 +72,7 @@ type TestContext = {
   cycleArchivedAt?: string | null
   availabilityClosedAt?: string | null
   availabilityReopenedAt?: string | null
+  availabilityDueAt?: string | null
   overrideRow?: Record<string, unknown> | null
 }
 
@@ -241,10 +243,11 @@ function createSupabaseMock(context: TestContext = {}) {
                 id: filters.get('id') ?? 'cycle-1',
                 label: 'Block 1',
                 start_date: '2026-03-22',
-                end_date: '2026-05-02',
+                end_date: context.cycleEndDate ?? '2099-05-02',
                 published: context.cyclePublished ?? false,
                 status: context.cycleStatus ?? 'draft',
                 archived_at: context.cycleArchivedAt ?? null,
+                availability_due_at: context.availabilityDueAt ?? '2099-01-01T23:59:59.000Z',
                 availability_closed_at: context.availabilityClosedAt ?? null,
                 availability_reopened_at: context.availabilityReopenedAt ?? null,
                 site_id: context.cycleSiteId ?? context.siteId ?? 'default',
@@ -1127,13 +1130,31 @@ describe('availability actions', () => {
     expect(supabase.state.updates).toHaveLength(0)
   })
 
+  it('blocks unsubmitted therapist grid saves after the availability deadline', async () => {
+    const supabase = createSupabaseMock({ userId: 'therapist-1', role: 'therapist' })
+    const admin = createSupabaseMock({ availabilityDueAt: '2000-01-01T00:00:00.000Z' })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(
+      submitTherapistAvailabilityGridAction(makeTherapistGridFormData())
+    ).rejects.toThrow('REDIRECT:/availability?error=submission_closed&cycle=cycle-1')
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(admin.state.inserts).toHaveLength(0)
+    expect(admin.state.updates).toHaveLength(0)
+  })
+
   it('updates last_edited_at when resubmitting an existing official submission', async () => {
     const supabase = createSupabaseMock({
       userId: 'therapist-1',
       role: 'therapist',
       therapistSubmissionExists: true,
     })
-    const admin = createSupabaseMock({ therapistSubmissionExists: true })
+    const admin = createSupabaseMock({
+      availabilityDueAt: '2000-01-01T00:00:00.000Z',
+      therapistSubmissionExists: true,
+    })
     createClientMock.mockResolvedValue(supabase)
     createAdminClientMock.mockReturnValue(admin)
 
@@ -1307,6 +1328,40 @@ describe('availability actions', () => {
     expect(supabase.state.upsertPayloads).toHaveLength(0)
   })
 
+  it('blocks inbound email requests matched to a Schedule Block outside the manager site', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+      cycleSiteId: 'site-b',
+    })
+    supabase.state.emailIntakeRow = {
+      id: 'intake-1',
+      matched_therapist_id: 'therapist-1',
+      matched_cycle_id: 'cycle-1',
+      parse_status: 'parsed',
+      parsed_requests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off',
+          shift_type: 'both',
+          note: null,
+          source_line: 'Off Mar 24',
+        },
+      ],
+    }
+    createClientMock.mockResolvedValue(supabase)
+    const formData = new FormData()
+    formData.set('intake_id', 'intake-1')
+
+    await expect(applyEmailAvailabilityImportAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=email_intake_apply_failed&tab=intake'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(supabase.state.updates).toHaveLength(0)
+  })
+
   it('updates the therapist and cycle match on an intake and marks it parsed when actionable', async () => {
     const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
     supabase.state.emailIntakeRow = {
@@ -1341,6 +1396,38 @@ describe('availability actions', () => {
         filters: { id: 'intake-1' },
       },
     ])
+  })
+
+  it('blocks intake therapist matches outside the manager site', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      siteId: 'site-a',
+      therapistSiteId: 'site-b',
+      cycleSiteId: 'site-a',
+    })
+    supabase.state.emailIntakeRow = {
+      matched_cycle_id: 'cycle-1',
+      parsed_requests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off',
+          shift_type: 'both',
+          source_line: 'Need off Mar 24',
+        },
+      ],
+    }
+    createClientMock.mockResolvedValue(supabase)
+    const formData = new FormData()
+    formData.set('intake_id', 'intake-1')
+    formData.set('therapist_id', 'therapist-1')
+    formData.set('cycle_id', 'cycle-1')
+
+    await expect(updateEmailIntakeTherapistAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=email_intake_match_failed&tab=intake'
+    )
+
+    expect(supabase.state.updates).toEqual([])
   })
 
   it('cycles an intake item request and saves the updated parsed requests', async () => {

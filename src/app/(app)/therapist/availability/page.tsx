@@ -13,7 +13,7 @@ import { TherapistAvailabilityWorkspace } from '@/components/availability/Therap
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { buildCycleAvailabilityBaseline } from '@/lib/availability-pattern-generator'
-import { loadAvailabilityWindowState } from '@/lib/availability-window'
+import { resolveAvailabilityWindowState } from '@/lib/availability-window'
 import { can } from '@/lib/auth/can'
 import { findScheduledConflicts } from '@/lib/availability-scheduled-conflict'
 import { toUiRole } from '@/lib/auth/roles'
@@ -22,6 +22,7 @@ import {
   normalizeWorkPattern,
   type WorkPattern,
 } from '@/lib/coverage/work-patterns'
+import { resolveTherapistAvailabilityWritePermission } from '@/lib/therapist-availability-submission'
 import { toIsoDate } from '@/lib/calendar-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
@@ -274,9 +275,16 @@ export default async function TherapistAvailabilityPage({
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''
-  const availabilityWindow = selectedCycleId
-    ? await loadAvailabilityWindowState(admin as never, selectedCycleId)
-    : { locked: true, reason: null }
+  const visibleCycleIds = cycles.map((cycle) => cycle.id)
+  const { data: cycleShiftRows } =
+    visibleCycleIds.length > 0
+      ? await admin.from('shifts').select('cycle_id').in('cycle_id', visibleCycleIds)
+      : { data: [] }
+  const cycleIdsWithDraftSchedules = new Set(
+    ((cycleShiftRows ?? []) as Array<{ cycle_id: string | null }>).flatMap((row) =>
+      row.cycle_id ? [row.cycle_id] : []
+    )
+  )
 
   const { data: submissionRowsData } =
     cycles.length > 0
@@ -298,6 +306,26 @@ export default async function TherapistAvailabilityPage({
       lastEditedAt: r.last_edited_at,
     }
   }
+
+  const availabilityWindowByCycleId = Object.fromEntries(
+    cycles.map((cycle) => {
+      const windowState = resolveAvailabilityWindowState({
+        cycle,
+        hasDraftSchedule: cycleIdsWithDraftSchedules.has(cycle.id),
+      })
+      if (windowState.locked) return [cycle.id, windowState]
+
+      const writePermission = resolveTherapistAvailabilityWritePermission(
+        cycle,
+        Boolean(submissionsByCycleId[cycle.id]),
+        today
+      )
+      return [
+        cycle.id,
+        writePermission.allowed ? windowState : { locked: true, reason: writePermission.reason },
+      ]
+    })
+  )
 
   const entriesQuery = supabase
     .from('availability_overrides')
@@ -354,6 +382,28 @@ export default async function TherapistAvailabilityPage({
   const selectedCycleRows = selectedCycleId
     ? availabilityRows.filter((row) => row.cycleId === selectedCycleId)
     : availabilityRows
+  const hasSelectedCycleSubmission = Boolean(
+    selectedCycleId && submissionsByCycleId[selectedCycleId]
+  )
+  const selectedCycleAvailabilityWindow = selectedCycleId
+    ? availabilityWindowByCycleId[selectedCycleId]
+    : null
+  const isSelectedCycleReadOnly = Boolean(selectedCycleAvailabilityWindow?.locked)
+  const entriesTitle = hasSelectedCycleSubmission
+    ? 'Submitted Availability'
+    : isSelectedCycleReadOnly
+      ? 'No Submitted Availability'
+      : 'Current Draft'
+  const entriesDescription = hasSelectedCycleSubmission
+    ? 'These are the exceptions managers will review for this Schedule Block.'
+    : isSelectedCycleReadOnly
+      ? 'No exceptions were submitted for this Schedule Block. Your normal schedule will be used.'
+      : 'These saved exceptions are still a draft until you submit availability.'
+  const entriesEmptyMessage = hasSelectedCycleSubmission
+    ? 'No exceptions selected for this Schedule Block.'
+    : isSelectedCycleReadOnly
+      ? 'Your normal schedule remains the starting point for this Schedule Block.'
+      : 'No exceptions selected for this Schedule Block. Your normal schedule will be used unless you mark Need Off or Need to Work.'
 
   const generatedBaselineByCycleId = Object.fromEntries(
     cycles.map((cycle) => [
@@ -380,8 +430,7 @@ export default async function TherapistAvailabilityPage({
         generatedBaselineByCycleId={generatedBaselineByCycleId}
         submissionsByCycleId={submissionsByCycleId}
         regularShiftType={regularShiftType}
-        availabilityLocked={availabilityWindow.locked}
-        availabilityLockedReason={availabilityWindow.reason}
+        availabilityWindowByCycleId={availabilityWindowByCycleId}
         submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
         returnToPath="/therapist/availability"
       />
@@ -392,9 +441,9 @@ export default async function TherapistAvailabilityPage({
         deleteAvailabilityEntryAction={deleteAvailabilityEntryAction}
         initialFilters={initialFilters}
         returnToPath="/therapist/availability"
-        titleOverride="Submitted Availability"
-        descriptionOverride="Once you submit, your availability will appear here."
-        emptyMessageOverride="No day-level entries yet for this Schedule Block."
+        titleOverride={entriesTitle}
+        descriptionOverride={entriesDescription}
+        emptyMessageOverride={entriesEmptyMessage}
       />
     </div>
   )

@@ -100,53 +100,57 @@ All elevation uses **named classes** in `src/app/globals.css` (search for `Eleva
 - If nothing fits, add a **new utility** next to the others in `globals.css` and document it in the table below — do not use ad-hoc `shadow-[0_…rgba(…)]` in JSX.
 - **Print:** on the availability print surface, `shadow-tw-md` and `shadow-tw-md-strong` are stripped (see `@media print` in `globals.css`).
 
-| Class                        | Basis                            | When to use                                                                         |
-| ---------------------------- | -------------------------------- | ----------------------------------------------------------------------------------- |
-| `shadow-tw-2xs`              | Foreground hairline (~2%)        | Default “paper edge” on dense cells (e.g. coverage day panel).                      |
-| `shadow-tw-2xs-soft`         | Foreground hairline (~3%)        | Softer bottom edge on large bordered shells (e.g. therapist workspace container).   |
-| `shadow-tw-xs`               | Foreground hairline (~4%)        | Slightly stronger section divider shadow (e.g. availability request strip).         |
-| `shadow-tw-sm`               | Foreground ~5%, small blur       | **Default card** elevation — `Card`, list rows, publish tables, preliminary blocks. |
-| `shadow-tw-md`               | Foreground ~6%                   | Cards that need a bit more separation (badges, nested cards).                       |
-| `shadow-tw-md-soft`          | Foreground ~5%                   | **Metrics / stats** — `StatsCard`, schedule progress card shell.                    |
-| `shadow-tw-md-strong`        | Foreground ~8%                   | **Workspace shells** — availability split, manager scheduling panel.                |
-| `shadow-tw-float`            | Foreground ~6%, wider spread     | **Section shells** — shift board header area, notifications list container.         |
-| `shadow-tw-float-lg`         | Foreground ~7%, larger spread    | **Hero / summary sections** — staff dashboard featured block.                       |
-| `shadow-tw-float-tight`      | Foreground ~5%, 8px spread       | **Tiled cards** — inbox sidebar cards, manager triage secondary `Card`s.            |
-| `shadow-tw-pill`             | Foreground ~6%, tight            | **Pills / chips** with numeric content (e.g. coverage headcount badge).             |
-| `shadow-tw-inbox-hero`       | Large soft lift                  | **Single hero band** — manager inbox top banner.                                    |
-| `shadow-tw-metric`           | Large soft lift                  | **Clickable metric tiles** — inbox KPI link cards.                                  |
-| `shadow-tw-panel`            | Large panel depth                | **Primary analytics panel** — schedule progress outer container.                    |
-| `shadow-tw-panel-inner`      | Medium depth                     | **Nested panel** inside a panel — schedule progress inner summary.                  |
-| `shadow-tw-panel-inner-soft` | Softer medium                    | **Nested callout** — auto-draft dialog inner rule card.                             |
-| `shadow-tw-modal`            | Deep modal                       | **Standard dialogs** — cycle management, clear draft confirm.                       |
-| `shadow-tw-modal-lg`         | Deeper modal                     | **Large / full-bleed dialogs** — auto-draft confirm shell.                          |
-| `shadow-tw-popover`          | Floating near-modal              | **Popovers / floating panels** — assignment status popover.                         |
-| `shadow-tw-hero-media`       | Wide marketing lift              | **Marketing imagery** — homepage app preview frame.                                 |
-| `shadow-tw-header`           | Double layer (tight + wide)      | **Deprecated page header** chrome — `PageHeader` legacy shell.                      |
-| `shadow-tw-double-panel`     | Double layer (stacked)           | **Stacked elevation** — request composer panel on tinted surface.                   |
-| `shadow-tw-day-hover`        | Lift on hover                    | **Coverage calendar** — day cell hover (non-warning).                               |
-| `shadow-tw-day-warning`      | Hairline + `warning-border` ring | **Coverage** — constraint / warning day tone.                                       |
-| `shadow-tw-day-selected`     | Primary ring + primary lift      | **Coverage** — selected day (keyboard / mouse focus).                               |
-| `shadow-tw-ring-attention`   | `attention` 1px ring             | **Coverage** — missing-lead day (amber signal, no fill change alone).               |
-| `shadow-tw-ring-error-soft`  | `destructive` 1px ring           | **Coverage** — under-staffed / error signal ring.                                   |
-| `shadow-tw-cell-error`       | Neutral depth + error context    | **Therapist availability grid** — error cell (pairs with error border/bg).          |
-| `shadow-tw-cell-info`        | Slightly lighter depth           | **Therapist availability grid** — info / neutral emphasis cell.                     |
-| `shadow-tw-primary-glow`     | Primary-colored glow             | **Primary CTA emphasis** — high-impact actions (e.g. generate draft).               |
-| `shadow-tw-inset-highlight`  | Inset top gloss                  | **Inset “specular”** on tinted callout surfaces (warning panel top edge).           |
+| Class                            | Basis                            | When to use                                                                          |
+| -------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------ |
+| `shadow-tw-2xs`                  | Foreground hairline (~2%)        | Default “paper edge” on dense cells (e.g. coverage day panel).                       |
+| `shadow-tw-2xs-soft`             | Foreground hairline (~3%)        | Softer bottom edge on large bordered shells (e.g. therapist workspace container).    |
+| `shadow-tw-xs`                   | Foreground hairline (~4%)        | Slightly stronger section divider shadow (e.g. availability request strip).          |
+| `shadow-tw-sm`                   | Foreground ~5%, small blur       | **Default card** elevation — `Card`, list rows, publish tables, preliminary blocks.  |
+| `shadow-tw-md`                   | Foreground ~6%                   | Cards that need a bit more separation (badges, nested cards).                        |
+| `shadow-tw-md-soft`              | Foreground ~5%                   | **Metrics / stats** — `StatsCard`, schedule progress card shell.                     |
+| `shadow-tw-md-strong`            | Foreground ~8%                   | **Workspace shells** — availability split, manager scheduling panel.                 |
+| `shadow-tw-float`                | Foreground ~6%, wider spread     | **Section shells** — shift board header area, notifications list container.          |
+| `shadow-tw-float-lg`             | Foreground ~7%, larger spread    | **Hero / summary sections** — staff dashboard featured block.                        |
+| `shadow-tw-float-tight`          | Foreground ~5%, 8px spread       | **Tiled cards** — inbox sidebar cards, manager triage secondary `Card`s.             |
+| `shadow-tw-pill`                 | Foreground ~6%, tight            | **Pills / chips** with numeric content (e.g. coverage headcount badge).              |
+| `shadow-tw-inbox-hero`           | Large soft lift                  | **Single hero band** — manager inbox top banner.                                     |
+| `shadow-tw-metric`               | Large soft lift                  | **Clickable metric tiles** — inbox KPI link cards.                                   |
+| `shadow-tw-panel`                | Large panel depth                | **Primary analytics panel** — schedule progress outer container.                     |
+| `shadow-tw-panel-inner`          | Medium depth                     | **Nested panel** inside a panel — schedule progress inner summary.                   |
+| `shadow-tw-panel-inner-soft`     | Softer medium                    | **Nested callout** — auto-draft dialog inner rule card.                              |
+| `shadow-tw-modal`                | Deep modal                       | **Standard dialogs** — cycle management, clear draft confirm.                        |
+| `shadow-tw-modal-lg`             | Deeper modal                     | **Large / full-bleed dialogs** — auto-draft confirm shell.                           |
+| `shadow-tw-popover`              | Floating near-modal              | **Popovers / floating panels** — assignment status popover.                          |
+| `shadow-tw-hero-media`           | Wide marketing lift              | **Marketing imagery** — homepage app preview frame.                                  |
+| `shadow-tw-header`               | Double layer (tight + wide)      | **Deprecated page header** chrome — `PageHeader` legacy shell.                       |
+| `shadow-tw-app-chrome`           | Sidebar foreground + warm ring   | **Fixed app header** chrome — authenticated header and onboarding header.            |
+| `shadow-tw-app-chrome-sub`       | Sidebar foreground + inset ring  | **Mobile app drawer** chrome — fixed drawer surfaces on the authenticated shell.     |
+| `shadow-tw-shell-control-hover`  | Sidebar ring + foreground lift   | **Shell controls** — hover emphasis for notification/header controls on dark chrome. |
+| `shadow-tw-double-panel`         | Double layer (stacked)           | **Stacked elevation** — request composer panel on tinted surface.                    |
+| `shadow-tw-day-hover`            | Lift on hover                    | **Coverage calendar** — day cell hover (non-warning).                                |
+| `shadow-tw-day-warning`          | Hairline + `warning-border` ring | **Coverage** — constraint / warning day tone.                                        |
+| `shadow-tw-day-selected`         | Primary ring + primary lift      | **Coverage** — selected day (keyboard / mouse focus).                                |
+| `shadow-tw-ring-attention`       | `attention` 1px ring             | **Coverage** — missing-lead day (amber signal, no fill change alone).                |
+| `shadow-tw-ring-error-soft`      | `destructive` 1px ring           | **Coverage** — under-staffed / error signal ring.                                    |
+| `shadow-tw-cell-error`           | Neutral depth + error context    | **Therapist availability grid** — error cell (pairs with error border/bg).           |
+| `shadow-tw-cell-info`            | Slightly lighter depth           | **Therapist availability grid** — info / neutral emphasis cell.                      |
+| `shadow-tw-primary-glow`         | Primary-colored glow             | **Primary CTA emphasis** — high-impact actions (e.g. generate draft).                |
+| `shadow-tw-inset-highlight`      | Inset top gloss                  | **Inset “specular”** on tinted callout surfaces (warning panel top edge).            |
+| `shadow-tw-inset-highlight-soft` | Softer inset top gloss           | **Subtle selected-option gloss** — manager availability editor and summary pills.    |
 
 ## Component Patterns
 
-### Availability status chips
+### Availability exception chips
 
-Three states map to `availability_overrides.type` and therapist submission intent. Color communicates immediately; label confirms for accessibility. Never use color alone.
+Exception states map to `availability_overrides.override_type` and therapist submission intent. Color communicates immediately; label confirms for accessibility. Never use color alone.
 
-| State                        | Token family  | Label             | When                                             |
-| ---------------------------- | ------------- | ----------------- | ------------------------------------------------ |
-| Request to work (`force_on`) | `--success-*` | "Request to work" | Therapist wants this date; autodraft prioritizes |
-| Need off (`force_off`)       | `--error-*`   | "Need off"        | Therapist blocked; autodraft excludes            |
-| Neutral (no override row)    | `--muted`     | "Available"       | Default — no override exists                     |
+| State                          | Token family  | Label                     | When                                                                                                                                                          |
+| ------------------------------ | ------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Need to Work (`force_on`)      | `--success-*` | "Need to Work"            | Therapist needs to work this date; auto-draft treats it as hard scheduling intent unless a higher-priority structural conflict blocks it                      |
+| Need Off (`force_off`)         | `--error-*`   | "Need Off"                | Therapist needs not to be scheduled; auto-draft excludes unless a manager override is recorded                                                                |
+| No exception (no override row) | `--muted`     | "No exception" / baseline | Default therapist state — no Schedule Block exception exists. Manager clear/reset controls may use "Available" when they are explicitly removing an exception |
 
-**Interaction rule:** Chips cycle `force_off ↔ force_on` only. Removing a date uses an explicit Remove path with confirmation — no silent third-click delete.
+**Interaction rule:** Exception controls switch only between `force_off ↔ force_on`. Removing a date uses an explicit Clear/Remove path with confirmation where the surface needs one — no silent third-click delete. Do not reintroduce "Request to Work" or a cyclic "Available" therapist choice; the canonical language is **Need Off** and **Need to Work**.
 
 ### Coverage day cell anatomy
 

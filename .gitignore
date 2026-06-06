@@ -57,6 +57,12 @@ shots/
 /artifacts/
 output/server/
 output/*.log
+output/ocr-benchmark/
+/scripts/ocr-benchmark/.venv/
+/scripts/ocr-benchmark/.venv312/
+/scripts/ocr-benchmark/__pycache__/
+/scripts/ocr-benchmark/manifest.local.json
+/scripts/ocr-benchmark/samples/
 
 # local agent/tooling state
 .agents/

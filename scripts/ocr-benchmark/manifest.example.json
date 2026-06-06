@@ -1,0 +1,26 @@
+{
+  "samplesDir": "scripts/ocr-benchmark/samples",
+  "cases": [
+    {
+      "id": "example-pto-form",
+      "filename": "example-pto-form.pdf",
+      "contentType": "application/pdf",
+      "expected": {
+        "employeeName": "Jane Smith",
+        "requests": [
+          {
+            "date": "2026-06-12",
+            "type": "force_off",
+            "note": "PTO"
+          },
+          {
+            "date": "2026-06-13",
+            "type": "force_off",
+            "note": "PTO"
+          }
+        ],
+        "reviewExpectation": "ready_to_apply"
+      }
+    }
+  ]
+}

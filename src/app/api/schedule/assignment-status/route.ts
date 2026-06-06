@@ -77,10 +77,6 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null
 }
 
-function isIncidentAssignmentStatus(value: AssignmentStatus) {
-  return value === 'call_in' || value === 'cancelled' || value === 'left_early'
-}
-
 function shouldNotifyAffectedTherapist(nextStatus: AssignmentStatus) {
   return nextStatus !== 'left_early'
 }
@@ -202,14 +198,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Assignment is outside your site scope.' }, { status: 403 })
   }
 
-  if (isIncidentAssignmentStatus(status) && !preflightCycle?.published) {
+  if (!preflightCycle?.published) {
     return NextResponse.json(
       { error: 'Operational statuses can only be applied after the Schedule Block is published.' },
       { status: 409 }
     )
   }
 
-  if (isIncidentAssignmentStatus(status) && !preflightShift.user_id) {
+  if (!preflightShift.user_id) {
     return NextResponse.json(
       { error: 'Operational statuses require an assigned therapist.' },
       { status: 409 }

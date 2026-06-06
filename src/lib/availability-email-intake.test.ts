@@ -236,6 +236,43 @@ describe('parseAvailabilityEmailItem', () => {
     ])
   })
 
+  it('keeps mixed off/work PTO forms in review even when matching is high confidence', () => {
+    const profiles = [{ id: 'therapist-1', full_name: 'Ruth Guandique', is_active: true }]
+
+    const result = parseAvailabilityEmailBatchSources({
+      normalizedBodyText: '',
+      attachments: [
+        {
+          id: 'attachment-1',
+          filename: 'mixed-form.txt',
+          rawText: [
+            'Employee Name: Ruth Guandique',
+            'Date PTO Hours LT Sick Hours Jury Hours Bereavement Hours',
+            '5/3 off',
+            '5/14 working memorial',
+          ].join('\n'),
+          ocrStatus: 'completed',
+          ocrModel: 'test-model',
+          ocrError: null,
+        },
+      ],
+      cycles: ptoCycles,
+      profiles,
+      autoApplyHighConfidence: true,
+    })
+
+    expect(result.items[0]).toMatchObject({
+      parseStatus: 'needs_review',
+      confidenceLevel: 'medium',
+      confidenceReasons: ['mixed_request_intent_needs_review'],
+      requests: [
+        expect.objectContaining({ date: '2026-05-03', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-05-14', override_type: 'force_on' }),
+      ],
+    })
+    expect(result.batchStatus).toBe('needs_review')
+  })
+
   it('expands weekday recurrence within a handwritten PTO form window', () => {
     const profiles = [{ id: 'therapist-1', full_name: 'Kim Suarez', is_active: true }]
 

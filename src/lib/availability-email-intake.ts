@@ -527,6 +527,12 @@ function buildConfidenceReasons(params: {
   if (params.parsed.unresolvedLines.length > 0) {
     reasons.push('unresolved_lines_present')
   }
+  if (
+    params.parsed.requests.some((request) => request.override_type === 'force_off') &&
+    params.parsed.requests.some((request) => request.override_type === 'force_on')
+  ) {
+    reasons.push('mixed_request_intent_needs_review')
+  }
   return [...new Set(reasons)]
 }
 
@@ -539,7 +545,8 @@ function classifyItemConfidence(params: {
     params.therapistMatch.confidence === 'high' &&
     params.parsed.requests.length > 0 &&
     params.parsed.matchedCycleId &&
-    params.parsed.unresolvedLines.length === 0
+    params.parsed.unresolvedLines.length === 0 &&
+    params.confidenceReasons.length === 0
   ) {
     return 'high'
   }

@@ -7,6 +7,7 @@ import { findBlockingAvailabilityOverwrite } from '@/lib/availability-overwrite-
 import { loadAvailabilityWindowState } from '@/lib/availability-window'
 import { intentForTherapistOverride } from '@/lib/employee-directory'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { resolveTherapistAvailabilityWritePermission } from '@/lib/therapist-availability-submission'
 import {
   buildAvailabilityUrl,
   getAuthenticatedUserWithRole,
@@ -19,6 +20,7 @@ import {
 type WritableTherapistCycle = {
   start_date: string
   end_date: string
+  availability_due_at: string | null
   site_id: string | null
 }
 
@@ -40,7 +42,7 @@ async function loadWritableTherapistCycle(
 
   const { data: cycle, error: cycleError } = await admin
     .from('schedule_cycles')
-    .select('start_date, end_date, site_id')
+    .select('start_date, end_date, availability_due_at, site_id')
     .eq('id', cycleId)
     .maybeSingle()
 
@@ -49,6 +51,54 @@ async function loadWritableTherapistCycle(
   }
 
   return cycle
+}
+
+async function loadHasOfficialTherapistSubmission(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  cycleId: string
+): Promise<boolean> {
+  const { data } = await admin
+    .from('therapist_availability_submissions')
+    .select('id')
+    .eq('therapist_id', userId)
+    .eq('schedule_cycle_id', cycleId)
+    .maybeSingle()
+
+  return Boolean(data)
+}
+
+async function assertTherapistAvailabilityWritable(params: {
+  admin: ReturnType<typeof createAdminClient>
+  userId: string
+  cycleId: string
+  cycle: WritableTherapistCycle
+  returnPath: '/availability' | '/therapist/availability'
+}) {
+  const availabilityWindow = await loadAvailabilityWindowState(
+    params.admin as never,
+    params.cycleId
+  )
+  if (availabilityWindow.locked) {
+    redirect(
+      buildAvailabilityUrl({ error: 'submission_closed', cycle: params.cycleId }, params.returnPath)
+    )
+  }
+
+  const hasOfficialSubmission = await loadHasOfficialTherapistSubmission(
+    params.admin,
+    params.userId,
+    params.cycleId
+  )
+  const writePermission = resolveTherapistAvailabilityWritePermission(
+    params.cycle,
+    hasOfficialSubmission
+  )
+  if (!writePermission.allowed) {
+    redirect(
+      buildAvailabilityUrl({ error: 'submission_closed', cycle: params.cycleId }, params.returnPath)
+    )
+  }
 }
 
 export async function submitAvailabilityEntryAction(formData: FormData) {
@@ -73,12 +123,8 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
     redirect(buildAvailabilityUrl({ error: 'submit_failed' }, returnPath))
   }
 
-  await loadWritableTherapistCycle(admin, user.id, cycleId, returnPath)
-
-  const availabilityWindow = await loadAvailabilityWindowState(admin as never, cycleId)
-  if (availabilityWindow.locked) {
-    redirect(buildAvailabilityUrl({ error: 'submission_closed', cycle: cycleId }, returnPath))
-  }
+  const cycle = await loadWritableTherapistCycle(admin, user.id, cycleId, returnPath)
+  await assertTherapistAvailabilityWritable({ admin, userId: user.id, cycleId, cycle, returnPath })
 
   const { data: conflictingRows, error: conflictsError } = await supabase
     .from('availability_overrides')
@@ -152,11 +198,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
   }
 
   const cycle = await loadWritableTherapistCycle(admin, user.id, cycleId, returnPath)
-
-  const availabilityWindow = await loadAvailabilityWindowState(admin as never, cycleId)
-  if (availabilityWindow.locked) {
-    redirect(buildAvailabilityUrl({ error: 'submission_closed', cycle: cycleId }, returnPath))
-  }
+  await assertTherapistAvailabilityWritable({ admin, userId: user.id, cycleId, cycle, returnPath })
 
   const isValidCycleDate = (date: string) => date >= cycle.start_date && date <= cycle.end_date
 
@@ -292,11 +334,14 @@ export async function deleteAvailabilityEntryAction(formData: FormData) {
 
   if (cycleId) {
     const admin = createAdminClient()
-    await loadWritableTherapistCycle(admin, user.id, cycleId, returnPath)
-    const availabilityWindow = await loadAvailabilityWindowState(admin as never, cycleId)
-    if (availabilityWindow.locked) {
-      redirect(buildAvailabilityUrl({ error: 'submission_closed', cycle: cycleId }, returnPath))
-    }
+    const cycle = await loadWritableTherapistCycle(admin, user.id, cycleId, returnPath)
+    await assertTherapistAvailabilityWritable({
+      admin,
+      userId: user.id,
+      cycleId,
+      cycle,
+      returnPath,
+    })
   }
 
   const { error } = await supabase
