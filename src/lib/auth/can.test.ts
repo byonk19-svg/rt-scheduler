@@ -70,14 +70,6 @@ describe('can - update_assignment_status', () => {
     expect(can('lead', 'update_assignment_status')).toBe(true)
   })
 
-  it('denies access to therapist with isLeadEligible: true', () => {
-    expect(can('therapist', 'update_assignment_status', { isLeadEligible: true })).toBe(false)
-  })
-
-  it('denies access to therapist with isLeadEligible: false', () => {
-    expect(can('therapist', 'update_assignment_status', { isLeadEligible: false })).toBe(false)
-  })
-
   it('denies access to therapist with no context', () => {
     expect(can('therapist', 'update_assignment_status')).toBe(false)
   })

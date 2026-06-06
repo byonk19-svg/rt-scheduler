@@ -14,7 +14,6 @@ export type Permission =
   | 'update_assignment_status'
 
 type CanContext = {
-  isLeadEligible?: boolean
   isActive?: boolean
   archivedAt?: string | null
 }
@@ -29,7 +28,6 @@ function isLeadToolsRole(role: Role | null): boolean {
 
 export function can(roleInput: unknown, permission: Permission, context: CanContext = {}): boolean {
   const role = parseRole(roleInput)
-  void context
 
   if (context.isActive === false || context.archivedAt) {
     return false

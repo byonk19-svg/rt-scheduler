@@ -98,7 +98,6 @@ function filterScheduleTherapistsForCycle({
 
   return therapists.filter((therapist) => {
     if (therapist.archived_at) return assignedTherapistIds.has(therapist.id)
-    if (isPublished) return true
     if (therapist.is_active === false) return assignedTherapistIds.has(therapist.id)
     return true
   })
