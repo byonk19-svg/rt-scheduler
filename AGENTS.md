@@ -6,6 +6,11 @@ IF BLOCKED, TRY AN ALTERNATIVE APPROACH. ONLY ASK WHEN TRULY AMBIGUOUS OR DESTRU
 USE CODEX NATIVE SUBAGENTS FOR INDEPENDENT PARALLEL SUBTASKS WHEN THAT IMPROVES THROUGHPUT. THIS IS COMPLEMENTARY TO OMX TEAM MODE.
 
 <!-- END AUTONOMY DIRECTIVE -->
+
+## RT Scheduler project notes
+
+Repo-specific Codex guidance lives in `docs/CODEX_PROJECT_GUIDE.md`.
+
 <!-- omx:generated:agents-md -->
 
 # oh-my-codex - Intelligent Multi-Agent Orchestration
