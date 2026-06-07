@@ -144,25 +144,34 @@ jobs:
         run: |
           if [[ -n "${NEXT_PUBLIC_SUPABASE_URL}" && -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY}" && -n "${SUPABASE_SERVICE_ROLE_KEY}" ]]; then
             echo "run_seeded=true" >> "$GITHUB_OUTPUT"
-            echo "Seeded E2E enabled; DB-backed pickup concurrency coverage is included."
+            echo "Seeded DB-backed E2E enabled."
+            echo "Seeded mode validates more workflows, including DB-backed scheduling coverage."
           else
             echo "run_seeded=false" >> "$GITHUB_OUTPUT"
-            echo "Seeded Supabase secrets not fully set; running only reduced non-seeded e2e coverage."
-            echo "Reduced E2E excludes DB-backed pickup concurrency coverage."
+            echo "Seeded Supabase secrets are not fully set."
+            echo "Seeded mode requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY."
+            echo "Reduced E2E is useful, but it is not enough for final demo confidence."
           fi
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: Run e2e tests
+      - name: Run seeded DB-backed E2E tests
+        if: steps.seeded.outputs.run_seeded == 'true'
         run: |
-          if [[ "${{ steps.seeded.outputs.run_seeded }}" == "true" ]]; then
-            npm run test:e2e
-          else
-            export NEXT_PUBLIC_SUPABASE_URL="https://example.supabase.co"
-            export NEXT_PUBLIC_SUPABASE_ANON_KEY="ci-placeholder-anon-key"
-            npx playwright test e2e/auth-redirect.spec.ts e2e/public-pages.spec.ts e2e/authenticated-flow.spec.ts
-          fi
+          echo "Running seeded DB-backed E2E tests."
+          echo "Seeded mode validates more workflows because Supabase test data and service-role access are available."
+          npm run test:e2e
+
+      - name: Run reduced E2E tests without Supabase secrets
+        if: steps.seeded.outputs.run_seeded != 'true'
+        run: |
+          echo "Running reduced E2E tests without Supabase secrets."
+          echo "Reduced mode is useful for public/auth coverage, but it is not enough for final demo confidence."
+          echo "Seeded mode requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY."
+          export NEXT_PUBLIC_SUPABASE_URL="https://example.supabase.co"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="ci-placeholder-anon-key"
+          npx playwright test e2e/auth-redirect.spec.ts e2e/public-pages.spec.ts e2e/authenticated-flow.spec.ts
 
       - name: Upload Playwright artifacts
         if: always()
