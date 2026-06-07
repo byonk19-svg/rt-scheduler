@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
 
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
 import {
   notifyPreliminaryShiftAdded,
   notifyPreliminaryShiftMoved,
@@ -36,6 +34,7 @@ import {
   SCHEDULE_MUTATION_ERROR_CODES as ERROR_CODES,
   type ScheduleMutationErrorCode,
 } from '@/lib/schedule-mutations/errors'
+import { authorizeScheduleMutationManager } from '@/lib/schedule-mutations/authorize-manager'
 import { parseActionBody, type DragAction } from '@/lib/schedule-mutations/parse-action-body'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import {
@@ -326,40 +325,15 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return scheduleMutationErrorResponse('Unauthorized', ERROR_CODES.unauthorized, 401)
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, is_active, archived_at, site_id')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if (
-    !can(parseRole(profile?.role), 'manage_coverage', {
-      isActive: profile?.is_active !== false,
-      archivedAt: profile?.archived_at ?? null,
-    })
-  ) {
+  const authorization = await authorizeScheduleMutationManager(supabase)
+  if (!authorization.ok) {
     return scheduleMutationErrorResponse(
-      'Manager access required',
-      ERROR_CODES.managerAccessRequired,
-      403
+      authorization.error,
+      authorization.code,
+      authorization.status
     )
   }
-  const managerSiteId = typeof profile?.site_id === 'string' ? profile.site_id : ''
-  if (!managerSiteId) {
-    return scheduleMutationErrorResponse(
-      'Manager site scope required',
-      ERROR_CODES.managerSiteScopeRequired,
-      403
-    )
-  }
+  const { managerSiteId, userId } = authorization
 
   const payload = parseActionBody(await request.json().catch(() => null))
 
@@ -544,7 +518,7 @@ export async function POST(request: Request) {
         availability_override_reason: shouldSetAvailabilityOverride
           ? normalizedAvailabilityOverrideReason
           : null,
-        availability_override_by: shouldSetAvailabilityOverride ? user.id : null,
+        availability_override_by: shouldSetAvailabilityOverride ? userId : null,
         availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
       })
       .select('id')
@@ -563,7 +537,7 @@ export async function POST(request: Request) {
 
     if (insertedShift?.id) {
       await writeAuditLog(supabase, {
-        userId: user.id,
+        userId: userId,
         action: 'shift_added',
         targetType: 'shift',
         targetId: insertedShift.id,
@@ -580,7 +554,7 @@ export async function POST(request: Request) {
 
     if (shouldLogPostPublishModification && insertedShift?.id) {
       await writeAuditLog(supabase, {
-        userId: user.id,
+        userId: userId,
         action: 'post_publish_modification',
         targetType: 'shift',
         targetId: insertedShift.id,
@@ -802,7 +776,7 @@ export async function POST(request: Request) {
         availability_override_reason: shouldSetAvailabilityOverride
           ? normalizedAvailabilityOverrideReason
           : null,
-        availability_override_by: shouldSetAvailabilityOverride ? user.id : null,
+        availability_override_by: shouldSetAvailabilityOverride ? userId : null,
         availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
       })
       .eq('id', payload.shiftId)
@@ -877,7 +851,7 @@ export async function POST(request: Request) {
 
     if (sourceNeedsAudit || targetNeedsAudit) {
       await writeAuditLog(supabase, {
-        userId: user.id,
+        userId: userId,
         action: 'post_publish_modification',
         targetType: 'shift',
         targetId: payload.shiftId,
@@ -944,7 +918,7 @@ export async function POST(request: Request) {
     }
 
     await writeAuditLog(supabase, {
-      userId: user.id,
+      userId: userId,
       action: 'shift_removed',
       targetType: 'shift',
       targetId: shift.id,
@@ -985,7 +959,7 @@ export async function POST(request: Request) {
     if (shouldLogPostPublishModification) {
       const targetId = 'shiftId' in payload ? payload.shiftId : `${payload.userId}:${payload.date}`
       await writeAuditLog(supabase, {
-        userId: user.id,
+        userId: userId,
         action: 'post_publish_modification',
         targetType: 'shift',
         targetId,
@@ -1186,7 +1160,7 @@ export async function POST(request: Request) {
     }
 
     await writeAuditLog(supabase, {
-      userId: user.id,
+      userId: userId,
       action: 'designated_lead_assigned',
       targetType: 'shift_slot',
       targetId: `${payload.cycleId}:${payload.date}:${payload.shiftType}`,
@@ -1207,7 +1181,7 @@ export async function POST(request: Request) {
         availability_override_reason: shouldSetAvailabilityOverride
           ? normalizedAvailabilityOverrideReason
           : null,
-        availability_override_by: shouldSetAvailabilityOverride ? user.id : null,
+        availability_override_by: shouldSetAvailabilityOverride ? userId : null,
         availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
       })
       .eq('cycle_id', payload.cycleId)
@@ -1267,7 +1241,7 @@ export async function POST(request: Request) {
 
     if (shouldLogPostPublishModification) {
       await writeAuditLog(supabase, {
-        userId: user.id,
+        userId: userId,
         action: 'post_publish_modification',
         targetType: 'shift',
         targetId: leadShiftId,
