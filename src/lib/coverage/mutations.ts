@@ -1,7 +1,11 @@
 import type { AssignmentStatus, ShiftStatus } from '@/app/schedule/types'
 import type { CoverageAssignmentPayload } from '@/lib/coverage/updateAssignmentStatus'
+import type { ScheduleMutationErrorCode } from '@/lib/schedule-mutations/errors'
 
-export type CoverageMutationError = { code?: string; message?: string } | null
+export type CoverageMutationError = {
+  code?: ScheduleMutationErrorCode | (string & {})
+  message?: string
+} | null
 
 export type AssignCoverageShiftParams = {
   cycleId: string

@@ -32,6 +32,10 @@ import {
 import { formatEligibilityReason, resolveEligibility } from '@/lib/coverage/resolve-availability'
 import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
 import type { AvailabilityOverrideRow as CycleAvailabilityOverrideRow } from '@/lib/coverage/types'
+import {
+  SCHEDULE_MUTATION_ERROR_CODES as ERROR_CODES,
+  type ScheduleMutationErrorCode,
+} from '@/lib/schedule-mutations/errors'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import {
   closePendingShiftPostsForShiftIds,
@@ -105,6 +109,15 @@ type DragAction =
 
 type ShiftSlotRow = {
   id: string
+}
+
+function scheduleMutationErrorResponse(
+  error: string,
+  code: ScheduleMutationErrorCode,
+  status: number,
+  extra?: Record<string, unknown>
+) {
+  return NextResponse.json({ error, code, ...extra }, { status })
 }
 
 async function getCoverageCountForSlot(
@@ -441,7 +454,7 @@ function parseActionBody(raw: unknown): DragAction | null {
 
 export async function POST(request: Request) {
   if (!isTrustedMutationRequest(request)) {
-    return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 })
+    return scheduleMutationErrorResponse('Invalid request origin.', ERROR_CODES.forbidden, 403)
   }
 
   const supabase = await createClient()
@@ -450,7 +463,7 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return scheduleMutationErrorResponse('Unauthorized', ERROR_CODES.unauthorized, 401)
   }
 
   const { data: profile } = await supabase
@@ -465,20 +478,25 @@ export async function POST(request: Request) {
       archivedAt: profile?.archived_at ?? null,
     })
   ) {
-    return NextResponse.json({ error: 'Manager access required' }, { status: 403 })
+    return scheduleMutationErrorResponse(
+      'Manager access required',
+      ERROR_CODES.managerAccessRequired,
+      403
+    )
   }
   const managerSiteId = typeof profile?.site_id === 'string' ? profile.site_id : ''
   if (!managerSiteId) {
-    return NextResponse.json({ error: 'Manager site scope required' }, { status: 403 })
+    return scheduleMutationErrorResponse(
+      'Manager site scope required',
+      ERROR_CODES.managerSiteScopeRequired,
+      403
+    )
   }
 
   const payload = parseActionBody(await request.json().catch(() => null))
 
   if (!payload) {
-    return NextResponse.json(
-      { error: 'Invalid request body', code: 'invalid_body' },
-      { status: 400 }
-    )
+    return scheduleMutationErrorResponse('Invalid request body', ERROR_CODES.invalidBody, 400)
   }
 
   const { data: cycle, error: cycleError } = await supabase
@@ -488,18 +506,20 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (cycleError || !cycle) {
-    return NextResponse.json({ error: 'Schedule Block not found' }, { status: 404 })
+    return scheduleMutationErrorResponse('Schedule Block not found', ERROR_CODES.cycleNotFound, 404)
   }
   if (cycle.site_id !== managerSiteId) {
-    return NextResponse.json(
-      { error: 'Schedule Block is outside your site scope.' },
-      { status: 403 }
+    return scheduleMutationErrorResponse(
+      'Schedule Block is outside your site scope.',
+      ERROR_CODES.outsideSiteScope,
+      403
     )
   }
   if (cycle.status === 'offline' || cycle.status === 'archived' || cycle.archived_at) {
-    return NextResponse.json(
-      { error: 'This Schedule Block is read-only until it is republished.' },
-      { status: 409 }
+    return scheduleMutationErrorResponse(
+      'This Schedule Block is read-only until it is republished.',
+      ERROR_CODES.cycleReadOnly,
+      409
     )
   }
 
@@ -513,10 +533,14 @@ export async function POST(request: Request) {
 
   if (payload.action === 'assign') {
     if (!payload.userId || !payload.shiftType || !payload.date) {
-      return NextResponse.json({ error: 'Missing assignment data' }, { status: 400 })
+      return scheduleMutationErrorResponse('Missing assignment data', ERROR_CODES.invalidBody, 400)
     }
     if (!isDateWithinRange(payload.date, cycle.start_date, cycle.end_date)) {
-      return NextResponse.json({ error: 'Date is outside this Schedule Block' }, { status: 400 })
+      return scheduleMutationErrorResponse(
+        'Date is outside this Schedule Block',
+        ERROR_CODES.dateOutsideCycle,
+        400
+      )
     }
 
     const { data: targetProfile, error: targetProfileError } = await supabase
@@ -526,12 +550,17 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (targetProfileError || targetProfile?.site_id !== managerSiteId) {
-      return NextResponse.json({ error: 'Therapist is outside your site scope.' }, { status: 403 })
+      return scheduleMutationErrorResponse(
+        'Therapist is outside your site scope.',
+        ERROR_CODES.outsideSiteScope,
+        403
+      )
     }
     if (targetProfile.shift_type !== payload.shiftType) {
-      return NextResponse.json(
-        { error: 'Therapist shift type does not match the selected schedule shift.' },
-        { status: 409 }
+      return scheduleMutationErrorResponse(
+        'Therapist shift type does not match the selected schedule shift.',
+        ERROR_CODES.therapistShiftTypeMismatch,
+        409
       )
     }
     if (
@@ -539,7 +568,11 @@ export async function POST(request: Request) {
       Boolean(targetProfile.archived_at) ||
       targetProfile.on_fmla === true
     ) {
-      return NextResponse.json({ error: 'This therapist cannot be assigned.' }, { status: 409 })
+      return scheduleMutationErrorResponse(
+        'This therapist cannot be assigned.',
+        ERROR_CODES.therapistUnassignable,
+        409
+      )
     }
 
     const availabilityState = await getTherapistAvailabilityState(
@@ -551,24 +584,24 @@ export async function POST(request: Request) {
       payload.shiftType
     )
     if (availabilityState.error) {
-      return NextResponse.json({ error: availabilityState.error }, { status: 500 })
+      return scheduleMutationErrorResponse(availabilityState.error, ERROR_CODES.internalError, 500)
     }
     if (
       availabilityState.blockedByConstraints &&
       (availabilityState.inactiveOrFmla || availabilityState.prnNotOffered)
     ) {
-      return NextResponse.json(
-        {
-          error: availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
-        },
-        { status: 409 }
+      return scheduleMutationErrorResponse(
+        availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
+        ERROR_CODES.therapistUnassignable,
+        409
       )
     }
     if (availabilityState.blockedByConstraints && payload.availabilityOverride !== true) {
-      return NextResponse.json(
+      return scheduleMutationErrorResponse(
+        'Conflicts with scheduling constraints.',
+        ERROR_CODES.availabilityConflict,
+        409,
         {
-          error: 'Conflicts with scheduling constraints.',
-          code: 'availability_conflict',
           availability: {
             therapistId: payload.userId,
             therapistName: availabilityState.therapistName,
@@ -576,8 +609,7 @@ export async function POST(request: Request) {
             shiftType: payload.shiftType,
             reason: availabilityState.unavailableReason,
           },
-        },
-        { status: 409 }
+        }
       )
     }
 
@@ -589,31 +621,34 @@ export async function POST(request: Request) {
         payload.shiftType
       )
       if (coverage.error) {
-        return NextResponse.json(
-          { error: 'Failed to validate daily coverage limit.' },
-          { status: 500 }
+        return scheduleMutationErrorResponse(
+          'Failed to validate daily coverage limit.',
+          ERROR_CODES.internalError,
+          500
         )
       }
       if (exceedsCoverageLimit(coverage.count, MAX_SHIFT_COVERAGE_PER_DAY)) {
-        return NextResponse.json(
-          {
-            error: `Each shift can have at most ${MAX_SHIFT_COVERAGE_PER_DAY} scheduled team members.`,
-          },
-          { status: 409 }
+        return scheduleMutationErrorResponse(
+          `Each shift can have at most ${MAX_SHIFT_COVERAGE_PER_DAY} scheduled team members.`,
+          ERROR_CODES.coverageLimitExceeded,
+          409
         )
       }
 
       const weekly = await getWorkedDatesInWeek(supabase, payload.userId, payload.date)
       if (weekly.error) {
-        return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
+        return scheduleMutationErrorResponse(
+          'Failed to validate weekly rule',
+          ERROR_CODES.internalError,
+          500
+        )
       }
       const weeklyLimit = await getTherapistWeeklyLimit(supabase, payload.userId, managerSiteId)
       if (exceedsWeeklyLimit(weekly.dates, payload.date, weeklyLimit)) {
-        return NextResponse.json(
-          {
-            error: `Therapists are limited to ${weeklyLimit} day(s) per week unless override is enabled.`,
-          },
-          { status: 409 }
+        return scheduleMutationErrorResponse(
+          `Therapists are limited to ${weeklyLimit} day(s) per week unless override is enabled.`,
+          ERROR_CODES.weeklyLimitExceeded,
+          409
         )
       }
     }
@@ -649,12 +684,13 @@ export async function POST(request: Request) {
 
     if (error || !insertedShift) {
       if (error?.code === '23505') {
-        return NextResponse.json(
-          { error: 'That therapist already has a shift on this date.' },
-          { status: 409 }
+        return scheduleMutationErrorResponse(
+          'That therapist already has a shift on this date.',
+          ERROR_CODES.duplicateShift,
+          409
         )
       }
-      return NextResponse.json({ error: 'Could not create shift' }, { status: 500 })
+      return scheduleMutationErrorResponse('Could not create shift', ERROR_CODES.internalError, 500)
     }
 
     if (insertedShift?.id) {
@@ -722,10 +758,14 @@ export async function POST(request: Request) {
 
   if (payload.action === 'move') {
     if (!payload.shiftId || !payload.targetDate || !payload.targetShiftType) {
-      return NextResponse.json({ error: 'Missing move data' }, { status: 400 })
+      return scheduleMutationErrorResponse('Missing move data', ERROR_CODES.invalidBody, 400)
     }
     if (!isDateWithinRange(payload.targetDate, cycle.start_date, cycle.end_date)) {
-      return NextResponse.json({ error: 'Date is outside this Schedule Block' }, { status: 400 })
+      return scheduleMutationErrorResponse(
+        'Date is outside this Schedule Block',
+        ERROR_CODES.dateOutsideCycle,
+        400
+      )
     }
 
     const { data: shift, error: shiftError } = await supabase
@@ -735,10 +775,18 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (shiftError || !shift || shift.cycle_id !== payload.cycleId) {
-      return NextResponse.json({ error: 'Shift not found in this Schedule Block' }, { status: 404 })
+      return scheduleMutationErrorResponse(
+        'Shift not found in this Schedule Block',
+        ERROR_CODES.shiftNotFound,
+        404
+      )
     }
     if (shift.site_id !== managerSiteId) {
-      return NextResponse.json({ error: 'Shift is outside your site scope.' }, { status: 403 })
+      return scheduleMutationErrorResponse(
+        'Shift is outside your site scope.',
+        ERROR_CODES.outsideSiteScope,
+        403
+      )
     }
 
     if (shift.date === payload.targetDate && shift.shift_type === payload.targetShiftType) {
@@ -747,7 +795,11 @@ export async function POST(request: Request) {
 
     const assignedUserId = shift.user_id
     if (!assignedUserId) {
-      return NextResponse.json({ error: 'Only assigned shifts can be moved.' }, { status: 400 })
+      return scheduleMutationErrorResponse(
+        'Only assigned shifts can be moved.',
+        ERROR_CODES.invalidBody,
+        400
+      )
     }
     const { data: assignedProfile, error: assignedProfileError } = await supabase
       .from('profiles')
@@ -755,12 +807,17 @@ export async function POST(request: Request) {
       .eq('id', assignedUserId)
       .maybeSingle()
     if (assignedProfileError || assignedProfile?.site_id !== managerSiteId) {
-      return NextResponse.json({ error: 'Therapist is outside your site scope.' }, { status: 403 })
+      return scheduleMutationErrorResponse(
+        'Therapist is outside your site scope.',
+        ERROR_CODES.outsideSiteScope,
+        403
+      )
     }
     if (assignedProfile.shift_type !== payload.targetShiftType) {
-      return NextResponse.json(
-        { error: 'Therapist shift type does not match the selected schedule shift.' },
-        { status: 409 }
+      return scheduleMutationErrorResponse(
+        'Therapist shift type does not match the selected schedule shift.',
+        ERROR_CODES.therapistShiftTypeMismatch,
+        409
       )
     }
     if (
@@ -768,7 +825,11 @@ export async function POST(request: Request) {
       Boolean(assignedProfile.archived_at) ||
       assignedProfile.on_fmla === true
     ) {
-      return NextResponse.json({ error: 'This therapist cannot be assigned.' }, { status: 409 })
+      return scheduleMutationErrorResponse(
+        'This therapist cannot be assigned.',
+        ERROR_CODES.therapistUnassignable,
+        409
+      )
     }
 
     const availabilityState = await getTherapistAvailabilityState(
@@ -780,24 +841,24 @@ export async function POST(request: Request) {
       payload.targetShiftType
     )
     if (availabilityState.error) {
-      return NextResponse.json({ error: availabilityState.error }, { status: 500 })
+      return scheduleMutationErrorResponse(availabilityState.error, ERROR_CODES.internalError, 500)
     }
     if (
       availabilityState.blockedByConstraints &&
       (availabilityState.inactiveOrFmla || availabilityState.prnNotOffered)
     ) {
-      return NextResponse.json(
-        {
-          error: availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
-        },
-        { status: 409 }
+      return scheduleMutationErrorResponse(
+        availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
+        ERROR_CODES.therapistUnassignable,
+        409
       )
     }
     if (availabilityState.blockedByConstraints && payload.availabilityOverride !== true) {
-      return NextResponse.json(
+      return scheduleMutationErrorResponse(
+        'Conflicts with scheduling constraints.',
+        ERROR_CODES.availabilityConflict,
+        409,
         {
-          error: 'Conflicts with scheduling constraints.',
-          code: 'availability_conflict',
           availability: {
             therapistId: assignedUserId,
             therapistName: availabilityState.therapistName,
@@ -805,8 +866,7 @@ export async function POST(request: Request) {
             shiftType: payload.targetShiftType,
             reason: availabilityState.unavailableReason,
           },
-        },
-        { status: 409 }
+        }
       )
     }
 
@@ -819,17 +879,17 @@ export async function POST(request: Request) {
         shift.id
       )
       if (coverage.error) {
-        return NextResponse.json(
-          { error: 'Failed to validate daily coverage limit.' },
-          { status: 500 }
+        return scheduleMutationErrorResponse(
+          'Failed to validate daily coverage limit.',
+          ERROR_CODES.internalError,
+          500
         )
       }
       if (exceedsCoverageLimit(coverage.count, MAX_SHIFT_COVERAGE_PER_DAY)) {
-        return NextResponse.json(
-          {
-            error: `Each shift can have at most ${MAX_SHIFT_COVERAGE_PER_DAY} scheduled team members.`,
-          },
-          { status: 409 }
+        return scheduleMutationErrorResponse(
+          `Each shift can have at most ${MAX_SHIFT_COVERAGE_PER_DAY} scheduled team members.`,
+          ERROR_CODES.coverageLimitExceeded,
+          409
         )
       }
 
@@ -840,15 +900,18 @@ export async function POST(request: Request) {
         shift.id
       )
       if (weekly.error) {
-        return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
+        return scheduleMutationErrorResponse(
+          'Failed to validate weekly rule',
+          ERROR_CODES.internalError,
+          500
+        )
       }
       const weeklyLimit = await getTherapistWeeklyLimit(supabase, assignedUserId, managerSiteId)
       if (exceedsWeeklyLimit(weekly.dates, payload.targetDate, weeklyLimit)) {
-        return NextResponse.json(
-          {
-            error: `Therapists are limited to ${weeklyLimit} day(s) per week unless override is enabled.`,
-          },
-          { status: 409 }
+        return scheduleMutationErrorResponse(
+          `Therapists are limited to ${weeklyLimit} day(s) per week unless override is enabled.`,
+          ERROR_CODES.weeklyLimitExceeded,
+          409
         )
       }
     }
@@ -880,16 +943,17 @@ export async function POST(request: Request) {
 
     if (error) {
       if (error.code === '23505') {
-        return NextResponse.json(
-          { error: 'Therapist already has a shift on that date.' },
-          { status: 409 }
+        return scheduleMutationErrorResponse(
+          'Therapist already has a shift on that date.',
+          ERROR_CODES.duplicateShift,
+          409
         )
       }
-      return NextResponse.json({ error: 'Could not move shift' }, { status: 500 })
+      return scheduleMutationErrorResponse('Could not move shift', ERROR_CODES.internalError, 500)
     }
 
     if (!shift.date || !shift.shift_type) {
-      return NextResponse.json({ error: 'Incomplete shift data' }, { status: 422 })
+      return scheduleMutationErrorResponse('Incomplete shift data', ERROR_CODES.internalError, 422)
     }
 
     if (cycle.published || preliminaryActive) {
@@ -981,10 +1045,18 @@ export async function POST(request: Request) {
     }
 
     if (shiftError || !shift || shift.cycle_id !== payload.cycleId) {
-      return NextResponse.json({ error: 'Shift not found in this Schedule Block' }, { status: 404 })
+      return scheduleMutationErrorResponse(
+        'Shift not found in this Schedule Block',
+        ERROR_CODES.shiftNotFound,
+        404
+      )
     }
     if (shift.site_id !== managerSiteId) {
-      return NextResponse.json({ error: 'Shift is outside your site scope.' }, { status: 403 })
+      return scheduleMutationErrorResponse(
+        'Shift is outside your site scope.',
+        ERROR_CODES.outsideSiteScope,
+        403
+      )
     }
 
     await preserveShiftPostHistoryBeforeShiftDeletion(
@@ -1000,7 +1072,7 @@ export async function POST(request: Request) {
       .eq('cycle_id', payload.cycleId)
       .eq('site_id', managerSiteId)
     if (error) {
-      return NextResponse.json({ error: 'Could not remove shift' }, { status: 500 })
+      return scheduleMutationErrorResponse('Could not remove shift', ERROR_CODES.internalError, 500)
     }
 
     await writeAuditLog(supabase, {
@@ -1057,10 +1129,18 @@ export async function POST(request: Request) {
 
   if (payload.action === 'set_lead') {
     if (!payload.therapistId || !payload.shiftType || !payload.date) {
-      return NextResponse.json({ error: 'Missing designated lead data' }, { status: 400 })
+      return scheduleMutationErrorResponse(
+        'Missing designated lead data',
+        ERROR_CODES.invalidBody,
+        400
+      )
     }
     if (!isDateWithinRange(payload.date, cycle.start_date, cycle.end_date)) {
-      return NextResponse.json({ error: 'Date is outside this Schedule Block' }, { status: 400 })
+      return scheduleMutationErrorResponse(
+        'Date is outside this Schedule Block',
+        ERROR_CODES.dateOutsideCycle,
+        400
+      )
     }
 
     const { data: therapist, error: therapistError } = await supabase
@@ -1075,18 +1155,24 @@ export async function POST(request: Request) {
       (therapist.role !== 'therapist' && therapist.role !== 'lead') ||
       !therapist.is_lead_eligible
     ) {
-      return NextResponse.json(
-        { error: 'Only lead-eligible therapists can be designated as lead.' },
-        { status: 409 }
+      return scheduleMutationErrorResponse(
+        'Only lead-eligible therapists can be designated as lead.',
+        ERROR_CODES.leadNotEligible,
+        409
       )
     }
     if (therapist.site_id !== managerSiteId) {
-      return NextResponse.json({ error: 'Therapist is outside your site scope.' }, { status: 403 })
+      return scheduleMutationErrorResponse(
+        'Therapist is outside your site scope.',
+        ERROR_CODES.outsideSiteScope,
+        403
+      )
     }
     if (therapist.shift_type !== payload.shiftType) {
-      return NextResponse.json(
-        { error: 'Therapist shift type does not match the selected schedule shift.' },
-        { status: 409 }
+      return scheduleMutationErrorResponse(
+        'Therapist shift type does not match the selected schedule shift.',
+        ERROR_CODES.therapistShiftTypeMismatch,
+        409
       )
     }
     if (
@@ -1094,7 +1180,11 @@ export async function POST(request: Request) {
       Boolean(therapist.archived_at) ||
       therapist.on_fmla === true
     ) {
-      return NextResponse.json({ error: 'This therapist cannot be assigned.' }, { status: 409 })
+      return scheduleMutationErrorResponse(
+        'This therapist cannot be assigned.',
+        ERROR_CODES.therapistUnassignable,
+        409
+      )
     }
 
     const availabilityState = await getTherapistAvailabilityState(
@@ -1106,24 +1196,24 @@ export async function POST(request: Request) {
       payload.shiftType
     )
     if (availabilityState.error) {
-      return NextResponse.json({ error: availabilityState.error }, { status: 500 })
+      return scheduleMutationErrorResponse(availabilityState.error, ERROR_CODES.internalError, 500)
     }
     if (
       availabilityState.blockedByConstraints &&
       (availabilityState.inactiveOrFmla || availabilityState.prnNotOffered)
     ) {
-      return NextResponse.json(
-        {
-          error: availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
-        },
-        { status: 409 }
+      return scheduleMutationErrorResponse(
+        availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
+        ERROR_CODES.therapistUnassignable,
+        409
       )
     }
     if (availabilityState.blockedByConstraints && payload.availabilityOverride !== true) {
-      return NextResponse.json(
+      return scheduleMutationErrorResponse(
+        'Conflicts with scheduling constraints.',
+        ERROR_CODES.availabilityConflict,
+        409,
         {
-          error: 'Conflicts with scheduling constraints.',
-          code: 'availability_conflict',
           availability: {
             therapistId: payload.therapistId,
             therapistName: availabilityState.therapistName,
@@ -1131,8 +1221,7 @@ export async function POST(request: Request) {
             shiftType: payload.shiftType,
             reason: availabilityState.unavailableReason,
           },
-        },
-        { status: 409 }
+        }
       )
     }
 
@@ -1146,9 +1235,10 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (existingShiftError) {
-      return NextResponse.json(
-        { error: 'Failed to load existing shift for lead validation.' },
-        { status: 500 }
+      return scheduleMutationErrorResponse(
+        'Failed to load existing shift for lead validation.',
+        ERROR_CODES.internalError,
+        500
       )
     }
 
@@ -1161,23 +1251,27 @@ export async function POST(request: Request) {
           payload.shiftType
         )
         if (coverage.error) {
-          return NextResponse.json(
-            { error: 'Failed to validate daily coverage limit.' },
-            { status: 500 }
+          return scheduleMutationErrorResponse(
+            'Failed to validate daily coverage limit.',
+            ERROR_CODES.internalError,
+            500
           )
         }
         if (exceedsCoverageLimit(coverage.count, MAX_SHIFT_COVERAGE_PER_DAY)) {
-          return NextResponse.json(
-            {
-              error: `Each shift can have at most ${MAX_SHIFT_COVERAGE_PER_DAY} scheduled team members.`,
-            },
-            { status: 409 }
+          return scheduleMutationErrorResponse(
+            `Each shift can have at most ${MAX_SHIFT_COVERAGE_PER_DAY} scheduled team members.`,
+            ERROR_CODES.coverageLimitExceeded,
+            409
           )
         }
 
         const weekly = await getWorkedDatesInWeek(supabase, payload.therapistId, payload.date)
         if (weekly.error) {
-          return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
+          return scheduleMutationErrorResponse(
+            'Failed to validate weekly rule',
+            ERROR_CODES.internalError,
+            500
+          )
         }
         const weeklyLimit = await getTherapistWeeklyLimit(
           supabase,
@@ -1185,11 +1279,10 @@ export async function POST(request: Request) {
           managerSiteId
         )
         if (exceedsWeeklyLimit(weekly.dates, payload.date, weeklyLimit)) {
-          return NextResponse.json(
-            {
-              error: `Therapists are limited to ${weeklyLimit} day(s) per week unless override is enabled.`,
-            },
-            { status: 409 }
+          return scheduleMutationErrorResponse(
+            `Therapists are limited to ${weeklyLimit} day(s) per week unless override is enabled.`,
+            ERROR_CODES.weeklyLimitExceeded,
+            409
           )
         }
       }
@@ -1204,18 +1297,24 @@ export async function POST(request: Request) {
 
     if (!mutationResult.ok) {
       if (mutationResult.reason === 'lead_not_eligible') {
-        return NextResponse.json(
-          { error: 'Only lead-eligible therapists can be designated as lead.' },
-          { status: 409 }
+        return scheduleMutationErrorResponse(
+          'Only lead-eligible therapists can be designated as lead.',
+          ERROR_CODES.leadNotEligible,
+          409
         )
       }
       if (mutationResult.reason === 'multiple_leads_prevented') {
-        return NextResponse.json(
-          { error: 'A designated lead already exists for that shift.' },
-          { status: 409 }
+        return scheduleMutationErrorResponse(
+          'A designated lead already exists for that shift.',
+          ERROR_CODES.duplicateDesignatedLead,
+          409
         )
       }
-      return NextResponse.json({ error: 'Could not set designated lead.' }, { status: 500 })
+      return scheduleMutationErrorResponse(
+        'Could not set designated lead.',
+        ERROR_CODES.internalError,
+        500
+      )
     }
 
     await writeAuditLog(supabase, {
@@ -1250,9 +1349,10 @@ export async function POST(request: Request) {
       .eq('site_id', managerSiteId)
 
     if (overrideUpdateError) {
-      return NextResponse.json(
-        { error: 'Could not record availability override metadata.' },
-        { status: 500 }
+      return scheduleMutationErrorResponse(
+        'Could not record availability override metadata.',
+        ERROR_CODES.internalError,
+        500
       )
     }
 
@@ -1309,5 +1409,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Designated lead updated.' })
   }
 
-  return NextResponse.json({ error: 'Unsupported action' }, { status: 400 })
+  return scheduleMutationErrorResponse('Unsupported action', ERROR_CODES.unsupportedAction, 400)
 }

@@ -21,7 +21,11 @@ type Scenario = {
   coverageStatuses: Array<'scheduled' | 'on_call' | 'sick' | 'called_off'>
   weeklyShifts: Array<{ date: string; status: 'scheduled' | 'on_call' | 'sick' | 'called_off' }>
   cyclePublished?: boolean
+  cycleStatus?: 'draft' | 'final' | 'offline' | 'archived'
+  cycleArchivedAt?: string | null
   cycleSiteId?: string
+  managerRole?: string
+  managerSiteId?: string | null
   leadTherapistEligible?: boolean
   leadTherapistRole?: 'therapist' | 'lead' | 'manager'
   existingShiftForLead?: {
@@ -72,8 +76,8 @@ function makeSupabaseMock(scenario: Scenario) {
     start_date: '2026-03-01',
     end_date: '2026-03-31',
     published: scenario.cyclePublished ?? false,
-    status: scenario.cyclePublished ? 'final' : 'draft',
-    archived_at: null,
+    status: scenario.cycleStatus ?? (scenario.cyclePublished ? 'final' : 'draft'),
+    archived_at: scenario.cycleArchivedAt ?? null,
     site_id: scenario.cycleSiteId ?? 'site-a',
   }
 
@@ -95,12 +99,12 @@ function makeSupabaseMock(scenario: Scenario) {
   const profileById = (id: string) => {
     if (id === 'manager-1') {
       return {
-        role: 'manager',
+        role: scenario.managerRole ?? 'manager',
         is_lead_eligible: false,
         full_name: 'Manager',
         employment_type: 'full_time',
         max_work_days_per_week: 3,
-        site_id: 'site-a',
+        site_id: scenario.managerSiteId === undefined ? 'site-a' : scenario.managerSiteId,
         shift_type: null,
         is_active: true,
         archived_at: null,
@@ -427,8 +431,94 @@ describe('drag-drop API behavior', () => {
     expect(response.status).toBe(403)
     await expect(response.json()).resolves.toMatchObject({
       error: 'Invalid request origin.',
+      code: 'forbidden',
     })
     expect(createClient).not.toHaveBeenCalled()
+  })
+
+  it('returns typed invalid_body code for invalid request bodies', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        coverageStatuses: [],
+        weeklyShifts: [],
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({ cycleId: 'cycle-1' }),
+      })
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Invalid request body',
+      code: 'invalid_body',
+    })
+  })
+
+  it('returns typed manager_access_required code for non-manager access', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        managerRole: 'therapist',
+        coverageStatuses: [],
+        weeklyShifts: [],
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Manager access required',
+      code: 'manager_access_required',
+    })
+  })
+
+  it('returns typed cycle_read_only code for offline Schedule Blocks', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        cycleStatus: 'offline',
+        coverageStatuses: [],
+        weeklyShifts: [],
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'This Schedule Block is read-only until it is republished.',
+      code: 'cycle_read_only',
+    })
   })
 
   it('returns 409 when assign would exceed daily coverage', async () => {
@@ -457,6 +547,7 @@ describe('drag-drop API behavior', () => {
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toMatchObject({
       error: 'Each shift can have at most 5 scheduled team members.',
+      code: 'coverage_limit_exceeded',
     })
   })
 

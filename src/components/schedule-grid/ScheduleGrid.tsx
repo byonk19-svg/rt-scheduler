@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { createCoverageShiftMutator, type CoverageMutationError } from '@/lib/coverage/mutations'
 import { shiftTabToQueryValue } from '@/lib/coverage/coverage-shift-tab'
+import { SCHEDULE_MUTATION_ERROR_CODES as ERROR_CODES } from '@/lib/schedule-mutations/errors'
 import {
   toScheduleGridMutationPayload,
   type ScheduleGridAssignmentStatus,
@@ -69,12 +70,49 @@ const SAFE_MUTATION_ERROR_MESSAGES = [
   'Therapist shift type does not match the selected schedule shift.',
 ] as const
 
-function resolveScheduleGridMutationErrorMessage(
+type ScheduleGridMutationErrorCode = NonNullable<CoverageMutationError>['code']
+
+function resolveScheduleGridMutationErrorCodeMessage(
+  code: ScheduleGridMutationErrorCode,
+  message: string | undefined
+) {
+  switch (code) {
+    case ERROR_CODES.availabilityConflict:
+      return 'This therapist has a scheduling conflict. Review their availability before assigning.'
+    case ERROR_CODES.unauthorized:
+      return 'Your session expired. Sign in again, then retry this schedule change.'
+    case ERROR_CODES.forbidden:
+    case ERROR_CODES.managerAccessRequired:
+    case ERROR_CODES.managerSiteScopeRequired:
+    case ERROR_CODES.outsideSiteScope:
+      return 'You do not have permission to make this schedule change.'
+    case ERROR_CODES.cycleReadOnly:
+      return 'This Schedule Block is read-only until it is republished.'
+    case ERROR_CODES.cycleNotFound:
+    case ERROR_CODES.shiftNotFound:
+      return 'This schedule changed since you opened it. Refresh Schedule and try again.'
+    case ERROR_CODES.dateOutsideCycle:
+    case ERROR_CODES.therapistShiftTypeMismatch:
+    case ERROR_CODES.therapistUnassignable:
+    case ERROR_CODES.leadNotEligible:
+    case ERROR_CODES.coverageLimitExceeded:
+    case ERROR_CODES.weeklyLimitExceeded:
+    case ERROR_CODES.duplicateShift:
+    case ERROR_CODES.duplicateDesignatedLead:
+      return message ?? null
+    default:
+      return null
+  }
+}
+
+export function resolveScheduleGridMutationErrorMessage(
   action: ScheduleGridMutationAction,
   error: CoverageMutationError
 ) {
   const fallback = SCHEDULE_GRID_MUTATION_ERROR_MESSAGES[action]
   const message = error?.message?.trim()
+  const codeMessage = resolveScheduleGridMutationErrorCodeMessage(error?.code, message)
+  if (codeMessage) return codeMessage
   if (!message) return fallback
 
   const normalized = message.toLowerCase()

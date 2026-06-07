@@ -411,7 +411,7 @@ describe('ScheduleGrid feedback rendering', () => {
   )
 
   it(
-    'shows specific feedback when assignment fails on a known scheduling conflict',
+    'shows specific feedback from typed code when assignment fails on a scheduling conflict',
     async () => {
       const page = await browser.newPage()
       try {
@@ -420,7 +420,7 @@ describe('ScheduleGrid feedback rendering', () => {
           errors: {
             assign: {
               code: 'availability_conflict',
-              message: 'Conflicts with scheduling constraints.',
+              message: 'Availability copy changed.',
             },
           },
         })
@@ -463,7 +463,8 @@ describe('ScheduleGrid feedback rendering', () => {
           cellStatus: 'staff',
           errors: {
             updateStatus: {
-              message: 'This Schedule Block is read-only until it is republished.',
+              code: 'cycle_read_only',
+              message: 'Read-only copy changed.',
             },
           },
         })
