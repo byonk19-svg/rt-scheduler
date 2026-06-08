@@ -11,12 +11,14 @@ function readShiftBoardSources(): {
   routeSource: string
   clientSource: string
   modelSource: string
+  tabsSource: string
   requestCardSource: string
 } {
   return {
     routeSource: readShiftBoardSource('src/app/(app)/shift-board/page.tsx'),
     clientSource: readShiftBoardSource('src/components/shift-board/ShiftBoardClientPage.tsx'),
     modelSource: readShiftBoardSource('src/components/shift-board/shift-board-model.ts'),
+    tabsSource: readShiftBoardSource('src/lib/shift-board/tabs.ts'),
     requestCardSource: readShiftBoardSource('src/components/shift-board/ShiftBoardRequestCard.tsx'),
   }
 }
@@ -30,8 +32,8 @@ function scrubNonVisibleShiftBoardCopy(source: string): string {
 
 describe('shift-board route source contract', () => {
   it('sets route-specific metadata and keeps manager navigation language aligned with schedule', () => {
-    const { routeSource, clientSource, modelSource } = readShiftBoardSources()
-    const navigationSource = `${clientSource}\n${modelSource}`
+    const { routeSource, clientSource, modelSource, tabsSource } = readShiftBoardSources()
+    const navigationSource = `${clientSource}\n${modelSource}\n${tabsSource}`
 
     expect(routeSource).toContain("title: 'Shift Board'")
     expect(clientSource).toContain('Shift Board')
@@ -115,11 +117,14 @@ describe('shift-board route source contract', () => {
   })
 
   it('defaults the manager queue to Needs Action unless a notification tab is linked', () => {
-    const { routeSource, clientSource, modelSource } = readShiftBoardSources()
+    const { routeSource, clientSource, modelSource, tabsSource } = readShiftBoardSources()
 
     expect(clientSource).toContain('initialTab =')
     expect(clientSource).toContain('useState<ShiftBoardSection>(initialTab)')
-    expect(modelSource).toContain(": 'needs-action'")
+    expect(tabsSource).toContain(": 'needs-action'")
+    expect(modelSource).toContain("from '@/lib/shift-board/tabs'")
+    expect(routeSource).toContain("from '@/lib/shift-board/tabs'")
+    expect(routeSource).not.toContain("from '@/components/shift-board/shift-board-model'")
     expect(routeSource).toContain("initialTab === 'history' ? 'history' : 'open'")
   })
 

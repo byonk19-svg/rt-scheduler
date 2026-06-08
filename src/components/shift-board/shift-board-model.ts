@@ -10,6 +10,14 @@ import type {
 import type { UiRole } from '@/lib/auth/roles'
 import type { ShiftRole, ShiftType } from '@/lib/shift-types'
 import { MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
+import {
+  BOARD_SECTIONS,
+  resolveShiftBoardTab,
+  type ShiftBoardSection,
+} from '@/lib/shift-board/tabs'
+
+export { BOARD_SECTIONS, resolveShiftBoardTab }
+export type { ShiftBoardSection }
 
 export type Role = UiRole
 export type RequestStatus = Exclude<SharedRequestStatus, 'selected'>
@@ -81,7 +89,6 @@ export type ShiftBoardInitialSnapshot = {
 }
 
 export const HISTORY_STATUSES: RequestStatus[] = ['approved', 'denied', 'expired', 'withdrawn']
-export type ShiftBoardSection = 'needs-action' | 'open-shifts' | 'waiting' | 'history'
 export type TypeFilter = 'all' | RequestType
 export type ShiftFilter = 'all' | ShiftType
 export type StatusFilter =
@@ -93,19 +100,6 @@ export type StatusFilter =
   | 'denied'
   | 'expired'
   | 'withdrawn'
-
-export const BOARD_SECTIONS: Array<{ id: ShiftBoardSection; label: string }> = [
-  { id: 'needs-action', label: 'Needs Action' },
-  { id: 'open-shifts', label: 'Open coverage requests' },
-  { id: 'waiting', label: 'Waiting' },
-  { id: 'history', label: 'History' },
-]
-
-export function resolveShiftBoardTab(value: string | null): ShiftBoardSection {
-  return BOARD_SECTIONS.some((section) => section.id === value)
-    ? (value as ShiftBoardSection)
-    : 'needs-action'
-}
 
 export function getRequestTypeLabel(req: ShiftBoardRequest): string {
   if (req.type === 'swap' && req.visibility === 'direct') return 'Direct trade'

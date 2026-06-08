@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import ShiftBoardClientPage from '@/components/shift-board/ShiftBoardClientPage'
-import { resolveShiftBoardTab } from '@/components/shift-board/shift-board-model'
 import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
+import { resolveShiftBoardTab } from '@/lib/shift-board/tabs'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
