@@ -721,6 +721,7 @@ test.describe.serial('unified schedule grid route', () => {
     await expect(
       page.getByTestId(cellTestId(smoke.dayCore.id, smoke.liveCycle.day1))
     ).toBeDisabled()
+    // Therapists may see read-only OC status labels, but not the On call mutation control.
     await expect(page.getByRole('button', { name: 'On call' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Unassign' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Designate as lead' })).toHaveCount(0)

@@ -62,7 +62,7 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
 - Published cycles stay editable in `/schedule`.
 - Schedule presents the active published cycle as a live schedule rather than a locked artifact.
 - Manual assignment changes, removals, and lead changes remain available and are treated as post-publish modifications.
-- Published assignment status changes (`on_call`, `cancelled`, `call_in`, `left_early`) are shown on the shared schedule UI and included in therapist published-schedule change notifications.
+- Published assignment status changes (`on_call`, `cancelled`, `call_in`, `left_early`) are shown as read-only status labels on the shared schedule UI for therapists and included in therapist published-schedule change notifications. Only managers/leads get the assignment-status action controls.
 - `Start over` on a currently live cycle unpublishes it, clears shifts, and closes any active preliminary snapshot.
 
 ## 2) Manager: Schedule Grid Edits
