@@ -35,6 +35,9 @@ const domain = String(process.env.SEED_USERS_DOMAIN ?? 'teamwise.test').trim()
 const prefix = String(process.env.SEED_USERS_PREFIX ?? 'employee').trim()
 const defaultPassword = String(process.env.SEED_USERS_PASSWORD ?? 'Teamwise123!').trim()
 const includeManager = String(process.env.SEED_INCLUDE_MANAGER ?? 'false').toLowerCase() === 'true'
+const onboardingComplete =
+  String(process.env.SEED_USERS_ONBOARDING_COMPLETE ?? 'false').toLowerCase() === 'true'
+const DEMO_ONBOARDING_COMPLETED_AT = '2026-04-27T17:00:00.000Z'
 
 const rosterNames = [
   'Julie D.',
@@ -110,6 +113,8 @@ async function createOrGetUser({ email, password, fullName, role, shiftType }) {
 }
 
 async function upsertProfile({ id, fullName, email, role, shiftType }) {
+  const isStaffRole = role === 'therapist' || role === 'lead'
+  const isOnboardingComplete = onboardingComplete && isStaffRole
   const { error } = await supabase.from('profiles').upsert(
     {
       id,
@@ -117,8 +122,16 @@ async function upsertProfile({ id, fullName, email, role, shiftType }) {
       email,
       role,
       shift_type: shiftType,
-      staff_onboarding_required: role === 'therapist' || role === 'lead',
-      staff_onboarding_completed_at: null,
+      preferred_work_days: [],
+      preferred_work_days_mode: isOnboardingComplete ? 'no_preference' : 'unset',
+      staff_onboarding_required: isStaffRole,
+      staff_onboarding_preferences_confirmed_at: isOnboardingComplete
+        ? DEMO_ONBOARDING_COMPLETED_AT
+        : null,
+      staff_onboarding_theme_confirmed_at: isOnboardingComplete
+        ? DEMO_ONBOARDING_COMPLETED_AT
+        : null,
+      staff_onboarding_completed_at: isOnboardingComplete ? DEMO_ONBOARDING_COMPLETED_AT : null,
     },
     { onConflict: 'id' }
   )

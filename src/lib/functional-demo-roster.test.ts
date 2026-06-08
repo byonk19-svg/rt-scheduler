@@ -84,16 +84,19 @@ describe('functional demo real-roster fixture', () => {
     })
   })
 
-  it('leaves the functional demo draft block empty and routes seeded staff through first-run onboarding', () => {
+  it('leaves the functional demo draft block empty and marks login staff ready for app surfaces', () => {
     const source = readFileSync(resolve(process.cwd(), 'scripts/seed-functional-demo.mjs'), 'utf8')
 
     expect(source).toContain('const draftCount = 0')
     expect(source).toContain('empty for Auto-draft testing')
     expect(source).toContain('requestAnchorEmail')
+    expect(source).toContain(".eq('site_id', DEMO_SITE_ID)")
     expect(source).toContain("access_status: 'approved'")
-    expect(source).toContain(
-      "staff_onboarding_required: member.role === 'therapist' || member.role === 'lead'"
-    )
-    expect(source).toContain('staff_onboarding_completed_at: null')
+    expect(source).toContain("pattern_type: hasWeeklyPattern ? 'weekly_fixed' : 'none'")
+    expect(source).toContain("weekend_rule: 'none'")
+    expect(source).toContain('const isLoginStaff = member.login === true && isStaffRole')
+    expect(source).toContain("preferred_work_days_mode: isLoginStaff ? 'no_preference' : 'unset'")
+    expect(source).toContain('staff_onboarding_preferences_confirmed_at: isLoginStaff')
+    expect(source).toContain('staff_onboarding_completed_at: isLoginStaff')
   })
 })

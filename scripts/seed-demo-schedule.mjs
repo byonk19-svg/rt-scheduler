@@ -19,6 +19,7 @@ import { DEMO_PAPER_SCHEDULE } from './fixtures/demo-paper-schedule.mjs'
 const REQUIRED_FLAG = '--confirm-demo-schedule'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const DEMO_ONBOARDING_COMPLETED_AT = '2026-04-27T17:00:00.000Z'
 
 function getSupabaseProjectRef(urlValue) {
   try {
@@ -415,7 +416,7 @@ async function seedDemoSchedule() {
     is_lead_eligible: true,
     on_fmla: false,
     staff_onboarding_required: false,
-    staff_onboarding_completed_at: '2026-04-27T17:00:00.000Z',
+    staff_onboarding_completed_at: DEMO_ONBOARDING_COMPLETED_AT,
   })
 
   const staffRowsByName = new Map()
@@ -438,8 +439,12 @@ async function seedDemoSchedule() {
       is_active: true,
       is_lead_eligible: false,
       on_fmla: false,
+      preferred_work_days: [],
+      preferred_work_days_mode: 'no_preference',
       staff_onboarding_required: false,
-      staff_onboarding_completed_at: '2026-04-27T17:00:00.000Z',
+      staff_onboarding_preferences_confirmed_at: DEMO_ONBOARDING_COMPLETED_AT,
+      staff_onboarding_theme_confirmed_at: DEMO_ONBOARDING_COMPLETED_AT,
+      staff_onboarding_completed_at: DEMO_ONBOARDING_COMPLETED_AT,
     })
     await ensureWorkPattern(id, staff.shiftType)
     staffRowsByName.set(staff.fullName, { id, ...staff })

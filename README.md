@@ -128,7 +128,7 @@ For a fuller UAT dataset, run:
 npm run seed:functional
 ```
 
-That seed creates Teamwise real-roster demo accounts, a populated published cycle, an empty draft cycle for Auto-draft testing, and seeded swap-request scenarios for `/requests/new` and `/shift-board`.
+That seed creates Teamwise real-roster demo accounts, a populated published cycle, an empty draft cycle for Auto-draft testing, and seeded swap-request scenarios for `/requests/new` and `/shift-board`. It also marks login-enabled staff demo accounts as onboarding-complete for walkthroughs.
 
 Required env vars:
 
@@ -165,6 +165,7 @@ Optional env overrides:
 - `SEED_USERS_PREFIX`
 - `SEED_USERS_PASSWORD`
 - `SEED_INCLUDE_MANAGER` (`true` creates `manager@<domain>`)
+- `SEED_USERS_ONBOARDING_COMPLETE` (`true` marks seeded staff ready for app-surface walkthroughs)
 
 ## Sync team roster from a file (ops / email list)
 

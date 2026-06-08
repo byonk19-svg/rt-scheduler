@@ -6,7 +6,7 @@
  * Usage:
  *   node --env-file=.env.local scripts/seed-functional-demo.mjs
  *
- * Each run removes prior demo cycles (label starts with "Teamwise UAT") then recreates them.
+ * Each run removes prior cycles for the Teamwise UAT demo site then recreates them.
  * Optional --reset is the same behavior (kept for explicit scripting).
  *
  * Env (optional):
@@ -69,6 +69,7 @@ const defaultDomain = String(process.env.SEED_DOMAIN ?? FUNCTIONAL_DEMO_DOMAIN)
   .trim()
   .toLowerCase()
 const defaultPassword = String(process.env.SEED_PASSWORD ?? FUNCTIONAL_DEMO_PASSWORD).trim()
+const DEMO_ONBOARDING_COMPLETED_AT = '2026-04-27T17:00:00.000Z'
 
 function formatDate(date) {
   const y = date.getFullYear()
@@ -172,7 +173,7 @@ async function wipeDemoCycles() {
   const { data: rows, error: selErr } = await supabase
     .from('schedule_cycles')
     .select('id,label')
-    .like('label', `${DEMO_LABEL_PREFIX}%`)
+    .eq('site_id', DEMO_SITE_ID)
   if (selErr) throw selErr
   if (!rows?.length) {
     console.log('No demo cycles to remove.')
@@ -181,7 +182,7 @@ async function wipeDemoCycles() {
   const { error: delErr } = await supabase
     .from('schedule_cycles')
     .delete()
-    .like('label', `${DEMO_LABEL_PREFIX}%`)
+    .eq('site_id', DEMO_SITE_ID)
   if (delErr) throw delErr
   console.log(`Removed ${rows.length} demo cycle(s) and cascaded data.`)
 }
@@ -197,6 +198,7 @@ async function ensureSite(id, name = 'Default') {
 }
 
 async function ensureWorkPattern(therapistId, worksDow) {
+  const hasWeeklyPattern = worksDow.length > 0
   const { error } = await supabase.from('work_patterns').upsert(
     {
       therapist_id: therapistId,
@@ -206,6 +208,11 @@ async function ensureWorkPattern(therapistId, worksDow) {
       weekend_anchor_date: null,
       works_dow_mode: 'soft',
       shift_preference: 'either',
+      pattern_type: hasWeeklyPattern ? 'weekly_fixed' : 'none',
+      weekly_weekdays: worksDow,
+      weekend_rule: 'none',
+      cycle_anchor_date: null,
+      cycle_segments: [],
     },
     { onConflict: 'therapist_id' }
   )
@@ -599,6 +606,8 @@ export async function seedFunctionalDemo(options = {}) {
     const email = toSeedEmail(member, domain)
     const accountPassword = member.login ? password : undisclosedPassword
     const isLeadEligible = member.role === 'lead'
+    const isStaffRole = member.role === 'therapist' || member.role === 'lead'
+    const isLoginStaff = member.login === true && isStaffRole
     const id = await ensureAuthUser(userByEmail, email, accountPassword, {
       full_name: member.fullName,
       role: member.role,
@@ -619,12 +628,16 @@ export async function seedFunctionalDemo(options = {}) {
       on_fmla: member.onFmla === true,
       fmla_return_date: null,
       access_status: 'approved',
-      staff_onboarding_required: member.role === 'therapist' || member.role === 'lead',
-      staff_onboarding_completed_at: null,
+      preferred_work_days: [],
+      preferred_work_days_mode: isLoginStaff ? 'no_preference' : 'unset',
+      staff_onboarding_required: isStaffRole,
+      staff_onboarding_preferences_confirmed_at: isLoginStaff ? DEMO_ONBOARDING_COMPLETED_AT : null,
+      staff_onboarding_theme_confirmed_at: isLoginStaff ? DEMO_ONBOARDING_COMPLETED_AT : null,
+      staff_onboarding_completed_at: isLoginStaff ? DEMO_ONBOARDING_COMPLETED_AT : null,
     }
     await upsertProfile(profileRow)
 
-    if (member.role === 'therapist' || member.role === 'lead') {
+    if (isStaffRole) {
       if (member.employmentType === 'prn') {
         await ensureWorkPattern(id, [])
       } else {
