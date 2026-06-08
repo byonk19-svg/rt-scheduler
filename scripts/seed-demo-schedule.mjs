@@ -302,6 +302,7 @@ function buildRows({ cycleId, managerId, staffRowsByName, days }) {
           note: `${note} Highlighted/confirmed working cell.`,
           created_by: profile.id,
           source: 'therapist',
+          intent: 'therapist_wants_work',
         })
       }
       if (token === '*' || token === 'N') {
@@ -318,6 +319,7 @@ function buildRows({ cycleId, managerId, staffRowsByName, days }) {
               : `${note} Unavailable / need-off / PTO-style marker.`,
           created_by: profile.id,
           source: 'therapist',
+          intent: 'therapist_need_off',
         })
         availabilityRequests.push({
           user_id: profile.id,
