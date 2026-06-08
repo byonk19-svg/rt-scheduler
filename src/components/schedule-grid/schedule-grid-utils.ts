@@ -8,7 +8,7 @@ export type CellDisplay = {
 }
 
 const STATUS_CODE: Record<GridCellStatus, string> = {
-  lead: 'L',
+  lead: '1',
   staff: '1',
   on_call: 'OC',
   cancelled: 'CX',

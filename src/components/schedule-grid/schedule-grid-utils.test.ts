@@ -19,7 +19,7 @@ describe('getCellDisplay', () => {
 
     const display = getCellDisplay(cell)
 
-    expect(display.code).toBe('L')
+    expect(display.code).toBe('1')
     expect(display.colorClass).toContain('bg-yellow')
     expect(display.colorClass).toContain('border-yellow')
     expect(display.asterisk).toBe(false)

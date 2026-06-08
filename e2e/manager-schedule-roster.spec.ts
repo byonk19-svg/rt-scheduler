@@ -612,6 +612,8 @@ test.describe.serial('unified schedule grid route', () => {
     const leadCell = page.getByTestId(cellTestId(smoke.lead.id, smoke.liveCycle.day2))
     const candidateCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.liveCycle.day2))
     await expect(leadCell).toHaveText('1', { timeout: 30_000 })
+    await expect(leadCell).toHaveClass(/bg-yellow-200/)
+    await expect(leadCell).toHaveClass(/border-yellow-300/)
     await expect(candidateCell).toHaveText('1', { timeout: 30_000 })
     await expect(page.getByTestId(`total-${smoke.liveCycle.day2}`)).toHaveText('2')
 

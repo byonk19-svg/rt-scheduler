@@ -137,7 +137,7 @@ describe('ScheduleGridTable', () => {
     expect(html).toContain('data-testid="cell-u1-2026-05-04"')
     expect(html).toContain('bg-yellow-200')
     expect(html).toContain('border-yellow-300')
-    expect(html).toContain('L')
+    expect(html).toContain('>1</button>')
   })
 
   it('renders a needs-off asterisk', () => {
