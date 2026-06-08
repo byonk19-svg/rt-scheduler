@@ -114,7 +114,7 @@ test.describe.serial('coverage proactive risk warning', () => {
     await expect(page.getByText('Pre-flight summary')).toBeVisible({ timeout: 15_000 })
     await expect(
       page.getByText(
-        /\d+ unfilled assignments,\s+\d+ missing lead slots,\s+\d+ need-to-work misses\./
+        /\d+ unfilled assignments,\s+\d+ missing lead slots,\s+\d+ need-to-work misses,\s+\d+ missing availability submissions,\s+\d+ open Shift Board requests\./
       )
     ).toBeVisible({ timeout: 15_000 })
   })
