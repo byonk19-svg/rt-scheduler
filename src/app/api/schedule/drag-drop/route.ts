@@ -37,6 +37,10 @@ import {
 import { authorizeScheduleMutationManager } from '@/lib/schedule-mutations/authorize-manager'
 import { loadScheduleMutationCycle } from '@/lib/schedule-mutations/load-cycle'
 import { parseActionBody, type DragAction } from '@/lib/schedule-mutations/parse-action-body'
+import {
+  validateAssignableTherapist,
+  validateLeadEligibleTherapist,
+} from '@/lib/schedule-mutations/validate-therapist'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import {
   closePendingShiftPostsForShiftIds,
@@ -368,35 +372,17 @@ export async function POST(request: Request) {
       )
     }
 
-    const { data: targetProfile, error: targetProfileError } = await supabase
-      .from('profiles')
-      .select('site_id, shift_type, is_active, archived_at, on_fmla')
-      .eq('id', payload.userId)
-      .maybeSingle()
-
-    if (targetProfileError || targetProfile?.site_id !== managerSiteId) {
+    const targetTherapist = await validateAssignableTherapist(
+      supabase,
+      payload.userId,
+      managerSiteId,
+      payload.shiftType
+    )
+    if (!targetTherapist.ok) {
       return scheduleMutationErrorResponse(
-        'Therapist is outside your site scope.',
-        ERROR_CODES.outsideSiteScope,
-        403
-      )
-    }
-    if (targetProfile.shift_type !== payload.shiftType) {
-      return scheduleMutationErrorResponse(
-        'Therapist shift type does not match the selected schedule shift.',
-        ERROR_CODES.therapistShiftTypeMismatch,
-        409
-      )
-    }
-    if (
-      targetProfile.is_active === false ||
-      Boolean(targetProfile.archived_at) ||
-      targetProfile.on_fmla === true
-    ) {
-      return scheduleMutationErrorResponse(
-        'This therapist cannot be assigned.',
-        ERROR_CODES.therapistUnassignable,
-        409
+        targetTherapist.error,
+        targetTherapist.code,
+        targetTherapist.status
       )
     }
 
@@ -626,34 +612,17 @@ export async function POST(request: Request) {
         400
       )
     }
-    const { data: assignedProfile, error: assignedProfileError } = await supabase
-      .from('profiles')
-      .select('site_id, shift_type, is_active, archived_at, on_fmla')
-      .eq('id', assignedUserId)
-      .maybeSingle()
-    if (assignedProfileError || assignedProfile?.site_id !== managerSiteId) {
+    const assignedTherapist = await validateAssignableTherapist(
+      supabase,
+      assignedUserId,
+      managerSiteId,
+      payload.targetShiftType
+    )
+    if (!assignedTherapist.ok) {
       return scheduleMutationErrorResponse(
-        'Therapist is outside your site scope.',
-        ERROR_CODES.outsideSiteScope,
-        403
-      )
-    }
-    if (assignedProfile.shift_type !== payload.targetShiftType) {
-      return scheduleMutationErrorResponse(
-        'Therapist shift type does not match the selected schedule shift.',
-        ERROR_CODES.therapistShiftTypeMismatch,
-        409
-      )
-    }
-    if (
-      assignedProfile.is_active === false ||
-      Boolean(assignedProfile.archived_at) ||
-      assignedProfile.on_fmla === true
-    ) {
-      return scheduleMutationErrorResponse(
-        'This therapist cannot be assigned.',
-        ERROR_CODES.therapistUnassignable,
-        409
+        assignedTherapist.error,
+        assignedTherapist.code,
+        assignedTherapist.status
       )
     }
 
@@ -968,47 +937,17 @@ export async function POST(request: Request) {
       )
     }
 
-    const { data: therapist, error: therapistError } = await supabase
-      .from('profiles')
-      .select('id, role, is_lead_eligible, site_id, shift_type, is_active, archived_at, on_fmla')
-      .eq('id', payload.therapistId)
-      .maybeSingle()
-
-    if (
-      therapistError ||
-      !therapist ||
-      (therapist.role !== 'therapist' && therapist.role !== 'lead') ||
-      !therapist.is_lead_eligible
-    ) {
+    const leadTherapist = await validateLeadEligibleTherapist(
+      supabase,
+      payload.therapistId,
+      managerSiteId,
+      payload.shiftType
+    )
+    if (!leadTherapist.ok) {
       return scheduleMutationErrorResponse(
-        'Only lead-eligible therapists can be designated as lead.',
-        ERROR_CODES.leadNotEligible,
-        409
-      )
-    }
-    if (therapist.site_id !== managerSiteId) {
-      return scheduleMutationErrorResponse(
-        'Therapist is outside your site scope.',
-        ERROR_CODES.outsideSiteScope,
-        403
-      )
-    }
-    if (therapist.shift_type !== payload.shiftType) {
-      return scheduleMutationErrorResponse(
-        'Therapist shift type does not match the selected schedule shift.',
-        ERROR_CODES.therapistShiftTypeMismatch,
-        409
-      )
-    }
-    if (
-      therapist.is_active === false ||
-      Boolean(therapist.archived_at) ||
-      therapist.on_fmla === true
-    ) {
-      return scheduleMutationErrorResponse(
-        'This therapist cannot be assigned.',
-        ERROR_CODES.therapistUnassignable,
-        409
+        leadTherapist.error,
+        leadTherapist.code,
+        leadTherapist.status
       )
     }
 

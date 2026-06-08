@@ -111,6 +111,10 @@ const loadScheduleMutationCycleSource = readFileSync(
   resolve(process.cwd(), 'src/lib/schedule-mutations/load-cycle.ts'),
   'utf8'
 )
+const validateTherapistSource = readFileSync(
+  resolve(process.cwd(), 'src/lib/schedule-mutations/validate-therapist.ts'),
+  'utf8'
+)
 const assignmentStatusRouteSource = readFileSync(
   resolve(process.cwd(), 'src/app/api/schedule/assignment-status/route.ts'),
   'utf8'
@@ -214,8 +218,14 @@ describe('schedule lifecycle hardening', () => {
       ".select('id, site_id, start_date, end_date, published, status, archived_at')"
     )
     expect(loadScheduleMutationCycleSource).toContain('cycle.site_id !== managerSiteId')
-    expect(dragDropRouteSource).toContain('targetProfile.is_active === false')
-    expect(dragDropRouteSource).toContain('Boolean(targetProfile.archived_at)')
+    expect(dragDropRouteSource).toContain('validateAssignableTherapist')
+    expect(dragDropRouteSource).toContain('validateLeadEligibleTherapist')
+    expect(validateTherapistSource).toContain(
+      "select('site_id, shift_type, is_active, archived_at, on_fmla')"
+    )
+    expect(validateTherapistSource).toContain('therapist.is_active === false')
+    expect(validateTherapistSource).toContain('Boolean(therapist.archived_at)')
+    expect(validateTherapistSource).toContain('therapist.on_fmla === true')
     expect(dragDropRouteSource).toContain(".eq('cycle_id', payload.cycleId)")
     expect(dragDropRouteSource).toContain(".eq('site_id', managerSiteId)")
     expect(assignmentStatusRouteSource).toContain(
