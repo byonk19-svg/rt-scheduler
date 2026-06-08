@@ -35,6 +35,7 @@ import {
   type ScheduleMutationErrorCode,
 } from '@/lib/schedule-mutations/errors'
 import { authorizeScheduleMutationManager } from '@/lib/schedule-mutations/authorize-manager'
+import { loadScheduleMutationCycle } from '@/lib/schedule-mutations/load-cycle'
 import { parseActionBody, type DragAction } from '@/lib/schedule-mutations/parse-action-body'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import {
@@ -341,29 +342,11 @@ export async function POST(request: Request) {
     return scheduleMutationErrorResponse('Invalid request body', ERROR_CODES.invalidBody, 400)
   }
 
-  const { data: cycle, error: cycleError } = await supabase
-    .from('schedule_cycles')
-    .select('id, site_id, start_date, end_date, published, status, archived_at')
-    .eq('id', payload.cycleId)
-    .maybeSingle()
-
-  if (cycleError || !cycle) {
-    return scheduleMutationErrorResponse('Schedule Block not found', ERROR_CODES.cycleNotFound, 404)
+  const cycleLoad = await loadScheduleMutationCycle(supabase, payload.cycleId, managerSiteId)
+  if (!cycleLoad.ok) {
+    return scheduleMutationErrorResponse(cycleLoad.error, cycleLoad.code, cycleLoad.status)
   }
-  if (cycle.site_id !== managerSiteId) {
-    return scheduleMutationErrorResponse(
-      'Schedule Block is outside your site scope.',
-      ERROR_CODES.outsideSiteScope,
-      403
-    )
-  }
-  if (cycle.status === 'offline' || cycle.status === 'archived' || cycle.archived_at) {
-    return scheduleMutationErrorResponse(
-      'This Schedule Block is read-only until it is republished.',
-      ERROR_CODES.cycleReadOnly,
-      409
-    )
-  }
+  const { cycle } = cycleLoad
 
   const { data: activePreliminarySnapshot } = await supabase
     .from('preliminary_snapshots')

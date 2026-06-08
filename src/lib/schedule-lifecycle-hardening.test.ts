@@ -107,6 +107,10 @@ const dragDropRouteSource = readFileSync(
   resolve(process.cwd(), 'src/app/api/schedule/drag-drop/route.ts'),
   'utf8'
 )
+const loadScheduleMutationCycleSource = readFileSync(
+  resolve(process.cwd(), 'src/lib/schedule-mutations/load-cycle.ts'),
+  'utf8'
+)
 const assignmentStatusRouteSource = readFileSync(
   resolve(process.cwd(), 'src/app/api/schedule/assignment-status/route.ts'),
   'utf8'
@@ -205,10 +209,11 @@ describe('schedule lifecycle hardening', () => {
     expect(shiftActionsSource).toContain('therapist.on_fmla === true')
     expect(shiftActionsSource).toContain('shift.cycle_id !== cycleId')
     expect(shiftActionsSource).toContain(".delete().eq('id', shiftId).eq('cycle_id', cycleId)")
-    expect(dragDropRouteSource).toContain(
+    expect(dragDropRouteSource).toContain('loadScheduleMutationCycle')
+    expect(loadScheduleMutationCycleSource).toContain(
       ".select('id, site_id, start_date, end_date, published, status, archived_at')"
     )
-    expect(dragDropRouteSource).toContain('cycle.site_id !== managerSiteId')
+    expect(loadScheduleMutationCycleSource).toContain('cycle.site_id !== managerSiteId')
     expect(dragDropRouteSource).toContain('targetProfile.is_active === false')
     expect(dragDropRouteSource).toContain('Boolean(targetProfile.archived_at)')
     expect(dragDropRouteSource).toContain(".eq('cycle_id', payload.cycleId)")
@@ -328,7 +333,8 @@ describe('schedule lifecycle hardening', () => {
     expect(shiftActionsSource).toContain('isReadOnlyScheduleBlock')
     expect(shiftActionsSource).toContain("cycle.status === 'offline'")
     expect(templateActionsSource).toContain("cycle.status !== 'draft'")
-    expect(dragDropRouteSource).toContain("cycle.status === 'offline'")
+    expect(dragDropRouteSource).toContain('loadScheduleMutationCycle')
+    expect(loadScheduleMutationCycleSource).toContain("cycle.status === 'offline'")
     expect(assignmentStatusRouteSource).toContain("preflightCycle?.status === 'offline'")
   })
 })
