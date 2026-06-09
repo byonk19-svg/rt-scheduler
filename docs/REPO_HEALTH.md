@@ -2,7 +2,7 @@
 
 Date: June 8, 2026
 Branch: `main`
-Validated commit: `07e7e73e66bdcdc740a05f9e1db40f47f5e605e4`
+Validated commit: `c5ed81f16b2397e07981e52fabe3e6826ccb207f`
 
 This file is a point-in-time snapshot for future maintainers and Codex runs. It is not a guarantee that every workflow is production-ready.
 
@@ -24,6 +24,7 @@ Recent stabilization work on `main` includes:
 - The paper-schedule demo fixture uses the current availability intent values.
 - Schedule lead cells display `1` and keep the yellow lead highlight.
 - Therapist schedule views may show read-only status labels like `OC`, but do not expose manager/lead assignment-status action controls.
+- Full local Chromium E2E is green after aligning the proactive-risk pre-flight summary and role-journey notification expectations with the current UI.
 
 ## Architecture Notes
 
@@ -35,33 +36,31 @@ Recent stabilization work on `main` includes:
 
 ## Current Verification
 
-The following commands were run during the June 8, 2026 post-fix demo sweep:
+The following commands were run during the June 8, 2026 post-E2E-fix demo readiness sweep:
 
+- Passed: `npm run seed:functional`
 - Passed: `npm run format:check`
 - Passed: `npm run lint`
 - Passed: `npm run typecheck`
 - Passed: `npm run test:unit` (`250` parallel test files / `1547` tests, plus `2` browser-backed test files / `5` tests)
 - Passed: `npm audit --omit=dev` (`0` vulnerabilities)
 - Passed: `npm run build`
-- Passed after removing stale generated `.next` output: `npm run build`
-- Passed: `npm run seed:functional`
-- Blocked by its hosted-project safety gate: `npm run seed:demo-schedule`
-- Passed in production mode against `http://127.0.0.1:3001`: `npx playwright test e2e/manager-schedule-roster.spec.ts --project=chromium --reporter=line`
-- Full Chromium Playwright was run: `npx playwright test --project=chromium --reporter=line`
-  - Result: `80` passed, `10` skipped, `8` did not run, `2` failed.
-  - Failed: `e2e/coverage-proactive-risk.spec.ts` did not find the pre-flight summary text after auto-draft.
-  - Failed: `e2e/role-journeys.spec.ts` did not find the therapist notification text `Published schedule updated`.
+- Passed after the full E2E dev server rewrote `.next` into a dev-artifact shape: `npm run build`
+- Passed: `npx playwright test --project=chromium --reporter=line`
+  - Result: `90` passed, `10` skipped, `0` failed.
+  - The previously failing `e2e/coverage-proactive-risk.spec.ts` and `e2e/role-journeys.spec.ts` paths passed.
+- Not run separately: `npm run test:e2e`. The repo's configured Playwright project is Chromium, so the direct full Chromium command covered the same project without repeating the 26-minute suite.
 
-Production-mode browser smoke with configured demo accounts also passed for public homepage, unauthenticated `/schedule` redirect, manager dashboard, `/team`, `/schedule`, cycle picker, day/night controls, `/availability`, `/requests`, `/profile`, manager `/shift-board`, staff `/dashboard/staff`, `/therapist/availability`, `/requests/new`, `/profile`, staff `/shift-board`, and staff `/schedule`. The staff schedule check confirmed manager-only mutation controls, including `On call`, were not present. A fast navigation smoke initially produced one aborted-fetch console error on `/requests/new`; a focused `/requests/new` production check with settle time returned `200` and captured zero console errors.
+Production-mode browser smoke against `http://127.0.0.1:3001` also passed with the configured demo accounts. It checked the public homepage, unauthenticated `/schedule` redirect, manager dashboard, manager `/schedule`, manager `/shift-board`, staff dashboard, staff `/schedule`, and staff `/shift-board`. No browser console errors were captured during that smoke.
 
-The focused production schedule spec validated assign, unassign, set lead, assignment-status update, lead cell `1` display, yellow lead highlight, and therapist read-only schedule behavior. A separate configured-manager hand walkthrough did not independently exercise move; use a focused follow-up if the move gesture must be demonstrated live.
+The earlier post-fix production schedule spec validated assign, unassign, set lead, assignment-status update, lead cell `1` display, yellow lead highlight, and therapist read-only schedule behavior. A separate configured-manager hand walkthrough did not independently exercise move; use a focused follow-up if the move gesture must be demonstrated live.
 
 ## Known Limitations / Risk Notes
 
 - This is still demo-stage unless production deployment, secrets, Supabase project config, cron, webhooks, backups, and UAT are verified.
 - Schedule mutation logic remains business-critical and should be changed carefully.
 - Seeded E2E coverage depends on Supabase secrets and service-role access.
-- The full local Chromium E2E suite is not green as of this snapshot; triage the two failing specs before claiming complete E2E confidence.
+- Full local Chromium E2E is green as of this snapshot, but that is still demo-readiness evidence, not production approval.
 - `npm run seed:demo-schedule` requires `SEED_DEMO_SCHEDULE_PROJECT_REFS` for hosted dev/test Supabase projects and should not be allowlisted for production projects.
 - `docs/REPO_HEALTH.md` is a snapshot, not a guarantee.
 - Dependency audit results are time-sensitive. Rerun `npm audit --omit=dev` after lockfile or package changes.
