@@ -991,7 +991,7 @@ test.describe.serial('role journeys', () => {
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await page.goto('/notifications')
     await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
-    await expect(page.getByText('Published schedule updated').first()).toBeVisible()
+    await expect(page.getByText('Published schedule changed').first()).toBeVisible()
     await expect(page.getByText(/call in/i).first()).toBeVisible()
 
     await page.getByRole('button', { name: 'Mark all read' }).click()
@@ -1047,14 +1047,17 @@ test.describe.serial('role journeys', () => {
     const managerPage = await managerContext.newPage()
     try {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
-      await gotoWithRetry(managerPage, '/shift-board')
+      await gotoWithRetry(managerPage, '/shift-board?tab=open-shifts')
       await managerPage.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined)
       await expect(managerPage.getByRole('heading', { name: 'Shift Board' })).toBeVisible({
         timeout: 20_000,
       })
 
-      await managerPage.getByRole('button', { name: /Open coverage requests -/ }).click()
-      await expect(managerPage.locator('main')).toContainText(requestMessage, { timeout: 20_000 })
+      const managerCard = managerPage
+        .locator('div.rounded-xl')
+        .filter({ has: managerPage.getByText(requestMessage) })
+        .first()
+      await expect(managerCard).toBeVisible({ timeout: 20_000 })
       const denyResult = await ctx!.supabase
         .from('shift_posts')
         .update({ status: 'denied' })
