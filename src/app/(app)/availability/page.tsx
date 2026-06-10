@@ -525,6 +525,7 @@ export default async function AvailabilityPage({
     .in('role', ['therapist', 'lead'])
     .eq('is_active', true)
     .is('archived_at', null)
+    .eq('on_fmla', false)
     .eq('site_id', profile.site_id)
     .order('full_name', { ascending: true })
 

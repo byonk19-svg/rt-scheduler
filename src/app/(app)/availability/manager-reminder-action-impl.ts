@@ -9,10 +9,17 @@ import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import { getPublishEmailConfig } from '@/lib/publish-events'
 import { getAuthenticatedUserWithRole } from './_actions/shared'
 
-export async function sendAvailabilityRemindersAction(
-  cycleId: string
-): Promise<{ sent: number; skipped: number; failed: number; error?: string }> {
-  const { supabase, role, siteId, permissionContext } = await getAuthenticatedUserWithRole()
+const AVAILABILITY_REMINDER_AUDIT_ACTION = 'availability_reminders_sent'
+const RECENT_REMINDER_WINDOW_HOURS = 24
+
+export async function sendAvailabilityRemindersAction(cycleId: string): Promise<{
+  sent: number
+  skipped: number
+  failed: number
+  error?: string
+  lastSentAt?: string
+}> {
+  const { supabase, user, role, siteId, permissionContext } = await getAuthenticatedUserWithRole()
 
   if (!siteId || !can(role, 'access_manager_ui', permissionContext)) {
     return { sent: 0, skipped: 0, failed: 0, error: 'unauthorized' }
@@ -34,6 +41,31 @@ export async function sendAvailabilityRemindersAction(
   }
 
   const cycleDateRange = formatHumanCycleRange(cycle.start_date, cycle.end_date)
+
+  const recentReminderCutoff = new Date(
+    Date.now() - RECENT_REMINDER_WINDOW_HOURS * 60 * 60 * 1000
+  ).toISOString()
+  const { data: recentReminderRows, error: recentReminderError } = await supabase
+    .from('audit_log')
+    .select('created_at')
+    .eq('action', AVAILABILITY_REMINDER_AUDIT_ACTION)
+    .eq('target_type', 'schedule_cycle')
+    .eq('target_id', cycleId)
+    .gte('created_at', recentReminderCutoff)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (recentReminderError) {
+    console.error('[sendAvailabilityRemindersAction] reminder audit lookup failed:', {
+      message: recentReminderError.message,
+    })
+    return { sent: 0, skipped: 0, failed: 0, error: 'db_error' }
+  }
+
+  const lastSentAt = recentReminderRows?.[0]?.created_at
+  if (lastSentAt) {
+    return { sent: 0, skipped: 0, failed: 0, error: 'recently_sent', lastSentAt }
+  }
 
   const { data: profileRows, error: profileError } = await supabase
     .from('profiles')
@@ -95,6 +127,21 @@ export async function sendAvailabilityRemindersAction(
       resendApiUrl: emailConfig.resendApiUrl,
     },
   })
+
+  if (sent > 0 || failed > 0) {
+    const { error: auditError } = await supabase.from('audit_log').insert({
+      user_id: user.id,
+      action: AVAILABILITY_REMINDER_AUDIT_ACTION,
+      target_type: 'schedule_cycle',
+      target_id: cycleId,
+    })
+
+    if (auditError) {
+      console.error('[sendAvailabilityRemindersAction] reminder audit write failed:', {
+        message: auditError.message,
+      })
+    }
+  }
 
   return { sent, skipped, failed }
 }

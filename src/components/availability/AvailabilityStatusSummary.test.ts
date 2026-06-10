@@ -172,6 +172,17 @@ describe('AvailabilityStatusSummary', () => {
 
     expect(source).toContain('all missing submissions for the Schedule')
     expect(source).toContain('even if the queue is filtered')
+    expect(source).toContain('email with a link to')
+  })
+
+  it('surfaces recent duplicate reminder protection to the manager', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/AvailabilityStatusSummary.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain("result.error === 'recently_sent'")
+    expect(source).toContain('Reminders were already sent recently for this Schedule Block')
   })
 
   it('does not render the send-reminders button when the full reminder scope is empty', () => {

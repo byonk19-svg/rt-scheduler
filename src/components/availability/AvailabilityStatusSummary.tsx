@@ -48,7 +48,13 @@ type AvailabilityStatusSummaryProps = {
   activeShift?: 'day' | 'night'
   cycleId?: string
   reminderMissingCount?: number
-  onSendReminders?: () => Promise<{ sent: number; skipped: number; failed: number; error?: string }>
+  onSendReminders?: () => Promise<{
+    sent: number
+    skipped: number
+    failed: number
+    error?: string
+    lastSentAt?: string
+  }>
 }
 
 type CombinedRosterRow = AvailabilityStatusSummaryRow & {
@@ -151,6 +157,11 @@ export function AvailabilityStatusSummary({
       if (result.error === 'email_not_configured') {
         setToast({
           message: 'Failed to send reminders — check email configuration',
+          variant: 'error',
+        })
+      } else if (result.error === 'recently_sent') {
+        setToast({
+          message: 'Reminders were already sent recently for this Schedule Block',
           variant: 'error',
         })
       } else if (result.error) {
@@ -314,7 +325,8 @@ export function AvailabilityStatusSummary({
                   {reminderScopeMissingCount === 1 ? '' : 's'}{' '}
                   {reminderScopeMissingCount === 1 ? "hasn't" : "haven't"} submitted for this
                   Schedule Block. This sends reminders to all missing submissions for the Schedule
-                  Block, even if the queue is filtered.
+                  Block, even if the queue is filtered. They will receive an email with a link to
+                  submit availability.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

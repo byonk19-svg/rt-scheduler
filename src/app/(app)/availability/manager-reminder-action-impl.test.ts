@@ -22,7 +22,7 @@ vi.mock('@/lib/availability-reminders', () => ({
 import { sendAvailabilityRemindersAction } from '@/app/(app)/availability/manager-reminder-action-impl'
 
 type QueryFilter = {
-  method: 'eq' | 'in' | 'is'
+  method: 'eq' | 'in' | 'is' | 'gte' | 'order' | 'limit'
   column: string
   value: unknown
 }
@@ -37,6 +37,7 @@ function createReminderSupabaseMock({
   profileRows,
   submissionRows,
   cycleSiteId = 'site-main',
+  recentReminderRows = [],
 }: {
   profileRows: Array<{
     id: string
@@ -46,11 +47,14 @@ function createReminderSupabaseMock({
   }>
   submissionRows: Array<{ therapist_id: string }>
   cycleSiteId?: string
+  recentReminderRows?: Array<{ created_at: string }>
 }) {
   const queries: QueryRecord[] = []
+  const inserts: Array<{ table: string; payload: unknown }> = []
 
   return {
     queries,
+    inserts,
     from(table: string) {
       const query: QueryRecord = { table, filters: [] }
       queries.push(query)
@@ -71,6 +75,22 @@ function createReminderSupabaseMock({
         is(column: string, value: unknown) {
           query.filters.push({ method: 'is', column, value })
           return builder
+        },
+        gte(column: string, value: unknown) {
+          query.filters.push({ method: 'gte', column, value })
+          return builder
+        },
+        order(column: string, value: unknown) {
+          query.filters.push({ method: 'order', column, value })
+          return builder
+        },
+        limit(value: number) {
+          query.filters.push({ method: 'limit', column: 'limit', value })
+          return builder
+        },
+        insert(payload: unknown) {
+          inserts.push({ table, payload })
+          return Promise.resolve({ error: null })
         },
         maybeSingle: async () => {
           if (table === 'schedule_cycles') {
@@ -93,6 +113,10 @@ function createReminderSupabaseMock({
 
           if (table === 'therapist_availability_submissions') {
             return Promise.resolve(resolve({ data: submissionRows, error: null }))
+          }
+
+          if (table === 'audit_log') {
+            return Promise.resolve(resolve({ data: recentReminderRows, error: null }))
           }
 
           return Promise.resolve(resolve({ data: [], error: null }))
@@ -149,6 +173,7 @@ describe('sendAvailabilityRemindersAction', () => {
     })
     getAuthenticatedUserWithRoleMock.mockResolvedValue({
       supabase,
+      user: { id: 'manager-1' },
       role: 'manager',
       siteId: 'site-main',
       permissionContext: { isActive: true, archivedAt: null },
@@ -181,6 +206,17 @@ describe('sendAvailabilityRemindersAction', () => {
       supabase.queries.find((query) => query.table === 'therapist_availability_submissions')
         ?.filters
     ).toContainEqual({ method: 'eq', column: 'schedule_cycle_id', value: 'cycle-1' })
+    expect(supabase.inserts).toEqual([
+      {
+        table: 'audit_log',
+        payload: {
+          user_id: 'manager-1',
+          action: 'availability_reminders_sent',
+          target_type: 'schedule_cycle',
+          target_id: 'cycle-1',
+        },
+      },
+    ])
   })
 
   it('does not send reminders for a Schedule Block outside the manager site', async () => {
@@ -198,6 +234,7 @@ describe('sendAvailabilityRemindersAction', () => {
     })
     getAuthenticatedUserWithRoleMock.mockResolvedValue({
       supabase,
+      user: { id: 'manager-1' },
       role: 'manager',
       siteId: 'site-main',
       permissionContext: { isActive: true, archivedAt: null },
@@ -211,5 +248,76 @@ describe('sendAvailabilityRemindersAction', () => {
     expect(
       supabase.queries.some((query) => query.table === 'therapist_availability_submissions')
     ).toBe(false)
+  })
+
+  it('does not allow non-manager users to send reminders', async () => {
+    const supabase = createReminderSupabaseMock({
+      profileRows: [
+        {
+          id: 'missing-therapist',
+          full_name: 'Layne P.',
+          email: 'layne@example.com',
+          notification_email_enabled: true,
+        },
+      ],
+      submissionRows: [],
+    })
+    getAuthenticatedUserWithRoleMock.mockResolvedValue({
+      supabase,
+      user: { id: 'therapist-1' },
+      role: 'therapist',
+      siteId: 'site-main',
+      permissionContext: { isActive: true, archivedAt: null },
+    })
+
+    const result = await sendAvailabilityRemindersAction('cycle-1')
+
+    expect(result).toEqual({ sent: 0, skipped: 0, failed: 0, error: 'unauthorized' })
+    expect(sendReminderEmailsMock).not.toHaveBeenCalled()
+    expect(supabase.queries).toEqual([])
+    expect(supabase.inserts).toEqual([])
+  })
+
+  it('blocks duplicate reminder sends for the same Schedule Block within the recent window', async () => {
+    const supabase = createReminderSupabaseMock({
+      profileRows: [
+        {
+          id: 'missing-therapist',
+          full_name: 'Layne P.',
+          email: 'layne@example.com',
+          notification_email_enabled: true,
+        },
+      ],
+      submissionRows: [],
+      recentReminderRows: [{ created_at: '2026-06-10T10:30:00.000Z' }],
+    })
+    getAuthenticatedUserWithRoleMock.mockResolvedValue({
+      supabase,
+      user: { id: 'manager-1' },
+      role: 'manager',
+      siteId: 'site-main',
+      permissionContext: { isActive: true, archivedAt: null },
+    })
+
+    const result = await sendAvailabilityRemindersAction('cycle-1')
+
+    expect(result).toEqual({
+      sent: 0,
+      skipped: 0,
+      failed: 0,
+      error: 'recently_sent',
+      lastSentAt: '2026-06-10T10:30:00.000Z',
+    })
+    expect(sendReminderEmailsMock).not.toHaveBeenCalled()
+    expect(supabase.queries.find((query) => query.table === 'audit_log')?.filters).toEqual(
+      expect.arrayContaining([
+        { method: 'eq', column: 'action', value: 'availability_reminders_sent' },
+        { method: 'eq', column: 'target_type', value: 'schedule_cycle' },
+        { method: 'eq', column: 'target_id', value: 'cycle-1' },
+        expect.objectContaining({ method: 'gte', column: 'created_at' }),
+      ])
+    )
+    expect(supabase.queries.some((query) => query.table === 'profiles')).toBe(false)
+    expect(supabase.inserts).toEqual([])
   })
 })

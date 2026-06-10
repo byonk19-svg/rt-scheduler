@@ -107,6 +107,7 @@ describe('availability page role-specific actions', () => {
     expect(
       source.match(/\.eq\('site_id', profile\.site_id\)/g)?.length ?? 0
     ).toBeGreaterThanOrEqual(2)
+    expect(source).toContain(".eq('on_fmla', false)")
   })
 
   it('preserves successful empty availability states after checking for required read errors', () => {

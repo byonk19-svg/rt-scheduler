@@ -51,5 +51,7 @@ describe('availability workflow action exports', () => {
     expect(reminderAction).toContain(".eq('site_id', cycle.site_id)")
     expect(reminderAction).toContain(".from('therapist_availability_submissions')")
     expect(reminderAction).toContain(".eq('schedule_cycle_id', cycleId)")
+    expect(reminderAction).toContain(".from('audit_log')")
+    expect(reminderAction).toContain("'availability_reminders_sent'")
   })
 })
