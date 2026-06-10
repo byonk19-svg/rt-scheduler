@@ -130,6 +130,15 @@ describe('ScheduleGrid source invariants', () => {
     expect(code).not.toContain('Respiratory Therapy Night Shift')
   })
 
+  it('renders the confidentiality footer only on the print schedule surface', () => {
+    const code = source()
+
+    expect(code).toContain('Internal Use Only - Teamwise schedule information')
+    expect(code).toContain('should not be shared outside approved channels.')
+    expect(code).toContain('<footer className="print-only')
+    expect(code).toContain('text-[var(--print-ink-muted)]')
+  })
+
   it('keeps readiness issue target copy ASCII-safe', () => {
     const code = source()
 

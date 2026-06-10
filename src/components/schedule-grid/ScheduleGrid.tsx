@@ -667,6 +667,10 @@ export function ScheduleGrid({
             onCellClick={handleCellClick}
             interactionsDisabled={cellsLocked}
           />
+          <footer className="print-only border-t border-border/70 px-5 py-2 text-center text-[8px] font-semibold uppercase text-[var(--print-ink-muted)]">
+            Internal Use Only - Teamwise schedule information is for department staffing use and
+            should not be shared outside approved channels.
+          </footer>
         </article>
       </div>
       {isAssignTarget && activeCellTarget ? (
