@@ -121,6 +121,18 @@ describe('parseActionBody', () => {
     expect(parseActionBody({ action: 'assign' })).toBeNull()
   })
 
+  it.each(['', '   '])('rejects blank cycleId %#', (cycleId) => {
+    expect(
+      parseActionBody({
+        action: 'assign',
+        cycleId,
+        userId: 'therapist-1',
+        shiftType: 'day',
+        date: '2026-03-10',
+      })
+    ).toBeNull()
+  })
+
   it('rejects invalid shiftType values', () => {
     expect(
       parseActionBody({
@@ -137,40 +149,173 @@ describe('parseActionBody', () => {
     expect(parseActionBody({ action: 'swap', cycleId: 'cycle-1' })).toBeNull()
   })
 
-  it.each([undefined, 123])('rejects invalid or missing assign userId %#', (userId) => {
+  it.each([undefined, 123, '', '   '])(
+    'rejects invalid, missing, or blank assign userId %#',
+    (userId) => {
+      expect(
+        parseActionBody({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId,
+          shiftType: 'day',
+          date: '2026-03-10',
+        })
+      ).toBeNull()
+    }
+  )
+
+  it.each([undefined, 123, '', '   '])(
+    'rejects invalid, missing, or blank move shiftId %#',
+    (shiftId) => {
+      expect(
+        parseActionBody({
+          action: 'move',
+          cycleId: 'cycle-1',
+          shiftId,
+          targetDate: '2026-03-10',
+          targetShiftType: 'day',
+        })
+      ).toBeNull()
+    }
+  )
+
+  it.each(['', '   '])('rejects blank remove shiftId %#', (shiftId) => {
+    expect(
+      parseActionBody({
+        action: 'remove',
+        cycleId: 'cycle-1',
+        shiftId,
+      })
+    ).toBeNull()
+  })
+
+  it.each(['', '   '])('rejects blank remove userId %#', (userId) => {
+    expect(
+      parseActionBody({
+        action: 'remove',
+        cycleId: 'cycle-1',
+        userId,
+        date: '2026-03-10',
+        shiftType: 'day',
+      })
+    ).toBeNull()
+  })
+
+  it.each([undefined, 123, '', '   '])(
+    'rejects invalid, missing, or blank set_lead therapistId %#',
+    (therapistId) => {
+      expect(
+        parseActionBody({
+          action: 'set_lead',
+          cycleId: 'cycle-1',
+          therapistId,
+          date: '2026-03-10',
+          shiftType: 'day',
+        })
+      ).toBeNull()
+    }
+  )
+
+  it.each(['2026/03/10', '03-10-2026', '2026-3-10', '20260310', 'not-a-date', ''])(
+    'rejects invalid date format %#',
+    (date) => {
+      expect(
+        parseActionBody({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date,
+        })
+      ).toBeNull()
+    }
+  )
+
+  it.each(['2026-02-31', '2026-13-01', '2026-00-10', '2026-04-31', '2026-02-29'])(
+    'rejects impossible date %#',
+    (date) => {
+      expect(
+        parseActionBody({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date,
+        })
+      ).toBeNull()
+    }
+  )
+
+  it('accepts valid strict calendar dates including leap day', () => {
     expect(
       parseActionBody({
         action: 'assign',
         cycleId: 'cycle-1',
-        userId,
+        userId: 'therapist-1',
         shiftType: 'day',
         date: '2026-03-10',
       })
-    ).toBeNull()
+    ).toMatchObject({ date: '2026-03-10' })
+
+    expect(
+      parseActionBody({
+        action: 'assign',
+        cycleId: 'cycle-1',
+        userId: 'therapist-1',
+        shiftType: 'day',
+        date: '2028-02-29',
+      })
+    ).toMatchObject({ date: '2028-02-29' })
   })
 
-  it.each([undefined, 123])('rejects invalid or missing move shiftId %#', (shiftId) => {
+  it('trims ids and dates before returning parsed actions', () => {
+    expect(
+      parseActionBody({
+        action: 'assign',
+        cycleId: '  cycle-1  ',
+        userId: ' therapist-1 ',
+        shiftType: 'day',
+        date: ' 2026-03-10 ',
+      })
+    ).toEqual({
+      action: 'assign',
+      cycleId: 'cycle-1',
+      userId: 'therapist-1',
+      shiftType: 'day',
+      date: '2026-03-10',
+      role: undefined,
+      overrideWeeklyRules: false,
+      availabilityOverride: undefined,
+      availabilityOverrideReason: undefined,
+    })
+
     expect(
       parseActionBody({
         action: 'move',
-        cycleId: 'cycle-1',
-        shiftId,
-        targetDate: '2026-03-10',
-        targetShiftType: 'day',
+        cycleId: ' cycle-1 ',
+        shiftId: ' shift-1 ',
+        targetDate: ' 2026-03-11 ',
+        targetShiftType: 'night',
       })
-    ).toBeNull()
-  })
+    ).toMatchObject({
+      cycleId: 'cycle-1',
+      shiftId: 'shift-1',
+      targetDate: '2026-03-11',
+    })
 
-  it.each([undefined, 123])('rejects invalid or missing set_lead therapistId %#', (therapistId) => {
     expect(
       parseActionBody({
         action: 'set_lead',
-        cycleId: 'cycle-1',
-        therapistId,
-        date: '2026-03-10',
-        shiftType: 'day',
+        cycleId: ' cycle-1 ',
+        therapistId: ' therapist-1 ',
+        date: ' 2026-03-10 ',
+        shiftType: 'night',
       })
-    ).toBeNull()
+    ).toMatchObject({
+      cycleId: 'cycle-1',
+      therapistId: 'therapist-1',
+      date: '2026-03-10',
+    })
   })
 
   it('drops invalid role values while preserving valid lead and staff roles', () => {
@@ -258,6 +403,19 @@ describe('parseActionBody', () => {
     ).toMatchObject({ availabilityOverride: undefined })
   })
 
+  it('trims availabilityOverrideReason when it is a non-blank string', () => {
+    expect(
+      parseActionBody({
+        action: 'assign',
+        cycleId: 'cycle-1',
+        userId: 'therapist-1',
+        shiftType: 'day',
+        date: '2026-03-10',
+        availabilityOverrideReason: '  Manager approved  ',
+      })
+    ).toMatchObject({ availabilityOverrideReason: 'Manager approved' })
+  })
+
   it('preserves availabilityOverrideReason only when it is a string', () => {
     expect(
       parseActionBody({
@@ -281,4 +439,20 @@ describe('parseActionBody', () => {
       })
     ).toMatchObject({ availabilityOverrideReason: undefined })
   })
+
+  it.each(['', '   '])(
+    'normalizes blank availabilityOverrideReason to undefined %#',
+    (availabilityOverrideReason) => {
+      expect(
+        parseActionBody({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          availabilityOverrideReason,
+        })
+      ).toMatchObject({ availabilityOverrideReason: undefined })
+    }
+  )
 })
