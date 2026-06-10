@@ -65,6 +65,22 @@ The earlier post-fix production schedule spec validated assign, unassign, set le
 - `docs/REPO_HEALTH.md` is a snapshot, not a guarantee.
 - Dependency audit results are time-sensitive. Rerun `npm audit --omit=dev` after lockfile or package changes.
 
+## Production Readiness Verification
+
+Run the configuration-shape check before treating an environment as production-ready:
+
+```bash
+npm run verify:prod
+```
+
+By default, the command runs in local/demo mode and reports missing production integrations as warnings unless a feature is explicitly enabled. To enforce production requirements, run:
+
+```bash
+npm run verify:prod -- --production
+```
+
+The report checks required Supabase env vars, app URL shape, cron secrets, Resend/OpenAI/publish-worker/Sentry configuration, and whether demo/seed credentials are present. It reports variable names and remediation hints only; it must not print secret values. This check verifies configuration shape, not deployment ownership, webhook delivery, database backups, Supabase RLS policy state, or UAT approval.
+
 ## Demo Validation Flow
 
 Use this sequence when preparing a local demo from a fresh checkout:
