@@ -35,6 +35,7 @@ const ONE_PAGE_PDF_BYTES = Uint8Array.from(
 
 function createAdminMock() {
   const state = {
+    selects: [] as Array<{ table: string; columns: string }>,
     intakeUpserts: [] as Array<Record<string, unknown>>,
     attachmentUpserts: [] as Array<Record<string, unknown>>,
     itemInserts: [] as Array<Array<Record<string, unknown>>>,
@@ -49,8 +50,11 @@ function createAdminMock() {
     state,
     from(table: string) {
       const filters = new Map<string, unknown>()
+      let selectedColumns: string | null = null
       const builder = {
-        select() {
+        select(columns = '*') {
+          selectedColumns = columns
+          state.selects.push({ table, columns })
           return builder
         },
         in(column: string, value: unknown) {
@@ -140,22 +144,38 @@ function createAdminMock() {
         },
         then(resolve: (value: unknown) => unknown) {
           if (table === 'profiles') {
+            const rows = [
+              {
+                id: 'therapist-1',
+                full_name: 'Brianna Brown',
+                email: 'brianna@example.com',
+                is_active: true,
+              },
+              {
+                id: 'therapist-2',
+                full_name: 'Brian Brown',
+                email: 'brian@example.com',
+                is_active: true,
+              },
+            ]
+            const selected = new Set(
+              (selectedColumns ?? '*')
+                .split(',')
+                .map((column) => column.trim())
+                .filter(Boolean)
+            )
+            const data =
+              selected.has('*') || selected.size === 0
+                ? rows
+                : rows.map((row) =>
+                    Object.fromEntries(
+                      Object.entries(row).filter(([column]) => selected.has(column))
+                    )
+                  )
+
             return Promise.resolve(
               resolve({
-                data: [
-                  {
-                    id: 'therapist-1',
-                    full_name: 'Brianna Brown',
-                    email: 'brianna@example.com',
-                    is_active: true,
-                  },
-                  {
-                    id: 'therapist-2',
-                    full_name: 'Brian Brown',
-                    email: 'brian@example.com',
-                    is_active: true,
-                  },
-                ],
+                data,
                 error: null,
               })
             )
@@ -205,6 +225,13 @@ async function waitForAfterWork() {
   if (backgroundWork && typeof backgroundWork.then === 'function') {
     await backgroundWork
   }
+}
+
+function expectProfilesSelectIncludesEmail(admin: ReturnType<typeof createAdminMock>) {
+  expect(admin.state.selects).toContainEqual({
+    table: 'profiles',
+    columns: expect.stringMatching(/\bemail\b/),
+  })
 }
 
 describe('POST /api/inbound/availability-email', () => {
@@ -322,6 +349,77 @@ describe('POST /api/inbound/availability-email', () => {
         date: '2026-03-24',
       }),
     ])
+  })
+
+  it('auto-applies a high-confidence body request when the sender matches the therapist email', async () => {
+    const admin = createAdminMock()
+    createAdminClientMock.mockReturnValue(admin)
+
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input.endsWith('/email-1/attachments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: [],
+          }),
+        }
+      }
+
+      if (input.endsWith('/email-1')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              id: 'email-1',
+              from: { email: 'BRIANNA@example.com', name: 'Brianna Brown' },
+              subject: 'Availability',
+              text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+              created_at: '2026-03-20T12:00:00Z',
+              message_id: 'msg-1',
+            },
+          }),
+        }
+      }
+
+      throw new Error(`Unhandled fetch: ${input}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await POST(createWebhookRequest())
+
+    expect(response.status).toBe(200)
+    await waitForAfterWork()
+    expectProfilesSelectIncludesEmail(admin)
+    expect(admin.state.intakeUpserts[0]).toMatchObject({
+      parse_status: 'parsed',
+      item_count: 1,
+      auto_applied_count: 0,
+      needs_review_count: 0,
+      failed_count: 0,
+    })
+    expect(admin.state.itemInserts[0]?.[0]).toMatchObject({
+      source_type: 'body',
+      parse_status: 'ready_to_apply',
+      confidence_level: 'high',
+      matched_therapist_id: 'therapist-1',
+      matched_cycle_id: 'cycle-1',
+    })
+    expect(admin.state.overrideUpserts[0]).toEqual([
+      expect.objectContaining({
+        therapist_id: 'therapist-1',
+        cycle_id: 'cycle-1',
+        date: '2026-03-24',
+      }),
+    ])
+    expect(admin.state.itemUpdates.at(-1)).toMatchObject({
+      parse_status: 'applied',
+      apply_method: 'auto',
+    })
+    expect(admin.state.intakeUpdates.at(-1)).toMatchObject({
+      parse_status: 'applied',
+      auto_applied_count: 1,
+      needs_review_count: 0,
+    })
   })
 
   it('treats generic pdf attachments as PDFs and auto-applies when confidence is high', async () => {
@@ -707,12 +805,16 @@ describe('POST /api/inbound/availability-email', () => {
 
     expect(response.status).toBe(200)
     await waitForAfterWork()
+    expectProfilesSelectIncludesEmail(admin)
     expect(admin.state.intakeUpserts[0]).toMatchObject({
       auto_applied_count: 0,
       needs_review_count: 1,
     })
     expect(admin.state.itemInserts[0]?.[0]).toMatchObject({
       parse_status: 'needs_review',
+      confidence_reasons: expect.arrayContaining([
+        'Sender email does not match the matched therapist profile.',
+      ]),
       matched_therapist_id: 'therapist-1',
     })
     expect(admin.state.overrideUpserts).toHaveLength(0)

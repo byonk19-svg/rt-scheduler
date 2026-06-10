@@ -61,8 +61,8 @@ type ResendAttachmentRecord = {
 type MatchableProfile = {
   id: string
   full_name: string
-  email?: string | null
-  is_active?: boolean | null
+  email: string | null
+  is_active: boolean | null
 }
 
 function getResendApiKey(): string {
@@ -230,7 +230,7 @@ async function processInboundAvailabilityEmail(emailId: string) {
 
   const { data: activeProfiles } = await admin
     .from('profiles')
-    .select('id, full_name, is_active')
+    .select('id, full_name, email, is_active')
     .in('role', ['therapist', 'lead'])
     .eq('is_active', true)
     .is('archived_at', null)
