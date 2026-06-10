@@ -222,6 +222,7 @@ describe('publish process route security', () => {
   })
 
   it('processes only the same-site publish event for browser managers', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     vi.mocked(createClient).mockResolvedValue(
       makeSupabaseMock({
         role: 'manager',
@@ -256,5 +257,9 @@ describe('publish process route security', () => {
       publishEventId: 'event-1',
       batchSize: 25,
     })
+    expect(infoSpy).toHaveBeenCalledTimes(2)
+    const events = infoSpy.mock.calls.map((call) => JSON.parse(String(call[0])).event)
+    expect(events).toEqual(['publish.process.requested', 'publish.process.completed'])
+    infoSpy.mockRestore()
   })
 })

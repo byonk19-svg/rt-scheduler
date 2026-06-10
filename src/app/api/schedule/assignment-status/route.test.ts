@@ -960,12 +960,17 @@ describe('assignment status API', () => {
     expect(response.status).toBe(500)
     expect(payload).toEqual({ error: 'Could not update assignment status.' })
     expect(JSON.stringify(payload)).not.toContain(rawInternalError)
-    expect(errorSpy).toHaveBeenCalledWith(
-      'Failed to update assignment status via Lottery-aware mutation:',
-      {
-        code: 'XX000',
-        error: rawInternalError,
-      }
-    )
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    const logged = JSON.parse(String(errorSpy.mock.calls[0][0])) as Record<string, unknown>
+    expect(logged).toMatchObject({
+      level: 'error',
+      event: 'assignment_status.update.failed',
+      assignment_id: 'shift-1',
+      user_id: 'manager-1',
+      site_id: 'site-1',
+      status: 'on_call',
+      code: 'XX000',
+    })
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(rawInternalError)
   })
 })

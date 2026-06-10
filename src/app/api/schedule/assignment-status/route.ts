@@ -11,6 +11,7 @@ import {
   type ScheduleGridAssignmentStatus,
 } from '@/lib/schedule/schedule-status-model'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
+import { captureSafeException, logStructuredEvent } from '@/lib/observability'
 import { writeAuditLog } from '@/lib/audit-log'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -250,10 +251,15 @@ export async function POST(request: Request) {
     if (mutation.code === 'P0002') {
       return NextResponse.json({ error: 'Assignment not found.' }, { status: 404 })
     }
-    console.error('Failed to update assignment status via Lottery-aware mutation:', {
+    const context = {
+      assignment_id: assignmentId,
+      user_id: user.id,
+      site_id: actorProfile.site_id,
+      status,
       code: mutation.code ?? null,
-      error: mutation.error,
-    })
+    }
+    logStructuredEvent('error', 'assignment_status.update.failed', context)
+    captureSafeException('assignment_status.update.failed', context)
     return NextResponse.json({ error: 'Could not update assignment status.' }, { status: 500 })
   }
 

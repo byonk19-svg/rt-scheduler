@@ -8,6 +8,7 @@ import { isValidPublishWorkerRequest } from '@/lib/security/worker-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { processQueuedPublishEmails } from '@/lib/publish-events'
 import { createClient } from '@/lib/supabase/server'
+import { captureSafeException, logStructuredEvent } from '@/lib/observability'
 
 type PublishProcessorActorProfile = {
   role: string | null
@@ -100,8 +101,14 @@ export async function POST(request: Request) {
   let admin: SupabaseClient
   try {
     admin = createAdminClient()
-  } catch (error) {
-    console.error('Failed to initialize admin client for publish processing:', error)
+  } catch {
+    const context = {
+      worker_request: allowWorkerRequest,
+      publish_event_id: publishEventId,
+      batch_size: batchSize,
+    }
+    logStructuredEvent('error', 'publish.process.admin_client_failed', context)
+    captureSafeException('publish.process.admin_client_failed', context)
     return NextResponse.json({ error: 'Could not initialize publish processing.' }, { status: 500 })
   }
 
@@ -127,13 +134,29 @@ export async function POST(request: Request) {
   }
 
   try {
+    logStructuredEvent('info', 'publish.process.requested', {
+      worker_request: allowWorkerRequest,
+      publish_event_id: publishEventId,
+      batch_size: batchSize,
+    })
     const result = await processQueuedPublishEmails(admin, {
       publishEventId,
       batchSize,
     })
+    logStructuredEvent('info', 'publish.process.completed', {
+      worker_request: allowWorkerRequest,
+      publish_event_id: publishEventId,
+      batch_size: batchSize,
+    })
     return NextResponse.json(result)
-  } catch (error) {
-    console.error('Failed to process queued publish emails:', error)
+  } catch {
+    const context = {
+      worker_request: allowWorkerRequest,
+      publish_event_id: publishEventId,
+      batch_size: batchSize,
+    }
+    logStructuredEvent('error', 'publish.process.failed', context)
+    captureSafeException('publish.process.failed', context)
     return NextResponse.json({ error: 'Could not process publish notifications.' }, { status: 500 })
   }
 }
