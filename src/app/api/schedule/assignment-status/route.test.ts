@@ -846,6 +846,7 @@ describe('assignment status API', () => {
   })
 
   it('enforces site scope via RPC errors', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const supabase = makeSupabaseMock({
       role: 'manager',
       userId: 'manager-1',
@@ -879,5 +880,92 @@ describe('assignment status API', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'Not authorized to update this assignment status.',
     })
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Assignment status RPC authorization denied:',
+      'Assignment is outside your site scope.'
+    )
+  })
+
+  it('returns not found when the privileged mutation reports a missing assignment', async () => {
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      userId: 'manager-1',
+      shiftLookup: {
+        date: '2026-02-23',
+        shift_type: 'day',
+        user_id: 'therapist-1',
+        published: false,
+      },
+    })
+    const admin = makeAdminClientMock({
+      rpcError: { code: 'P0002', message: 'No assignment matched update_assignment_status.' },
+    })
+    createAdminClientMock.mockReturnValue(admin.client)
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'on_call',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Assignment not found.',
+    })
+  })
+
+  it('returns a generic server error when the privileged mutation fails unexpectedly', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const rawInternalError =
+      'update_assignment_status failed: duplicate key value violates unique constraint internal_lottery_table'
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      userId: 'manager-1',
+      shiftLookup: {
+        date: '2026-02-23',
+        shift_type: 'day',
+        user_id: 'therapist-1',
+        published: false,
+      },
+    })
+    const admin = makeAdminClientMock({
+      rpcError: { code: 'XX000', message: rawInternalError },
+    })
+    createAdminClientMock.mockReturnValue(admin.client)
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'on_call',
+          note: 'Manager note must not affect the response payload',
+        }),
+      })
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(payload).toEqual({ error: 'Could not update assignment status.' })
+    expect(JSON.stringify(payload)).not.toContain(rawInternalError)
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Failed to update assignment status via Lottery-aware mutation:',
+      {
+        code: 'XX000',
+        error: rawInternalError,
+      }
+    )
   })
 })

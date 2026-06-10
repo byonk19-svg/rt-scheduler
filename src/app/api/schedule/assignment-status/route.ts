@@ -250,11 +250,11 @@ export async function POST(request: Request) {
     if (mutation.code === 'P0002') {
       return NextResponse.json({ error: 'Assignment not found.' }, { status: 404 })
     }
-    console.error('Failed to update assignment status via Lottery-aware mutation:', mutation.error)
-    return NextResponse.json(
-      { error: mutation.error || 'Could not update assignment status.' },
-      { status: 500 }
-    )
+    console.error('Failed to update assignment status via Lottery-aware mutation:', {
+      code: mutation.code ?? null,
+      error: mutation.error,
+    })
+    return NextResponse.json({ error: 'Could not update assignment status.' }, { status: 500 })
   }
 
   const row = {
