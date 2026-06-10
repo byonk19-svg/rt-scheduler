@@ -276,6 +276,49 @@ npm run screens:therapist
 
 That script prefers `SHOT_STAFF_EMAIL` / `SHOT_PASSWORD` when they work, but if the seeded staff login is stale it falls back to creating a temporary therapist user, authenticating Playwright with Supabase cookies, capturing the therapist routes, and deleting the temporary user afterward.
 
+Final responsive demo/UAT capture lane:
+
+```bash
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 npm run qa:responsive
+```
+
+Run it against the local production server after `npm run build` and `npm run start:prod:local`.
+The command captures desktop (`1440x900`), tablet (`834x1112`), and mobile (`390x844`) PNGs for:
+
+- public homepage, login, and signup
+- manager dashboard, Schedule, Availability, Team import, and Audit log
+- therapist dashboard, therapist schedule, and therapist availability
+
+Screenshots and `summary.json` are written under `artifacts/responsive-qa/<timestamp>/` and mirrored to
+`artifacts/responsive-qa/latest/`. The `artifacts/` directory is local-only and gitignored; do not commit these images.
+
+Coverage improves when these env vars point at a seeded local/demo Supabase environment:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SHOT_MANAGER_EMAIL` or `E2E_USER_EMAIL` (defaults to `julie.d@teamwise.test`)
+- `SHOT_STAFF_EMAIL` (defaults to `layne@teamwise.test`)
+- `SHOT_PASSWORD` or `E2E_USER_PASSWORD` (defaults to the demo password)
+
+If Supabase auth env vars are missing, `npm run qa:responsive` automatically runs in reduced public-only mode and
+prints that state in the terminal and `summary.json`. To force public-only mode even when auth env vars exist, run:
+
+```bash
+npm run qa:responsive -- --mode=public
+```
+
+To require authenticated seeded coverage and fail when auth cannot be established, run:
+
+```bash
+npm run qa:responsive -- --mode=seeded
+```
+
+Optional filters:
+
+```bash
+npm run qa:responsive -- --viewports=mobile,tablet --personas=manager
+```
+
 Recommended lane:
 
 - `npm run test:e2e` against `next dev` for routine regression coverage

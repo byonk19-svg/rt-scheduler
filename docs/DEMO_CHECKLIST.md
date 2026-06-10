@@ -43,6 +43,15 @@ http://127.0.0.1:3001
 
 Use `next dev` for iteration. Use the local production build for the final pre-demo browser pass.
 
+Capture the repeatable responsive QA artifact set:
+
+```bash
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 npm run qa:responsive
+```
+
+If Supabase/auth env vars are not configured, the command runs in reduced public-only mode and records that in
+`artifacts/responsive-qa/latest/summary.json`.
+
 ## Manual Browser Walkthrough
 
 - [ ] Public homepage loads.
@@ -61,6 +70,7 @@ Use `next dev` for iteration. Use the local production build for the final pre-d
 - [ ] Shift board loads.
 - [ ] Requests page loads.
 - [ ] Profile/theme page loads.
+- [ ] Responsive QA screenshots are captured for desktop, tablet, and mobile, or reduced public-only mode is understood.
 - [ ] No obvious browser console errors appear during the walkthrough.
 
 ## Optional Seeded E2E Validation

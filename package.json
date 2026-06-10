@@ -20,6 +20,7 @@
     "reset:e2e:fresh-auth": "node --env-file=.env.local scripts/reset-e2e-data.mjs --delete-auth-users",
     "screens:all": "node --env-file=.env.local scripts/capture-all-screens.mjs",
     "screens:therapist": "node --env-file=.env.local scripts/capture-therapist-validation.mjs",
+    "qa:responsive": "node scripts/capture-responsive-qa.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
     "cleanup:seed-users": "node --env-file=.env.local scripts/cleanup-seed-users.mjs",
     "cleanup:local": "node scripts/cleanup-local-artifacts.mjs",
