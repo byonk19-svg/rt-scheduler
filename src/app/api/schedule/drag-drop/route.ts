@@ -37,6 +37,7 @@ import {
 import { authorizeScheduleMutationManager } from '@/lib/schedule-mutations/authorize-manager'
 import { loadScheduleMutationCycle } from '@/lib/schedule-mutations/load-cycle'
 import { parseActionBody, type DragAction } from '@/lib/schedule-mutations/parse-action-body'
+import { buildAvailabilityOverrideMutationFields } from '@/lib/schedule-mutations/availability-override'
 import {
   validateAssignableTherapist,
   validateLeadEligibleTherapist,
@@ -464,14 +465,13 @@ export async function POST(request: Request) {
       }
     }
 
-    const shouldSetAvailabilityOverride =
-      availabilityState.blockedByConstraints &&
-      !availabilityState.inactiveOrFmla &&
-      payload.availabilityOverride === true
-    const normalizedAvailabilityOverrideReason =
-      typeof payload.availabilityOverrideReason === 'string'
-        ? payload.availabilityOverrideReason.trim() || null
-        : null
+    const availabilityOverrideFields = buildAvailabilityOverrideMutationFields({
+      blockedByConstraints: availabilityState.blockedByConstraints,
+      inactiveOrFmla: availabilityState.inactiveOrFmla,
+      availabilityOverride: payload.availabilityOverride,
+      availabilityOverrideReason: payload.availabilityOverrideReason,
+      actorId: userId,
+    })
 
     const { data: insertedShift, error } = await supabase
       .from('shifts')
@@ -483,12 +483,7 @@ export async function POST(request: Request) {
         shift_type: payload.shiftType,
         status: 'scheduled',
         role: payload.role ?? 'staff',
-        availability_override: shouldSetAvailabilityOverride,
-        availability_override_reason: shouldSetAvailabilityOverride
-          ? normalizedAvailabilityOverrideReason
-          : null,
-        availability_override_by: shouldSetAvailabilityOverride ? userId : null,
-        availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
+        ...availabilityOverrideFields,
       })
       .select('id')
       .maybeSingle()
@@ -710,26 +705,20 @@ export async function POST(request: Request) {
       }
     }
 
-    const shouldSetAvailabilityOverride =
-      availabilityState.blockedByConstraints &&
-      !availabilityState.inactiveOrFmla &&
-      payload.availabilityOverride === true
-    const normalizedAvailabilityOverrideReason =
-      typeof payload.availabilityOverrideReason === 'string'
-        ? payload.availabilityOverrideReason.trim() || null
-        : null
+    const availabilityOverrideFields = buildAvailabilityOverrideMutationFields({
+      blockedByConstraints: availabilityState.blockedByConstraints,
+      inactiveOrFmla: availabilityState.inactiveOrFmla,
+      availabilityOverride: payload.availabilityOverride,
+      availabilityOverrideReason: payload.availabilityOverrideReason,
+      actorId: userId,
+    })
 
     const { error } = await supabase
       .from('shifts')
       .update({
         date: payload.targetDate,
         shift_type: payload.targetShiftType,
-        availability_override: shouldSetAvailabilityOverride,
-        availability_override_reason: shouldSetAvailabilityOverride
-          ? normalizedAvailabilityOverrideReason
-          : null,
-        availability_override_by: shouldSetAvailabilityOverride ? userId : null,
-        availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
+        ...availabilityOverrideFields,
       })
       .eq('id', payload.shiftId)
       .eq('cycle_id', payload.cycleId)
@@ -1088,23 +1077,17 @@ export async function POST(request: Request) {
       targetId: `${payload.cycleId}:${payload.date}:${payload.shiftType}`,
     })
 
-    const shouldSetAvailabilityOverride =
-      availabilityState.blockedByConstraints &&
-      !availabilityState.inactiveOrFmla &&
-      payload.availabilityOverride === true
-    const normalizedAvailabilityOverrideReason =
-      typeof payload.availabilityOverrideReason === 'string'
-        ? payload.availabilityOverrideReason.trim() || null
-        : null
+    const availabilityOverrideFields = buildAvailabilityOverrideMutationFields({
+      blockedByConstraints: availabilityState.blockedByConstraints,
+      inactiveOrFmla: availabilityState.inactiveOrFmla,
+      availabilityOverride: payload.availabilityOverride,
+      availabilityOverrideReason: payload.availabilityOverrideReason,
+      actorId: userId,
+    })
     const { error: overrideUpdateError } = await supabase
       .from('shifts')
       .update({
-        availability_override: shouldSetAvailabilityOverride,
-        availability_override_reason: shouldSetAvailabilityOverride
-          ? normalizedAvailabilityOverrideReason
-          : null,
-        availability_override_by: shouldSetAvailabilityOverride ? userId : null,
-        availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
+        ...availabilityOverrideFields,
       })
       .eq('cycle_id', payload.cycleId)
       .eq('user_id', payload.therapistId)
