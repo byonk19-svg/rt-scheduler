@@ -5,7 +5,10 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { AvailabilityStatusSummary } from '@/components/availability/AvailabilityStatusSummary'
+import {
+  AvailabilityStatusSummary,
+  availabilityReminderResultToast,
+} from '@/components/availability/AvailabilityStatusSummary'
 
 describe('AvailabilityStatusSummary', () => {
   it('renders the queue-first roster with table-like columns and manager actions', () => {
@@ -183,6 +186,30 @@ describe('AvailabilityStatusSummary', () => {
 
     expect(source).toContain("result.error === 'recently_sent'")
     expect(source).toContain('Reminders were already sent recently for this Schedule Block')
+  })
+
+  it('surfaces duplicate marker write failure without presenting a clean success', () => {
+    const toast = availabilityReminderResultToast({
+      sent: 2,
+      skipped: 0,
+      failed: 1,
+      error: 'duplicate_marker_failed',
+    })
+
+    expect(toast).toEqual({
+      message:
+        'Reminders sent to 2 therapists; 1 failed, but duplicate protection could not be recorded. Avoid resending for 24 hours.',
+      variant: 'error',
+    })
+  })
+
+  it('does not describe failed-only reminder attempts as sent', () => {
+    const toast = availabilityReminderResultToast({ sent: 0, skipped: 0, failed: 2 })
+
+    expect(toast.variant).toBe('error')
+    expect(toast.message).toContain('No reminders sent')
+    expect(toast.message).toContain('2 failed')
+    expect(toast.message).not.toContain('Reminders sent to 0 therapists')
   })
 
   it('does not render the send-reminders button when the full reminder scope is empty', () => {

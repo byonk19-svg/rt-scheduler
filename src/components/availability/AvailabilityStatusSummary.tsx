@@ -34,6 +34,19 @@ export type AvailabilityRosterFilter =
   | 'submitted'
   | 'has_requests'
 
+export type AvailabilityReminderResult = {
+  sent: number
+  skipped: number
+  failed: number
+  error?: string
+  lastSentAt?: string
+}
+
+type AvailabilityReminderToast = {
+  message: string
+  variant: 'success' | 'error'
+}
+
 type AvailabilityStatusSummaryProps = {
   submittedRows: AvailabilityStatusSummaryRow[]
   missingRows: AvailabilityStatusSummaryRow[]
@@ -48,13 +61,7 @@ type AvailabilityStatusSummaryProps = {
   activeShift?: 'day' | 'night'
   cycleId?: string
   reminderMissingCount?: number
-  onSendReminders?: () => Promise<{
-    sent: number
-    skipped: number
-    failed: number
-    error?: string
-    lastSentAt?: string
-  }>
+  onSendReminders?: () => Promise<AvailabilityReminderResult>
 }
 
 type CombinedRosterRow = AvailabilityStatusSummaryRow & {
@@ -125,6 +132,63 @@ function reminderButtonLabel(missingCount: number) {
   return `Remind missing submissions across shifts (${missingCount})`
 }
 
+function therapistCountLabel(count: number) {
+  return `${count} therapist${count === 1 ? '' : 's'}`
+}
+
+export function availabilityReminderResultToast(
+  result: AvailabilityReminderResult
+): AvailabilityReminderToast {
+  if (result.error === 'email_not_configured') {
+    return {
+      message: 'Failed to send reminders — check email configuration',
+      variant: 'error',
+    }
+  }
+
+  if (result.error === 'recently_sent') {
+    return {
+      message: 'Reminders were already sent recently for this Schedule Block',
+      variant: 'error',
+    }
+  }
+
+  if (result.error === 'duplicate_marker_failed') {
+    const sentLabel = `Reminders sent to ${therapistCountLabel(result.sent)}`
+    const failedLabel = result.failed > 0 ? `; ${result.failed} failed` : ''
+    return {
+      message: `${sentLabel}${failedLabel}, but duplicate protection could not be recorded. Avoid resending for 24 hours.`,
+      variant: 'error',
+    }
+  }
+
+  if (result.error) {
+    return { message: 'Failed to send reminders', variant: 'error' }
+  }
+
+  if (result.sent === 0 && result.skipped === 0 && result.failed === 0) {
+    return { message: 'Everyone has already submitted', variant: 'success' }
+  }
+
+  if (result.sent === 0 && result.failed > 0) {
+    const parts = [`No reminders sent — ${result.failed} failed`]
+    if (result.skipped > 0) parts.push(`${result.skipped} skipped — email disabled`)
+    return { message: parts.join(' · '), variant: 'error' }
+  }
+
+  if (result.sent === 0 && result.skipped > 0) {
+    return {
+      message: 'No reminders sent — all missing therapists have email notifications disabled',
+      variant: 'error',
+    }
+  }
+
+  const parts: string[] = [`Reminders sent to ${therapistCountLabel(result.sent)}`]
+  if (result.skipped > 0) parts.push(`${result.skipped} skipped — email disabled`)
+  if (result.failed > 0) parts.push(`${result.failed} failed`)
+  return { message: parts.join(' · '), variant: result.failed > 0 ? 'error' : 'success' }
+}
+
 export function AvailabilityStatusSummary({
   submittedRows,
   missingRows,
@@ -154,33 +218,7 @@ export function AvailabilityStatusSummary({
     setToast(null)
     try {
       const result = await onSendReminders()
-      if (result.error === 'email_not_configured') {
-        setToast({
-          message: 'Failed to send reminders — check email configuration',
-          variant: 'error',
-        })
-      } else if (result.error === 'recently_sent') {
-        setToast({
-          message: 'Reminders were already sent recently for this Schedule Block',
-          variant: 'error',
-        })
-      } else if (result.error) {
-        setToast({ message: 'Failed to send reminders', variant: 'error' })
-      } else if (result.sent === 0 && result.skipped === 0 && result.failed === 0) {
-        setToast({ message: 'Everyone has already submitted', variant: 'success' })
-      } else if (result.sent === 0 && result.skipped > 0) {
-        setToast({
-          message: 'No reminders sent — all missing therapists have email notifications disabled',
-          variant: 'error',
-        })
-      } else {
-        const parts: string[] = [
-          `Reminders sent to ${result.sent} therapist${result.sent === 1 ? '' : 's'}`,
-        ]
-        if (result.skipped > 0) parts.push(`${result.skipped} skipped — email disabled`)
-        if (result.failed > 0) parts.push(`${result.failed} failed`)
-        setToast({ message: parts.join(' · '), variant: result.failed > 0 ? 'error' : 'success' })
-      }
+      setToast(availabilityReminderResultToast(result))
     } finally {
       setIsSending(false)
     }

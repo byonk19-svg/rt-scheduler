@@ -140,6 +140,9 @@ export async function sendAvailabilityRemindersAction(cycleId: string): Promise<
       console.error('[sendAvailabilityRemindersAction] reminder audit write failed:', {
         message: auditError.message,
       })
+      if (sent > 0) {
+        return { sent, skipped, failed, error: 'duplicate_marker_failed' }
+      }
     }
   }
 

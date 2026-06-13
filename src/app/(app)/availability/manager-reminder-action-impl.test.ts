@@ -38,6 +38,7 @@ function createReminderSupabaseMock({
   submissionRows,
   cycleSiteId = 'site-main',
   recentReminderRows = [],
+  auditInsertError = null,
 }: {
   profileRows: Array<{
     id: string
@@ -48,6 +49,7 @@ function createReminderSupabaseMock({
   submissionRows: Array<{ therapist_id: string }>
   cycleSiteId?: string
   recentReminderRows?: Array<{ created_at: string }>
+  auditInsertError?: { message: string } | null
 }) {
   const queries: QueryRecord[] = []
   const inserts: Array<{ table: string; payload: unknown }> = []
@@ -90,7 +92,7 @@ function createReminderSupabaseMock({
         },
         insert(payload: unknown) {
           inserts.push({ table, payload })
-          return Promise.resolve({ error: null })
+          return Promise.resolve({ error: auditInsertError })
         },
         maybeSingle: async () => {
           if (table === 'schedule_cycles') {
@@ -217,6 +219,55 @@ describe('sendAvailabilityRemindersAction', () => {
         },
       },
     ])
+  })
+
+  it('surfaces duplicate marker write failure after reminders are sent', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const supabase = createReminderSupabaseMock({
+      profileRows: [
+        {
+          id: 'missing-therapist',
+          full_name: 'Layne P.',
+          email: 'layne@example.com',
+          notification_email_enabled: true,
+        },
+      ],
+      submissionRows: [],
+      auditInsertError: { message: 'audit unavailable' },
+    })
+    getAuthenticatedUserWithRoleMock.mockResolvedValue({
+      supabase,
+      user: { id: 'manager-1' },
+      role: 'manager',
+      siteId: 'site-main',
+      permissionContext: { isActive: true, archivedAt: null },
+    })
+
+    const result = await sendAvailabilityRemindersAction('cycle-1')
+
+    expect(result).toEqual({
+      sent: 1,
+      skipped: 0,
+      failed: 0,
+      error: 'duplicate_marker_failed',
+    })
+    expect(sendReminderEmailsMock).toHaveBeenCalledTimes(1)
+    expect(supabase.inserts).toEqual([
+      {
+        table: 'audit_log',
+        payload: {
+          user_id: 'manager-1',
+          action: 'availability_reminders_sent',
+          target_type: 'schedule_cycle',
+          target_id: 'cycle-1',
+        },
+      },
+    ])
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[sendAvailabilityRemindersAction] reminder audit write failed:',
+      { message: 'audit unavailable' }
+    )
+    consoleErrorSpy.mockRestore()
   })
 
   it('does not send reminders for a Schedule Block outside the manager site', async () => {
