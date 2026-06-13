@@ -72,15 +72,17 @@ describe('ManagerTriageDashboard', () => {
     expect(attentionIndex).toBeGreaterThan(-1)
     expect(staffingIndex).toBeGreaterThan(-1)
     expect(nextDeadlineIndex).toBeGreaterThan(-1)
-    expect(checklistIndex).toBeLessThan(attentionIndex)
-    expect(attentionIndex).toBeLessThan(staffingIndex)
+    expect(attentionIndex).toBeLessThan(checklistIndex)
+    expect(checklistIndex).toBeLessThan(staffingIndex)
     expect(staffingIndex).toBeLessThan(nextDeadlineIndex)
   })
 
   it('replaces separate KPI cards with attention rows and primary actions', () => {
     const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
 
-    expect(html).toContain('Top priority')
+    expect(html).toContain('Priority 1 - Top priority')
+    expect(html).toContain('Priority 2')
+    expect(html).toContain('Priority 3')
     expect(html).toContain('5 approvals waiting')
     expect(html).toContain('Review requests')
     expect(html).toContain('9 open shifts in this Schedule Block')
@@ -211,7 +213,7 @@ describe('ManagerTriageDashboard', () => {
     expect(pendingHtml).toContain('Pending')
   })
 
-  it('hides low-value empty sections and avoids duplicated metrics', () => {
+  it('shows a plain all-clear state when no manager action needs attention', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
         ...baseProps,
@@ -219,7 +221,10 @@ describe('ManagerTriageDashboard', () => {
         todayCoverageTotal: 0,
         upcomingShiftCount: 0,
         upcomingShiftDays: [],
-        todayStaffedShifts: [],
+        todayStaffedShifts: [
+          { label: 'Adrienne S.', detail: 'Day shift | Lead' },
+          { label: 'Barbara J.', detail: 'Night shift | Lead' },
+        ],
         recentActivity: [],
         pendingRequests: 0,
         approvalsWaiting: 0,
@@ -233,12 +238,30 @@ describe('ManagerTriageDashboard', () => {
       })
     )
 
-    expect(html).toContain('0 coverage safety issues')
+    expect(html).toContain('All clear for now')
+    expect(html).toContain('No urgent manager actions are showing.')
+    expect(html).toContain('Check staffing and the next Schedule Block when you have time.')
+    expect(html).not.toContain('0 coverage safety issues')
     expect(html).not.toContain('Recent activity')
     expect(html).not.toContain('Upcoming exceptions')
     expect(html).not.toContain('Open shifts snapshot')
     expect(html).not.toContain('Open Lottery')
     expect(html).not.toContain('Upcoming Shifts')
+  })
+
+  it('uses plain manager-facing copy when dashboard details fail to load', () => {
+    const html = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        ...baseProps,
+        dataLoadIssueCount: 2,
+      })
+    )
+
+    expect(html).toContain('Some dashboard details could not load.')
+    expect(html).toContain('Use Schedule as the final staffing source')
+    expect(html).not.toContain('Supabase')
+    expect(html).not.toContain('RPC')
+    expect(html).not.toContain('database')
   })
 
   it('lists only actionable upcoming exceptions and preserves workflow links', () => {

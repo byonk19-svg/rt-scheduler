@@ -54,6 +54,8 @@ If Supabase/auth env vars are not configured, the command runs in reduced public
 
 ## Manual Browser Walkthrough
 
+For the manager-specific plain-language review, use `docs/MANAGER_UAT_CHECKLIST.md`.
+
 - [ ] Public homepage loads.
 - [ ] Login works.
 - [ ] Manager dashboard loads.

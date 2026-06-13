@@ -345,6 +345,18 @@ export default async function ManagerDashboardPage() {
     console.error('Failed to load shift completion counts:', shiftCountResult.error)
   }
 
+  const dashboardLoadIssueCount = [
+    cyclesResult.error,
+    pendingApprovalsResult.error,
+    pendingShiftPostsResult.error,
+    recentActivityResult.error,
+    pendingShiftPostInterestsResult.error,
+    todayCoverageResult.error,
+    upcomingShiftsResult.error,
+    todayStaffedShiftsResult.error,
+    shiftCountResult.error,
+  ].filter(Boolean).length
+
   const todayRows = (todayCoverageResult.data ?? []) as ShiftStatusRow[]
   const upcomingRows = (upcomingShiftsResult.data ?? []) as ShiftDateRow[]
   const todayShiftRows = (todayStaffedShiftsResult.data ?? []) as ShiftAssignmentRow[]
@@ -448,6 +460,7 @@ export default async function ManagerDashboardPage() {
       activeCycleDateRange={activeCycleDateRange ?? undefined}
       currentCycleCtaHref={!activeCycle ? '/schedule' : undefined}
       nextCycleCtaHref={nextCyclePlanning.ctaHref}
+      dataLoadIssueCount={dashboardLoadIssueCount}
     />
   )
 }

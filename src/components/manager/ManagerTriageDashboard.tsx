@@ -45,6 +45,7 @@ type ManagerTriageDashboardProps = {
   activeCycleDateRange?: string
   currentCycleCtaHref?: string
   nextCycleCtaHref?: string
+  dataLoadIssueCount?: number
 }
 
 type ShiftSummary = {
@@ -293,6 +294,7 @@ export function ManagerTriageDashboard({
   activeCycleDateRange,
   currentCycleCtaHref,
   nextCycleCtaHref,
+  dataLoadIssueCount = 0,
 }: ManagerTriageDashboardProps) {
   const isLoading =
     isLoadingValue(todayCoverageCovered) ||
@@ -382,7 +384,7 @@ export function ManagerTriageDashboard({
         coverageIssueCount !== '--' && coverageIssueCount > 0
           ? ('danger' as const)
           : ('success' as const),
-      show: true,
+      show: coverageIssueCount === '--' || coverageIssueCount > 0,
     },
     {
       key: 'leads',
@@ -492,24 +494,18 @@ export function ManagerTriageDashboard({
         />
       </section>
 
-      <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-tw-sm">
-        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-foreground">Manager checklist</h2>
-            <p className="text-sm text-muted-foreground">
-              Start with the first item that needs attention. Everything else can wait.
-            </p>
-          </div>
-          <span className="text-xs font-semibold text-muted-foreground">
-            Calm review order for today
-          </span>
-        </div>
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          {managerChecklistSteps.map((step, index) => (
-            <ChecklistStep key={step.label} index={index + 1} {...step} />
-          ))}
-        </div>
-      </section>
+      {dataLoadIssueCount > 0 ? (
+        <section
+          aria-label="Dashboard data warning"
+          className="rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)]/55 px-4 py-3 text-sm text-[var(--warning-text)]"
+        >
+          <p className="font-bold">Some dashboard details could not load.</p>
+          <p className="mt-1">
+            Use Schedule as the final staffing source, then refresh this dashboard when you have a
+            moment.
+          </p>
+        </section>
+      ) : null}
 
       <section
         className="rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)]/55 p-4 shadow-tw-ring-attention"
@@ -532,15 +528,44 @@ export function ManagerTriageDashboard({
             </Button>
           ) : null}
         </div>
-        {primaryAttentionProps ? <PrimaryAttentionItem {...primaryAttentionProps} /> : null}
+        {primaryAttentionProps ? (
+          <PrimaryAttentionItem {...primaryAttentionProps} />
+        ) : (
+          <AllClearAttention href={scheduleHref} />
+        )}
         {secondaryAttentionItems.length > 0 ? (
           <div className="mt-2 grid gap-2 lg:grid-cols-3">
-            {secondaryAttentionItems.map((item) => {
+            {secondaryAttentionItems.map((item, index) => {
               const { key, ...attentionItem } = item
-              return <AttentionRow key={key} {...attentionItem} />
+              return (
+                <AttentionRow
+                  key={key}
+                  priorityLabel={`Priority ${index + 2}`}
+                  {...attentionItem}
+                />
+              )
             })}
           </div>
         ) : null}
+      </section>
+
+      <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-tw-sm">
+        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Manager checklist</h2>
+            <p className="text-sm text-muted-foreground">
+              Start with the first item that needs attention. Everything else can wait.
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-muted-foreground">
+            Calm review order for today
+          </span>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {managerChecklistSteps.map((step, index) => (
+            <ChecklistStep key={step.label} index={index + 1} {...step} />
+          ))}
+        </div>
       </section>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(22rem,0.75fr)]">
@@ -739,7 +764,7 @@ function PrimaryAttentionItem({
         </span>
         <span className="min-w-0">
           <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-            Top priority
+            Priority 1 - Top priority
           </span>
           <span className="mt-1 block text-2xl font-bold leading-tight text-foreground tabular-nums">
             {count === '--' ? LOADING_LABEL : label}
@@ -754,6 +779,37 @@ function PrimaryAttentionItem({
         <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
       </span>
     </Link>
+  )
+}
+
+function AllClearAttention({ href }: { href: string }) {
+  return (
+    <div className="rounded-lg border border-[var(--success-border)] bg-card p-4 shadow-tw-md">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <span className="flex min-w-0 items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[var(--success-subtle)] text-[var(--success-text)]">
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              All clear for now
+            </span>
+            <span className="mt-1 block text-2xl font-bold leading-tight text-foreground">
+              No urgent manager actions are showing.
+            </span>
+            <span className="mt-1 block text-sm leading-5 text-muted-foreground">
+              Check staffing and the next Schedule Block when you have time.
+            </span>
+          </span>
+        </span>
+        <Button variant="outline" size="sm" className="min-h-10" asChild>
+          <Link href={href}>
+            View schedule
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -772,6 +828,7 @@ function ContextCell({ icon, label, value }: { icon: ReactNode; label: string; v
 }
 
 function AttentionRow({
+  priorityLabel,
   count,
   label,
   detail,
@@ -780,6 +837,7 @@ function AttentionRow({
   icon,
   tone,
 }: {
+  priorityLabel: string
   count: number | '--'
   label: string
   detail: string
@@ -810,6 +868,9 @@ function AttentionRow({
           {icon}
         </span>
         <span className="min-w-0">
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+            {priorityLabel}
+          </span>
           <span className="block text-lg font-bold leading-tight text-foreground tabular-nums">
             {count === '--' ? LOADING_LABEL : label}
           </span>
