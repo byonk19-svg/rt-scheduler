@@ -34,6 +34,7 @@ type ManagerProfileRow = {
 type NotificationRow = {
   event_type: string
   title: string | null
+  message: string | null
   target_type: 'schedule_cycle' | 'shift' | 'shift_post' | 'system' | null
   target_id: string | null
   created_at?: string | null
@@ -60,6 +61,17 @@ type ShiftAssignmentRow = {
 type ShiftCountRow = {
   shift_type: 'day' | 'night'
   user_id: string | null
+}
+
+type ShiftPostActivityRow = {
+  id: string
+  type: 'swap' | 'pickup' | string
+  request_kind: string | null
+  visibility: string | null
+  status: string | null
+  requester: { full_name: string | null } | { full_name: string | null }[] | null
+  shift: { date: string | null; shift_type: 'day' | 'night' | string | null } | null
+  swap_shift: { date: string | null; shift_type: 'day' | 'night' | string | null } | null
 }
 
 type DashboardCycle = Cycle & {
@@ -198,6 +210,74 @@ function getActivityTitle(row: NotificationRow): string {
   return 'Dashboard activity update'
 }
 
+function formatShiftActivityLabel(
+  shift: { date: string | null; shift_type: 'day' | 'night' | string | null } | null
+): string {
+  if (!shift?.date) return 'a shift'
+  const shiftType =
+    shift.shift_type === 'night'
+      ? 'night shift'
+      : shift.shift_type === 'day'
+        ? 'day shift'
+        : 'shift'
+  return `${formatDayLabel(shift.date)} ${shiftType}`
+}
+
+function getShiftPostActivityCopy(row: ShiftPostActivityRow): { title: string; detail: string } {
+  const requester = getOne(row.requester)?.full_name?.trim() || 'A staff member'
+  const primaryShift = formatShiftActivityLabel(row.shift)
+  const swapShift = row.type === 'swap' ? formatShiftActivityLabel(row.swap_shift) : null
+  const requestLabel =
+    row.request_kind === 'call_in'
+      ? 'call-in coverage'
+      : row.type === 'swap'
+        ? 'trade request'
+        : 'pickup request'
+  const actionLabel =
+    row.status === 'pending'
+      ? 'Needs manager review.'
+      : row.status === 'approved'
+        ? 'Approved.'
+        : row.status === 'denied'
+          ? 'Denied.'
+          : 'Check Shift Board for the current status.'
+
+  if (swapShift) {
+    return {
+      title: `${requester} posted a trade request`,
+      detail: `${primaryShift} for ${swapShift}. ${actionLabel}`,
+    }
+  }
+
+  return {
+    title: `${requester} posted a ${requestLabel}`,
+    detail: `${primaryShift}. ${actionLabel}`,
+  }
+}
+
+function getRecentActivityCopy(
+  row: NotificationRow,
+  shiftPostById: Map<string, ShiftPostActivityRow>
+): { title: string; detail: string } {
+  if (row.target_type === 'shift_post' && row.target_id) {
+    const shiftPost = shiftPostById.get(row.target_id)
+    if (shiftPost) return getShiftPostActivityCopy(shiftPost)
+  }
+
+  if (row.event_type === 'new_request') {
+    return {
+      title: 'Request needs manager review',
+      detail: row.message?.trim() || 'A staff member posted a request that needs manager review.',
+    }
+  }
+
+  const displayCopy = getNotificationDisplayCopy(row, 'manager')
+  return {
+    title: displayCopy.title.trim() || getActivityTitle(row),
+    detail: displayCopy.message.trim() || row.message?.trim() || 'Open the activity for details.',
+  }
+}
+
 export default async function ManagerDashboardPage() {
   const supabase = await createClient()
   const {
@@ -246,7 +326,7 @@ export default async function ManagerDashboardPage() {
         .eq('status', 'pending'),
       supabase
         .from('notifications')
-        .select('event_type, title, target_type, target_id, created_at')
+        .select('event_type, title, message, target_type, target_id, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5),
@@ -345,11 +425,30 @@ export default async function ManagerDashboardPage() {
     console.error('Failed to load shift completion counts:', shiftCountResult.error)
   }
 
+  const activityRows = (recentActivityResult.data ?? []) as NotificationRow[]
+  const activityShiftPostIds = activityRows
+    .filter((row) => row.target_type === 'shift_post' && row.target_id)
+    .map((row) => row.target_id as string)
+  const shiftPostActivityResult =
+    activityShiftPostIds.length > 0
+      ? await supabase
+          .from('shift_posts')
+          .select(
+            'id, type, request_kind, visibility, status, requester:profiles!shift_posts_posted_by_fkey(full_name), shift:shifts!shift_posts_shift_id_fkey(date, shift_type), swap_shift:shifts!shift_posts_swap_shift_id_fkey(date, shift_type)'
+          )
+          .in('id', activityShiftPostIds)
+      : { data: [], error: null }
+
+  if (shiftPostActivityResult.error) {
+    console.error('Failed to load recent manager activity details:', shiftPostActivityResult.error)
+  }
+
   const dashboardLoadIssueCount = [
     cyclesResult.error,
     pendingApprovalsResult.error,
     pendingShiftPostsResult.error,
     recentActivityResult.error,
+    shiftPostActivityResult.error,
     pendingShiftPostInterestsResult.error,
     todayCoverageResult.error,
     upcomingShiftsResult.error,
@@ -394,9 +493,10 @@ export default async function ManagerDashboardPage() {
   const dayRows = shiftCountRows.filter((row) => row.shift_type === 'day')
   const nightRows = shiftCountRows.filter((row) => row.shift_type === 'night')
 
-  const activityRows = (recentActivityResult.data ?? []) as NotificationRow[]
+  const shiftPostActivityRows = (shiftPostActivityResult.data ?? []) as ShiftPostActivityRow[]
+  const shiftPostActivityById = new Map(shiftPostActivityRows.map((row) => [row.id, row]))
   const recentActivity = activityRows.map((row) => ({
-    title: getActivityTitle(row),
+    ...getRecentActivityCopy(row, shiftPostActivityById),
     timeLabel: toRelativeTime(row.created_at),
     href: resolveNotificationHref(row, 'manager', '/schedule') ?? '/schedule',
   }))

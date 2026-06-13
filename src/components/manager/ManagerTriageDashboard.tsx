@@ -25,7 +25,7 @@ type ManagerTriageDashboardProps = {
   upcomingShiftCount: number | '--'
   upcomingShiftDays: Array<{ label: string; count: number }>
   todayStaffedShifts: Array<{ label: string; detail: string }>
-  recentActivity: Array<{ title: string; timeLabel: string; href: string }>
+  recentActivity: Array<{ title: string; detail?: string; timeLabel: string; href: string }>
   pendingRequests: number | '--'
   approvalsWaiting: number | '--'
   currentCycleStatus: string
@@ -659,10 +659,15 @@ export function ManagerTriageDashboard({
               <Link
                 key={`${item.title}-${index}`}
                 href={item.href}
-                className="flex min-h-12 items-center justify-between gap-3 py-2 text-foreground hover:no-underline"
+                className="flex min-h-14 items-center justify-between gap-3 py-2 text-foreground hover:no-underline"
               >
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{item.title}</span>
+                  {item.detail ? (
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {item.detail}
+                    </span>
+                  ) : null}
                   <span className="text-xs text-muted-foreground">{item.timeLabel}</span>
                 </span>
                 <ArrowRight className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />

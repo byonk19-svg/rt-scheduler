@@ -20,7 +20,12 @@ const baseProps = {
     { label: 'Unassigned therapist', detail: 'Night shift | Staff' },
   ],
   recentActivity: [
-    { title: 'Brianna approved a shift swap', timeLabel: '2 hours ago', href: '/requests' },
+    {
+      title: 'Brianna posted a trade request',
+      detail: 'Mar 26 day shift for Mar 28 night shift. Needs manager review.',
+      timeLabel: '2 hours ago',
+      href: '/requests',
+    },
   ],
   pendingRequests: 5,
   approvalsWaiting: 5,
@@ -282,7 +287,8 @@ describe('ManagerTriageDashboard', () => {
     const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
 
     expect(html).toContain('Recent activity')
-    expect(html).toContain('Brianna approved a shift swap')
+    expect(html).toContain('Brianna posted a trade request')
+    expect(html).toContain('Mar 26 day shift for Mar 28 night shift. Needs manager review.')
     expect(html).toContain('href="/requests"')
     expect(html).toContain('href="/notifications"')
   })

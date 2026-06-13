@@ -47,8 +47,12 @@ describe('manager dashboard Schedule Block Planning cues', () => {
     expect(source).not.toContain('function getNotificationHref')
   })
 
-  it('uses shared notification display copy for recent activity titles', () => {
+  it('uses shared notification display copy and target details for recent activity', () => {
+    expect(source).toContain('getRecentActivityCopy(row,')
     expect(source).toContain('getNotificationDisplayCopy(row,')
+    expect(source).toContain('message, target_type, target_id, created_at')
+    expect(source).toContain('requester:profiles!shift_posts_posted_by_fkey(full_name)')
+    expect(source).toContain('shift:shifts!shift_posts_shift_id_fkey(date, shift_type)')
     expect(source).not.toContain('const title = row.title?.trim()')
   })
 
