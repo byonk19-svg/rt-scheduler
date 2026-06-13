@@ -169,6 +169,11 @@ describe('PublishHistoryPage', () => {
     const html = renderToStaticMarkup(await PublishHistoryPage({}))
 
     expect(html).toContain('Schedule Blocks')
+    expect(html).toContain('Publish checklist')
+    expect(html).toContain('Use this page after a schedule has been sent.')
+    expect(html).toContain('Send from Schedule')
+    expect(html).toContain('Check delivery')
+    expect(html).toContain('Manage lifecycle')
     expect(html).toContain('Publish email log')
     expect(html).toContain('Take offline')
     expect(html).not.toContain('Clear &amp; restart')

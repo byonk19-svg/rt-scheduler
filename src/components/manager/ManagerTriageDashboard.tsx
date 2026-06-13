@@ -190,6 +190,84 @@ function getCycleStepState(args: {
   ]
 }
 
+function getManagerChecklistSteps(args: {
+  coverageIssueCount: number | '--'
+  openAssignmentCount: number | '--'
+  needsReviewCount: number | '--'
+  needsReviewDetail: string
+  nextCycleLabel: string
+  nextCycleDetail: string
+  currentCycleStatus: string
+  currentCycleDetail: string
+}) {
+  const coverageValue =
+    args.coverageIssueCount === '--'
+      ? LOADING_LABEL
+      : args.coverageIssueCount > 0
+        ? `${pluralize(args.coverageIssueCount, 'coverage issue')}`
+        : 'Covered today'
+  const reviewValue =
+    args.needsReviewCount === '--'
+      ? LOADING_LABEL
+      : args.needsReviewCount > 0
+        ? `${pluralize(args.needsReviewCount, 'item')} waiting`
+        : 'No decisions waiting'
+  const assignmentValue =
+    args.openAssignmentCount === '--'
+      ? LOADING_LABEL
+      : args.openAssignmentCount > 0
+        ? `${pluralize(args.openAssignmentCount, 'open shift')}`
+        : 'Schedule filled'
+
+  return [
+    {
+      label: 'Make today safe',
+      value: coverageValue,
+      detail:
+        args.coverageIssueCount !== '--' && args.coverageIssueCount > 0
+          ? 'Fix today first before routine planning.'
+          : 'No coverage safety issue is showing for today.',
+      tone:
+        args.coverageIssueCount !== '--' && args.coverageIssueCount > 0
+          ? ('warning' as const)
+          : ('success' as const),
+    },
+    {
+      label: 'Clear manager decisions',
+      value: reviewValue,
+      detail:
+        args.needsReviewCount !== '--' && args.needsReviewCount > 0
+          ? args.needsReviewDetail
+          : 'Approvals and manager reviews are caught up.',
+      tone:
+        args.needsReviewCount !== '--' && args.needsReviewCount > 0
+          ? ('warning' as const)
+          : ('success' as const),
+    },
+    {
+      label: 'Fill the schedule',
+      value: assignmentValue,
+      detail:
+        args.openAssignmentCount !== '--' && args.openAssignmentCount > 0
+          ? 'Assign open shifts before publish.'
+          : 'No open assignments are showing for this Schedule Block.',
+      tone:
+        args.openAssignmentCount !== '--' && args.openAssignmentCount > 0
+          ? ('warning' as const)
+          : ('success' as const),
+    },
+    {
+      label: 'Prepare the next block',
+      value: args.nextCycleLabel,
+      detail: args.nextCycleDetail || args.currentCycleDetail,
+      tone:
+        args.currentCycleStatus === 'Published' && args.nextCycleLabel === 'No next Schedule Block'
+          ? ('muted' as const)
+          : ('warning' as const),
+    },
+  ]
+}
+
 export function ManagerTriageDashboard({
   todayCoverageCovered,
   todayCoverageTotal,
@@ -241,6 +319,16 @@ export function ManagerTriageDashboard({
     currentCycleHasNoShifts,
     needsReviewCount,
     nextCycleLabel,
+  })
+  const managerChecklistSteps = getManagerChecklistSteps({
+    coverageIssueCount,
+    openAssignmentCount,
+    needsReviewCount,
+    needsReviewDetail,
+    nextCycleLabel,
+    nextCycleDetail,
+    currentCycleStatus,
+    currentCycleDetail,
   })
 
   const attentionItems: AttentionItem[] = [
@@ -404,6 +492,25 @@ export function ManagerTriageDashboard({
         />
       </section>
 
+      <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-tw-sm">
+        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Manager checklist</h2>
+            <p className="text-sm text-muted-foreground">
+              Start with the first item that needs attention. Everything else can wait.
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-muted-foreground">
+            Calm review order for today
+          </span>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {managerChecklistSteps.map((step, index) => (
+            <ChecklistStep key={step.label} index={index + 1} {...step} />
+          ))}
+        </div>
+      </section>
+
       <section
         className="rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)]/55 p-4 shadow-tw-ring-attention"
         aria-label="Needs your attention"
@@ -541,6 +648,53 @@ export function ManagerTriageDashboard({
       ) : isLoading ? (
         <p className="sr-only">{LOADING_LABEL}</p>
       ) : null}
+    </div>
+  )
+}
+
+function ChecklistStep({
+  index,
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  index: number
+  label: string
+  value: string
+  detail: string
+  tone: 'success' | 'warning' | 'muted'
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-md border px-3 py-3',
+        tone === 'success'
+          ? 'border-[var(--success-border)] bg-[var(--success-subtle)]/45'
+          : tone === 'warning'
+            ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)]/55'
+            : 'border-border bg-muted/25'
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <span
+          className={cn(
+            'mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[10px] font-black tabular-nums',
+            tone === 'success'
+              ? 'border-[var(--success-border)] bg-background text-[var(--success-text)]'
+              : tone === 'warning'
+                ? 'border-[var(--warning-border)] bg-background text-[var(--warning-text)]'
+                : 'border-border bg-background text-muted-foreground'
+          )}
+        >
+          {index}
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-foreground">{label}</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
+        </div>
+      </div>
     </div>
   )
 }

@@ -351,6 +351,44 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         </div>
       )}
 
+      <section
+        aria-label="Publish checklist"
+        className="rounded-xl border border-border bg-card px-4 py-4 shadow-tw-sm"
+      >
+        <div className="mb-3">
+          <h2 className="text-sm font-bold tracking-tight text-foreground">Publish checklist</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Use this page after a schedule has been sent. Start publishing from Schedule.
+          </p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          <div className="rounded-md border border-border/70 bg-background px-3 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              1. Send from Schedule
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">
+              Run Pre-flight, then publish from the Schedule action bar.
+            </p>
+          </div>
+          <div className="rounded-md border border-border/70 bg-background px-3 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              2. Check delivery
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">
+              Review sent, failed, and queued email counts here.
+            </p>
+          </div>
+          <div className="rounded-md border border-border/70 bg-background px-3 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              3. Manage lifecycle
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">
+              Take live blocks offline before archiving or cleaning up history.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <div className="space-y-2">
         <div className="px-0.5">
           <h2 className="text-sm font-bold tracking-tight text-foreground">Schedule Blocks</h2>

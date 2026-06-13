@@ -59,6 +59,9 @@ describe('ScheduleGrid source invariants', () => {
 
     expect(code).toContain('{tab} shift')
     expect(code).toContain('Schedule Block')
+    expect(code).toContain('Next step:')
+    expect(code).toContain('getScheduleToolbarNextStep')
+    expect(code).toContain('Run Pre-flight before sending or publishing')
   })
 
   it('uses real Schedule Block lifecycle labels and plain schedule terminology', () => {

@@ -491,6 +491,9 @@ export function ManagerSchedulingInputs({
   const hasUnsavedChanges =
     baselineDates.length !== selectedDates.length ||
     baselineDates.some((date, index) => date !== selectedDates[index])
+  const selectedTherapistName = selectedTherapist?.full_name ?? 'No therapist selected'
+  const missingSubmissionLabel = `${missingRows.length} therapist${missingRows.length === 1 ? '' : 's'} missing`
+  const submittedSubmissionLabel = `${submittedRows.length} submitted`
 
   if (cycles.length === 0) {
     return (
@@ -623,6 +626,57 @@ export function ManagerSchedulingInputs({
           <div className="flex items-end">{toolbarUtilities}</div>
         </div>
       </div>
+
+      <section
+        aria-label="Availability manager checklist"
+        className="rounded-[1.25rem] border border-border/70 bg-card px-4 py-4 shadow-tw-sm"
+      >
+        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-base font-bold text-foreground">Availability checklist</h2>
+            <p className="text-sm text-muted-foreground">
+              Work left to right: collect responses, review requests, then edit only what needs a
+              manager decision.
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-muted-foreground">
+            {missingSubmissionLabel} | {submittedSubmissionLabel}
+          </span>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          <div className="rounded-md border border-border/70 bg-background px-3 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              1. Collect
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">
+              Follow up on missing submissions.
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Use reminders for the full Schedule Block, even when the queue is filtered.
+            </p>
+          </div>
+          <div className="rounded-md border border-border/70 bg-background px-3 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              2. Review
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">
+              Open each therapist with requests.
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Check submitted availability before adding manager-entered changes.
+            </p>
+          </div>
+          <div className="rounded-md border border-border/70 bg-background px-3 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              3. Edit
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{selectedTherapistName}</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Save manager edits only after the selected dates look right.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(28rem,0.8fr)_minmax(48rem,1.4fr)]">
         <div id="availability-work-queue" className="min-h-0">

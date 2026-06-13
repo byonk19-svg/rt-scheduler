@@ -16,6 +16,13 @@ type Props = {
 
 type Step = 1 | 2 | 3 | 4
 
+const IMPORT_STEPS: Array<{ step: Step; label: string; detail: string }> = [
+  { step: 1, label: 'Choose file', detail: 'Upload the CSV export.' },
+  { step: 2, label: 'Match columns', detail: 'Tell Teamwise what each column means.' },
+  { step: 3, label: 'Review rows', detail: 'Check valid rows and errors before import.' },
+  { step: 4, label: 'Apply import', detail: 'Import only the rows that passed review.' },
+]
+
 export function ImportWizard({ bulkImportRosterAction }: Props) {
   const [step, setStep] = useState<Step>(1)
   const [headers, setHeaders] = useState<string[]>([])
@@ -54,6 +61,43 @@ export function ImportWizard({ bulkImportRosterAction }: Props) {
 
   return (
     <div className="space-y-6">
+      <section
+        aria-label="Roster import checklist"
+        className="rounded-xl border border-border/70 bg-card px-4 py-4 shadow-tw-sm"
+      >
+        <div className="mb-3">
+          <h2 className="text-base font-bold text-foreground">Roster import checklist</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Move one step at a time. Nothing imports until the final button.
+          </p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-4">
+          {IMPORT_STEPS.map((item) => {
+            const complete = step > item.step
+            const current = step === item.step
+            return (
+              <div
+                key={item.step}
+                className={[
+                  'rounded-md border px-3 py-3',
+                  current
+                    ? 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
+                    : complete
+                      ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                      : 'border-border bg-background text-muted-foreground',
+                ].join(' ')}
+              >
+                <p className="text-[11px] font-bold uppercase tracking-[0.08em]">
+                  Step {item.step}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-foreground">{item.label}</p>
+                <p className="mt-1 text-xs leading-5">{item.detail}</p>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
       {step === 1 ? (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-foreground">Upload CSV</h2>
@@ -188,6 +232,13 @@ export function ImportWizard({ bulkImportRosterAction }: Props) {
           <p className="text-sm text-muted-foreground">
             {validRows.length} rows are ready to import.
           </p>
+          <div className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-4 py-3 text-sm text-[var(--warning-text)]">
+            <p className="font-semibold">Before you import</p>
+            <p className="mt-1">
+              Teamwise will import the valid preview rows only. Rows with errors stay skipped so you
+              can fix the CSV and run another import later.
+            </p>
+          </div>
           <form action={bulkImportRosterAction} className="space-y-3">
             <input type="hidden" name="rows_json" value={JSON.stringify(validRows)} />
             <button
