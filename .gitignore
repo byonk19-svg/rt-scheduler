@@ -55,6 +55,8 @@ shots/
 
 # local screen capture and generated artifact dumps
 /artifacts/
+/output/screen-capture/
+/output/screen-capture-latest/
 output/server/
 output/*.log
 

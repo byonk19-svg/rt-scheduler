@@ -8,11 +8,16 @@
  *
  * Env:
  *   NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY (required for authenticated shots)
- *   PLAYWRIGHT_BASE_URL   (default http://127.0.0.1:3000 — if this points at production, shots won’t match local edits)
+ *   PLAYWRIGHT_BASE_URL   (default http://127.0.0.1:3000 - if this points at production, shots won't match local edits)
+ *   SHOT_OUTPUT_DIR       (default output/screen-capture/<timestamp>)
+ *   SHOT_LATEST_DIR       (default output/screen-capture-latest)
+ *   SHOT_NAMES            (optional comma-separated screenshot names to capture)
+ *   SHOT_ALLOW_ERRORS     (set 1/true to keep the old non-failing route-error behavior)
+ *   SHOT_FAIL_ON_REDIRECTS (set 1/true to fail on unexpected redirects)
  *   SHOT_MANAGER_EMAIL    (default julie.d@teamwise.test)
  *   SHOT_STAFF_EMAIL      (default layne@teamwise.test)
  *   SHOT_PASSWORD         (default Teamwise123!)
- *   E2E_USER_EMAIL / E2E_USER_PASSWORD — fallback if SHOT_* not set for manager
+ *   E2E_USER_EMAIL / E2E_USER_PASSWORD - fallback if SHOT_* not set for manager
  */
 import { createServerClient } from '@supabase/ssr'
 import { chromium } from 'playwright'
@@ -20,6 +25,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 const baseURL = (process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '')
+const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'y', 'on'])
+const allowErrors = isTruthy(process.env.SHOT_ALLOW_ERRORS)
+const failOnRedirects = isTruthy(process.env.SHOT_FAIL_ON_REDIRECTS)
 
 const VIEWPORTS = [
   {
@@ -51,8 +59,17 @@ function csvFilter(name) {
   )
 }
 
+function isTruthy(value) {
+  return TRUTHY_VALUES.has(
+    String(value ?? '')
+      .trim()
+      .toLowerCase()
+  )
+}
+
 const viewportFilter = csvFilter('SHOT_VIEWPORTS')
 const personaFilter = csvFilter('SHOT_PERSONAS')
+const shotNameFilter = csvFilter('SHOT_NAMES')
 
 function selectedViewportList() {
   return viewportFilter
@@ -62,6 +79,14 @@ function selectedViewportList() {
 
 function shouldRunPersona(persona) {
   return !personaFilter || personaFilter.has(persona)
+}
+
+function shouldRunShotName(name) {
+  return !shotNameFilter || shotNameFilter.has(name)
+}
+
+function selectedShots(shots) {
+  return shotNameFilter ? shots.filter((shot) => shouldRunShotName(shot.name)) : shots
 }
 
 function mergeByKey(existing, next, keyFor) {
@@ -75,14 +100,23 @@ function mergeByKey(existing, next, keyFor) {
 async function mergeSummary(summaryPath, summary) {
   try {
     const existing = JSON.parse(await fs.readFile(summaryPath, 'utf8'))
+    const routeKey = (item) => [item.viewport, item.persona, item.name, item.path].join('|')
+    const rerunRouteKeys = new Set(summary.shots.map(routeKey))
     summary.shots = mergeByKey(existing.shots ?? [], summary.shots, (item) =>
       [item.viewport, item.persona, item.name, item.path].join('|')
     )
-    summary.errors = mergeByKey(existing.errors ?? [], summary.errors, (item) =>
-      [item.viewport, item.persona, item.name, item.path].join('|')
+    summary.errors = mergeByKey(
+      (existing.errors ?? []).filter((item) => !rerunRouteKeys.has(routeKey(item))),
+      summary.errors,
+      (item) => [item.viewport, item.persona, item.name, item.path].join('|')
     )
     summary.skipped = mergeByKey(existing.skipped ?? [], summary.skipped, (item) =>
       [item.viewport, item.persona, item.name].join('|')
+    )
+    summary.warnings = mergeByKey(
+      (existing.warnings ?? []).filter((item) => !rerunRouteKeys.has(routeKey(item))),
+      summary.warnings,
+      (item) => [item.viewport, item.persona, item.name, item.path, item.type].join('|')
     )
   } catch {
     // No prior summary to merge.
@@ -122,12 +156,11 @@ const PUBLIC_SHOTS = [
   { name: '02-public-login', path: '/login' },
   { name: '03-public-signup', path: '/signup' },
   { name: '04-public-reset-password', path: '/reset-password' },
-  { name: '05-public-auth', path: '/auth' },
 ]
 
 const MANAGER_SHOTS = [
   { name: '10-manager-dashboard', path: '/dashboard/manager' },
-  { name: '11-manager-dashboard-canonical', path: '/dashboard' },
+  { name: '11-manager-dashboard-canonical', path: '/dashboard', allowRedirect: true },
   { name: '12-manager-schedule', path: '/schedule' },
   {
     name: '13-manager-schedule-needs-attention',
@@ -142,7 +175,7 @@ const MANAGER_SHOTS = [
   { name: '20-manager-team', path: '/team' },
   { name: '21-manager-team-work-patterns', path: '/team/work-patterns' },
   { name: '22-manager-team-import', path: '/team/import' },
-  { name: '23-manager-directory', path: '/directory' },
+  { name: '23-manager-directory', path: '/directory', allowRedirect: true },
   { name: '24-manager-approvals', path: '/approvals' },
   { name: '25-manager-preliminary', path: '/preliminary' },
   { name: '26-manager-publish-history', path: '/publish' },
@@ -157,12 +190,12 @@ const MANAGER_SHOTS = [
 
 const STAFF_SHOTS = [
   { name: '40-staff-dashboard', path: '/dashboard/staff' },
-  { name: '41-staff-dashboard-canonical', path: '/dashboard' },
-  { name: '42-staff-dashboard-alias', path: '/staff/dashboard' },
-  { name: '43-staff-schedule-compat', path: '/therapist/schedule' },
-  { name: '44-staff-my-shifts-alias', path: '/staff/my-schedule' },
-  { name: '45-staff-schedule-alias', path: '/staff/schedule' },
-  { name: '46-staff-coverage-compat', path: '/coverage?shift=day' },
+  { name: '41-staff-dashboard-canonical', path: '/dashboard', allowRedirect: true },
+  { name: '42-staff-dashboard-alias', path: '/staff/dashboard', allowRedirect: true },
+  { name: '43-staff-schedule-compat', path: '/therapist/schedule', allowRedirect: true },
+  { name: '44-staff-my-shifts-alias', path: '/staff/my-schedule', allowRedirect: true },
+  { name: '45-staff-schedule-alias', path: '/staff/schedule', allowRedirect: true },
+  { name: '46-staff-coverage-compat', path: '/coverage?shift=day', allowRedirect: true },
   { name: '47-staff-schedule', path: '/schedule' },
   { name: '48-staff-preliminary', path: '/preliminary' },
   { name: '49-staff-recurring-pattern', path: '/therapist/recurring-pattern' },
@@ -171,15 +204,27 @@ const STAFF_SHOTS = [
   { name: '52-staff-swaps', path: '/therapist/swaps' },
   { name: '53-staff-requests-new', path: '/requests/new' },
   { name: '54-staff-requests-history', path: '/staff/history' },
-  { name: '55-staff-requests-alias', path: '/staff/requests' },
+  { name: '55-staff-requests-alias', path: '/staff/requests', allowRedirect: true },
   { name: '56-staff-notifications', path: '/notifications' },
   { name: '57-staff-settings', path: '/therapist/settings' },
   { name: '58-staff-profile', path: '/profile' },
-  { name: '59-staff-onboarding', path: '/onboarding' },
 ]
 
 function sanitizeFilename(name) {
   return name.replace(/[^\w\-]+/g, '_').slice(0, 120)
+}
+
+function normalizePathname(relPath) {
+  const withSlash = relPath.startsWith('/') ? relPath : `/${relPath}`
+  return new URL(withSlash, baseURL).pathname
+}
+
+function redirectedUnexpectedly(relPath, finalUrl) {
+  try {
+    return normalizePathname(relPath) !== new URL(finalUrl).pathname
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -252,27 +297,37 @@ async function attachSession(context, email, pwd, outDir, label) {
   const page = await context.newPage()
   const dash = `${baseURL}${cacheBustRelPath('/dashboard')}`
   await page.goto(dash, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  if (/\/login/i.test(page.url())) {
+  const finalUrl = page.url()
+  if (/\/(?:login|access|pending-setup)(?:[/?#]|$)/i.test(finalUrl)) {
     const snap = path.join(outDir, `_session-failed-${label}.png`)
     await page.screenshot({ path: snap, fullPage: true })
     throw new Error(
-      `Session cookies did not authenticate (see ${snap}). Check ANON key / user exists (npm run seed:functional).`
+      `Session cookies did not reach the app dashboard; landed on ${finalUrl} (see ${snap}). Check ANON key / user profile exists (npm run seed:functional).`
     )
   }
   return page
 }
 
-async function capture(page, outDir, name, relPath) {
+async function capture(page, outDir, shot) {
+  const { name, path: relPath } = shot
   const pathPart = relPath.startsWith('/') ? relPath : `/${relPath}`
   const url = `${baseURL}${cacheBustRelPath(pathPart)}`
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!shot.allowRedirect || !message.includes('net::ERR_ABORTED')) {
+      throw error
+    }
+    await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => {})
+  }
   // Client-heavy App Router pages can keep background requests open; do not block
   // the inventory on perfect network quiescence.
   await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
   await page.waitForTimeout(900)
   const file = path.join(outDir, `${sanitizeFilename(name)}.png`)
   await page.screenshot({ path: file, fullPage: true })
-  return file
+  return { file, finalUrl: page.url() }
 }
 
 async function tryFirstLinkCapture(page, outDir, name, sourcePath, hrefPattern) {
@@ -299,7 +354,7 @@ async function tryFirstLinkCapture(page, outDir, name, sourcePath, hrefPattern) 
     await page.waitForTimeout(1200)
     const file = path.join(outDir, `${sanitizeFilename(name)}.png`)
     await page.screenshot({ path: file, fullPage: true })
-    return file
+    return { file, finalUrl: page.url(), path: detailPath }
   } catch {
     return null
   }
@@ -311,7 +366,7 @@ async function main() {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   const outDir = process.env.SHOT_OUTPUT_DIR
     ? path.resolve(process.cwd(), process.env.SHOT_OUTPUT_DIR)
-    : path.join(process.cwd(), 'artifacts', 'screen-capture', stamp)
+    : path.join(process.cwd(), 'output', 'screen-capture', stamp)
   await fs.mkdir(outDir, { recursive: true })
 
   const browser = await chromium.launch({ headless: true })
@@ -327,18 +382,33 @@ async function main() {
     shots: [],
     skipped: [],
     errors: [],
+    warnings: [],
   }
 
   async function captureSafe(page, viewportName, persona, viewportOutDir, shot) {
     try {
-      const file = await capture(page, viewportOutDir, shot.name, shot.path)
+      const { file, finalUrl } = await capture(page, viewportOutDir, shot)
       summary.shots.push({
         viewport: viewportName,
         persona,
         name: shot.name,
         path: shot.path,
+        finalUrl,
         file,
       })
+      if (!shot.allowRedirect && redirectedUnexpectedly(shot.path, finalUrl)) {
+        summary.warnings.push({
+          type: 'unexpected-redirect',
+          viewport: viewportName,
+          persona,
+          name: shot.name,
+          path: shot.path,
+          finalUrl,
+        })
+        console.warn(
+          `Redirected ${viewportName}/${persona}/${shot.name}: ${shot.path} -> ${finalUrl}`
+        )
+      }
       console.log('Wrote', file)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -351,6 +421,20 @@ async function main() {
       })
       console.error(`Failed ${viewportName}/${persona}/${shot.name} (${shot.path}): ${message}`)
     }
+  }
+
+  function recordPersonaSetupError(viewportName, persona, shots, error) {
+    const message = error instanceof Error ? error.message : String(error)
+    for (const shot of shots) {
+      summary.errors.push({
+        viewport: viewportName,
+        persona,
+        name: shot.name,
+        path: shot.path,
+        error: message,
+      })
+    }
+    console.error(`Failed ${viewportName}/${persona} session setup: ${message}`)
   }
 
   console.log(`Base URL: ${baseURL}`)
@@ -375,7 +459,7 @@ async function main() {
       const publicContext = await browser.newContext(contextOpts)
       const publicPage = await publicContext.newPage()
 
-      for (const shot of PUBLIC_SHOTS) {
+      for (const shot of selectedShots(PUBLIC_SHOTS)) {
         await captureSafe(publicPage, viewport.name, 'public', viewportOutDir, shot)
       }
 
@@ -383,83 +467,113 @@ async function main() {
     }
 
     if (shouldRunPersona('manager')) {
+      const managerShots = selectedShots(MANAGER_SHOTS)
+      const capturePublishDetail = shouldRunShotName('34-manager-publish-detail')
+      const captureWorkPatternDetail = shouldRunShotName('35-manager-team-work-pattern-detail')
+      if (managerShots.length === 0 && !capturePublishDetail && !captureWorkPatternDetail) {
+        continue
+      }
       console.log('\n--- Manager session ---')
       const managerContext = await browser.newContext(contextOpts)
-      const page = await attachSession(
-        managerContext,
-        managerEmail,
-        password,
-        viewportOutDir,
-        'manager'
-      )
-      for (const shot of MANAGER_SHOTS) {
-        await captureSafe(page, viewport.name, 'manager', viewportOutDir, shot)
-      }
-      const publishDetail = await tryFirstLinkCapture(
-        page,
-        viewportOutDir,
-        '34-manager-publish-detail',
-        '/publish',
-        /^\/publish\/[^/?#]+/
-      )
-      if (publishDetail) {
-        summary.shots.push({
-          viewport: viewport.name,
-          persona: 'manager',
-          name: '34-manager-publish-detail',
-          path: '/publish/[id]',
-          file: publishDetail,
-        })
-        console.log('Wrote', publishDetail)
-      } else {
-        summary.skipped.push({
-          viewport: viewport.name,
-          persona: 'manager',
-          name: '34-manager-publish-detail',
-          reason: 'no row/link',
-        })
-        console.log('Skipped publish detail (no row/link)')
-      }
+      try {
+        const page = await attachSession(
+          managerContext,
+          managerEmail,
+          password,
+          viewportOutDir,
+          'manager'
+        )
+        for (const shot of managerShots) {
+          await captureSafe(page, viewport.name, 'manager', viewportOutDir, shot)
+        }
+        if (capturePublishDetail) {
+          const publishDetail = await tryFirstLinkCapture(
+            page,
+            viewportOutDir,
+            '34-manager-publish-detail',
+            '/publish',
+            /^\/publish\/[^/?#]+/
+          )
+          if (publishDetail) {
+            summary.shots.push({
+              viewport: viewport.name,
+              persona: 'manager',
+              name: '34-manager-publish-detail',
+              path: publishDetail.path,
+              finalUrl: publishDetail.finalUrl,
+              file: publishDetail.file,
+            })
+            console.log('Wrote', publishDetail.file)
+          } else {
+            summary.skipped.push({
+              viewport: viewport.name,
+              persona: 'manager',
+              name: '34-manager-publish-detail',
+              reason: 'no row/link',
+            })
+            console.log('Skipped publish detail (no row/link)')
+          }
+        }
 
-      const workPatternDetail = await tryFirstLinkCapture(
-        page,
-        viewportOutDir,
-        '35-manager-team-work-pattern-detail',
-        '/team/work-patterns',
-        /^\/team\/work-patterns\/[^/?#]+/
-      )
-      if (workPatternDetail) {
-        summary.shots.push({
-          viewport: viewport.name,
-          persona: 'manager',
-          name: '35-manager-team-work-pattern-detail',
-          path: '/team/work-patterns/[therapistId]',
-          file: workPatternDetail,
-        })
-        console.log('Wrote', workPatternDetail)
-      } else {
-        summary.skipped.push({
-          viewport: viewport.name,
-          persona: 'manager',
-          name: '35-manager-team-work-pattern-detail',
-          reason: 'no row/link',
-        })
-        console.log('Skipped work-pattern detail (no row/link)')
+        if (captureWorkPatternDetail) {
+          const workPatternDetail = await tryFirstLinkCapture(
+            page,
+            viewportOutDir,
+            '35-manager-team-work-pattern-detail',
+            '/team/work-patterns',
+            /^\/team\/work-patterns\/[^/?#]+/
+          )
+          if (workPatternDetail) {
+            summary.shots.push({
+              viewport: viewport.name,
+              persona: 'manager',
+              name: '35-manager-team-work-pattern-detail',
+              path: workPatternDetail.path,
+              finalUrl: workPatternDetail.finalUrl,
+              file: workPatternDetail.file,
+            })
+            console.log('Wrote', workPatternDetail.file)
+          } else {
+            summary.skipped.push({
+              viewport: viewport.name,
+              persona: 'manager',
+              name: '35-manager-team-work-pattern-detail',
+              reason: 'no row/link',
+            })
+            console.log('Skipped work-pattern detail (no row/link)')
+          }
+        }
+      } catch (error) {
+        recordPersonaSetupError(viewport.name, 'manager', managerShots, error)
+      } finally {
+        await managerContext.close()
       }
-
-      await managerContext.close()
     }
 
     if (shouldRunPersona('staff')) {
+      const staffShots = selectedShots(STAFF_SHOTS)
+      if (staffShots.length === 0) {
+        continue
+      }
       const staffContext = await browser.newContext(contextOpts)
 
       console.log('\n--- Staff session ---')
-      const page2 = await attachSession(staffContext, staffEmail, password, viewportOutDir, 'staff')
-      for (const shot of STAFF_SHOTS) {
-        await captureSafe(page2, viewport.name, 'staff', viewportOutDir, shot)
+      try {
+        const page2 = await attachSession(
+          staffContext,
+          staffEmail,
+          password,
+          viewportOutDir,
+          'staff'
+        )
+        for (const shot of staffShots) {
+          await captureSafe(page2, viewport.name, 'staff', viewportOutDir, shot)
+        }
+      } catch (error) {
+        recordPersonaSetupError(viewport.name, 'staff', staffShots, error)
+      } finally {
+        await staffContext.close()
       }
-
-      await staffContext.close()
     }
   }
   await browser.close()
@@ -467,15 +581,23 @@ async function main() {
   const summaryPath = path.join(outDir, 'summary.json')
   await mergeSummary(summaryPath, summary)
 
-  const latestDir = path.join(process.cwd(), 'artifacts', 'screen-capture', 'latest')
+  const latestDir = process.env.SHOT_LATEST_DIR
+    ? path.resolve(process.cwd(), process.env.SHOT_LATEST_DIR)
+    : path.join(process.cwd(), 'output', 'screen-capture-latest')
   await fs.rm(latestDir, { recursive: true, force: true })
   await fs.cp(outDir, latestDir, { recursive: true })
 
   console.log(`\nDone. This run: ${outDir}`)
   console.log(`Mirror (always newest): ${latestDir}`)
   console.log(
-    `Summary: ${summaryPath} (${summary.shots.length} screenshots, ${summary.errors.length} errors, ${summary.skipped.length} skipped)`
+    `Summary: ${summaryPath} (${summary.shots.length} screenshots, ${summary.errors.length} errors, ${summary.skipped.length} skipped, ${summary.warnings.length} warnings)`
   )
+  if (summary.errors.length > 0 && !allowErrors) {
+    process.exitCode = 1
+  }
+  if (summary.warnings.length > 0 && failOnRedirects) {
+    process.exitCode = 1
+  }
 }
 
 main().catch((err) => {
