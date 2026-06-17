@@ -87,6 +87,10 @@ const publishActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts'),
   'utf8'
 )
+const scheduleBlockLifecycleSource = readFileSync(
+  resolve(process.cwd(), 'src/lib/schedule-block-lifecycle.ts'),
+  'utf8'
+)
 const cycleActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/cycle-actions.ts'),
   'utf8'
@@ -191,9 +195,11 @@ describe('schedule lifecycle hardening', () => {
   })
 
   it('does not trust client-passed cycle publication or template dates', () => {
-    expect(publishActionsSource).toContain('publishMutationClient.rpc')
-    expect(publishActionsSource).toContain("'app_publish_schedule_cycle'")
-    expect(publishActionsSource).toContain('p_actor_id: user.id')
+    expect(publishActionsSource).toContain('publishScheduleBlockLifecycle')
+    expect(scheduleBlockLifecycleSource).toContain(
+      "mutationClient.rpc('app_publish_schedule_cycle'"
+    )
+    expect(publishActionsSource).toContain('actorId: user.id')
     expect(publishActionsSource).toContain("'take_offline_from_publish_history'")
     expect(publishActionsSource).not.toContain(".update({ published: false, status: 'draft' })")
     expect(cycleActionsSource).toContain("'app_delete_empty_draft_schedule_cycle'")

@@ -30,7 +30,7 @@ describe('publish actions immediate email processing', () => {
     expect(source).toContain('loadBlockingReadinessIssuesForCycle')
     expect(source).toContain("'publish_readiness_blocked'")
     expect(source.indexOf('loadBlockingReadinessIssuesForCycle')).toBeLessThan(
-      source.indexOf("'app_publish_schedule_cycle'")
+      source.indexOf('const publishLifecycle = await publishScheduleBlockLifecycle')
     )
   })
 

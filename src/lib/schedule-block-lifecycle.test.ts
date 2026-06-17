@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   archiveScheduleBlockLifecycle,
+  publishScheduleBlockLifecycle,
   takeScheduleBlockOfflineLifecycle,
   type ArchiveScheduleBlockLifecycleResult,
+  type PublishScheduleBlockLifecycleResult,
   type TakeScheduleBlockOfflineLifecycleResult,
 } from '@/lib/schedule-block-lifecycle'
 
@@ -147,6 +149,96 @@ function createMutationClient(result?: {
     rpc: vi.fn(async () => result ?? { data: [{ id: 'cycle-1' }], error: null }),
   }
 }
+
+function createPublishMutationClient(result?: {
+  data: Array<{ id: string }> | { id: string } | null
+  error: { message?: string } | null
+}) {
+  return {
+    rpc: vi.fn(async () => result ?? { data: [{ id: 'cycle-1' }], error: null }),
+  }
+}
+
+describe('publishScheduleBlockLifecycle', () => {
+  it('publishes a Schedule Block through the publish RPC', async () => {
+    const mutationClient = createPublishMutationClient()
+
+    await expect(
+      publishScheduleBlockLifecycle({
+        mutationClient,
+        actorId: 'manager-1',
+        cycleId: 'cycle-1',
+      })
+    ).resolves.toEqual({ ok: true })
+
+    expect(mutationClient.rpc).toHaveBeenCalledWith('app_publish_schedule_cycle', {
+      p_actor_id: 'manager-1',
+      p_cycle_id: 'cycle-1',
+    })
+  })
+
+  it('returns a preliminary marks failure when the publish RPC rejects unresolved marks', async () => {
+    const mutationClient = createPublishMutationClient({
+      data: null,
+      error: { message: 'Resolve preliminary marks before publishing.' },
+    })
+
+    await expect(
+      publishScheduleBlockLifecycle({
+        mutationClient,
+        actorId: 'manager-1',
+        cycleId: 'cycle-1',
+      })
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'unresolved_preliminary_marks',
+      error: { message: 'Resolve preliminary marks before publishing.' },
+    } satisfies PublishScheduleBlockLifecycleResult)
+  })
+
+  it.each([
+    ['Resolve preliminary requests before publishing.', 'unresolved_preliminary_requests'],
+    ['Another live block already covers the same date range.', 'republish_conflict'],
+    ['Need to Work conflicts with Need Off availability.', 'availability_rule_violation'],
+    ['A designated lead is required for this shift.', 'shift_rule_violation'],
+    ['Only draft or preliminary Schedule Blocks can be published.', 'invalid_state'],
+  ] as const)('classifies publish RPC failure: %s', async (message, reason) => {
+    const mutationClient = createPublishMutationClient({
+      data: null,
+      error: { message },
+    })
+
+    await expect(
+      publishScheduleBlockLifecycle({
+        mutationClient,
+        actorId: 'manager-1',
+        cycleId: 'cycle-1',
+      })
+    ).resolves.toEqual({
+      ok: false,
+      reason,
+      error: { message },
+    } satisfies PublishScheduleBlockLifecycleResult)
+  })
+
+  it('returns stale state when the publish RPC updates no rows', async () => {
+    const mutationClient = createPublishMutationClient({
+      data: [],
+      error: null,
+    })
+
+    await expect(
+      publishScheduleBlockLifecycle({
+        mutationClient,
+        actorId: 'manager-1',
+        cycleId: 'cycle-1',
+      })
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'state_changed',
+    } satisfies PublishScheduleBlockLifecycleResult)
+  })
+})
 
 describe('takeScheduleBlockOfflineLifecycle', () => {
   it('takes a live final Schedule Block offline, closes requests, and writes audit', async () => {

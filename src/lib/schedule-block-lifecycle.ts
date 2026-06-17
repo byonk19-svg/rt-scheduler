@@ -32,6 +32,32 @@ export type TakeScheduleBlockOfflineMutationClient = {
   }>
 }
 
+export type PublishScheduleBlockMutationClient = {
+  rpc: (
+    fn: 'app_publish_schedule_cycle',
+    args: { p_actor_id: string; p_cycle_id: string }
+  ) => PromiseLike<{
+    data: Array<{ id: string }> | { id: string } | null
+    error: { message?: string } | null
+  }>
+}
+
+export type PublishScheduleBlockLifecycleResult =
+  | { ok: true }
+  | {
+      ok: false
+      reason:
+        | 'mutation_failed'
+        | 'state_changed'
+        | 'unresolved_preliminary_marks'
+        | 'unresolved_preliminary_requests'
+        | 'republish_conflict'
+        | 'availability_rule_violation'
+        | 'shift_rule_violation'
+        | 'invalid_state'
+      error?: unknown
+    }
+
 export type TakeScheduleBlockOfflineLifecycleResult =
   | { ok: true }
   | {
@@ -52,6 +78,41 @@ export type ArchiveScheduleBlockLifecycleResult =
       reason: 'cycle_lookup_failed' | 'live' | 'outside_site' | 'mutation_failed'
       error?: unknown
     }
+
+function classifyPublishMutationFailure(message: string | undefined) {
+  const normalized = message ?? ''
+  if (/resolve preliminary marks/i.test(normalized)) return 'unresolved_preliminary_marks'
+  if (/resolve preliminary requests/i.test(normalized)) return 'unresolved_preliminary_requests'
+  if (/another live block|same date range/i.test(normalized)) return 'republish_conflict'
+  if (/Need to Work|Need Off|availability/i.test(normalized)) return 'availability_rule_violation'
+  if (/designated lead|lead-capable assigned/i.test(normalized)) return 'shift_rule_violation'
+  if (/draft or preliminary/i.test(normalized)) return 'invalid_state'
+  return 'mutation_failed'
+}
+
+export async function publishScheduleBlockLifecycle(params: {
+  mutationClient: PublishScheduleBlockMutationClient
+  actorId: string
+  cycleId: string
+}): Promise<PublishScheduleBlockLifecycleResult> {
+  const { mutationClient, actorId, cycleId } = params
+
+  const { data: updatedRows, error } = await mutationClient.rpc('app_publish_schedule_cycle', {
+    p_actor_id: actorId,
+    p_cycle_id: cycleId,
+  })
+
+  if (error) {
+    return { ok: false, reason: classifyPublishMutationFailure(error.message), error }
+  }
+
+  const hasUpdatedRow = Array.isArray(updatedRows) ? updatedRows.length > 0 : Boolean(updatedRows)
+  if (!hasUpdatedRow) {
+    return { ok: false, reason: 'state_changed' }
+  }
+
+  return { ok: true }
+}
 
 export async function takeScheduleBlockOfflineLifecycle(params: {
   supabase: ServerSupabaseClient

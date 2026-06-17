@@ -8,6 +8,11 @@ import { notifyUsers } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
 import { summarizeAvailabilityPublishIssues } from '@/lib/availability-publish-validation'
 import { getPublishEmailConfig, processQueuedPublishEmails } from '@/lib/publish-events'
+import {
+  publishScheduleBlockLifecycle,
+  type PublishScheduleBlockLifecycleResult,
+  type PublishScheduleBlockMutationClient,
+} from '@/lib/schedule-block-lifecycle'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildDateRange,
@@ -71,14 +76,27 @@ type PublishRecipientRow = {
   notification_email_enabled?: boolean | null
 }
 
-type PublishCycleMutationClient = {
-  rpc: (
-    fn: 'app_publish_schedule_cycle',
-    args: { p_actor_id: string; p_cycle_id: string }
-  ) => PromiseLike<{
-    data: Array<{ id: string }> | { id: string } | null
-    error: { message?: string } | null
-  }>
+function publishLifecycleFailureCode(
+  reason: Exclude<PublishScheduleBlockLifecycleResult, { ok: true }>['reason']
+) {
+  switch (reason) {
+    case 'unresolved_preliminary_marks':
+      return 'publish_unresolved_preliminary_marks'
+    case 'unresolved_preliminary_requests':
+      return 'publish_unresolved_preliminary_requests'
+    case 'republish_conflict':
+      return 'publish_republish_conflict'
+    case 'availability_rule_violation':
+      return 'publish_availability_rule_violation'
+    case 'shift_rule_violation':
+      return 'publish_shift_rule_violation'
+    case 'invalid_state':
+      return 'publish_invalid_state'
+    case 'state_changed':
+      return 'publish_state_changed'
+    case 'mutation_failed':
+      return 'publish_failed'
+  }
 }
 
 export async function toggleCyclePublishedAction(formData: FormData) {
@@ -434,55 +452,29 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     }
   }
 
-  const publishMutationClient = createAdminClient() as unknown as PublishCycleMutationClient
+  const publishLifecycle = await publishScheduleBlockLifecycle({
+    mutationClient: createAdminClient() as unknown as PublishScheduleBlockMutationClient,
+    actorId: user.id,
+    cycleId,
+  })
 
-  const { data: updatedCycle, error } = await publishMutationClient.rpc(
-    'app_publish_schedule_cycle',
-    {
-      p_actor_id: user.id,
-      p_cycle_id: cycleId,
+  if (!publishLifecycle.ok) {
+    if (publishLifecycle.reason !== 'state_changed') {
+      console.error('Failed to toggle schedule publication state:', publishLifecycle.error)
     }
-  )
-
-  if (error) {
-    console.error('Failed to toggle schedule publication state:', error)
-    const publishError =
-      !currentlyPublished && /resolve preliminary marks/i.test(error.message ?? '')
-        ? 'publish_unresolved_preliminary_marks'
-        : !currentlyPublished && /resolve preliminary requests/i.test(error.message ?? '')
-          ? 'publish_unresolved_preliminary_requests'
-          : !currentlyPublished && /another live block|same date range/i.test(error.message ?? '')
-            ? 'publish_republish_conflict'
-            : !currentlyPublished && /Need to Work|Need Off|availability/i.test(error.message ?? '')
-              ? 'publish_availability_rule_violation'
-              : !currentlyPublished &&
-                  /designated lead|lead-capable assigned/i.test(error.message ?? '')
-                ? 'publish_shift_rule_violation'
-                : !currentlyPublished && /draft or preliminary/i.test(error.message ?? '')
-                  ? 'publish_invalid_state'
-                  : 'publish_failed'
     redirect(
       buildReturnUrl(cycleId, {
         ...viewParams,
-        error: currentlyPublished ? 'unpublish_failed' : publishError,
+        error: currentlyPublished
+          ? publishLifecycle.reason === 'state_changed'
+            ? 'unpublish_state_changed'
+            : 'unpublish_failed'
+          : publishLifecycleFailureCode(publishLifecycle.reason),
       })
     )
   }
 
-  const hasUpdatedCycle = Array.isArray(updatedCycle)
-    ? updatedCycle.length > 0
-    : Boolean(updatedCycle)
-
-  if (!hasUpdatedCycle && !error) {
-    redirect(
-      buildReturnUrl(cycleId, {
-        ...viewParams,
-        error: currentlyPublished ? 'unpublish_state_changed' : 'publish_state_changed',
-      })
-    )
-  }
-
-  if (!currentlyPublished && !error && hasUpdatedCycle) {
+  if (!currentlyPublished) {
     const emailConfig = getPublishEmailConfig()
     let publishEventId: string | null = null
     let publishedAt: string | null = null
