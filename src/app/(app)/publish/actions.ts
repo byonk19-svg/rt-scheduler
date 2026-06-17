@@ -5,13 +5,11 @@ import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
-import { writeAuditLog } from '@/lib/audit-log'
 import { refreshPublishEventCounts } from '@/lib/publish-events'
 import {
-  OFFLINE_SHIFT_BOARD_CLOSURE_REASON,
-  canTakeScheduleBlockOffline,
-} from '@/lib/schedule-lifecycle-matrix'
-import { closePendingShiftPostsForShiftIds } from '@/lib/shift-post-cleanup'
+  archiveScheduleBlockLifecycle,
+  takeScheduleBlockOfflineLifecycle,
+} from '@/lib/schedule-block-lifecycle'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -49,16 +47,6 @@ async function requireManagerUser() {
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
-}
-
-type TakeOfflineMutationClient = {
-  rpc: (
-    fn: 'app_take_schedule_cycle_offline',
-    args: { p_actor_id: string; p_cycle_id: string }
-  ) => PromiseLike<{
-    data: Array<{ id: string }> | { id: string } | null
-    error: { message?: string } | null
-  }>
 }
 
 export async function requeueFailedPublishEmailsAction(formData: FormData) {
@@ -119,65 +107,30 @@ export async function takeScheduleBlockOfflineAction(formData: FormData) {
       console.error('Failed to initialize admin client for take offline:', error)
       redirect('/publish?error=take_offline_failed')
     }
-  })() as unknown as TakeOfflineMutationClient
+  })()
 
-  const { data: cycle, error: cycleError } = await supabase
-    .from('schedule_cycles')
-    .select('id, published, status')
-    .eq('id', cycleId)
-    .maybeSingle()
-
-  if (cycleError || !cycle) {
-    console.error('Failed to load cycle for take offline:', cycleError)
-    redirect('/publish?error=take_offline_failed')
-  }
-
-  if (!canTakeScheduleBlockOffline(cycle)) {
-    redirect('/publish?error=take_offline_not_live')
-  }
-
-  const { data: currentShifts, error: shiftsError } = await supabase
-    .from('shifts')
-    .select('id')
-    .eq('cycle_id', cycleId)
-
-  if (shiftsError) {
-    console.error('Failed to load shifts for take offline cleanup:', shiftsError)
-    redirect('/publish?error=take_offline_failed')
-  }
-
-  const { data: offlineRows, error: offlineError } = await admin.rpc(
-    'app_take_schedule_cycle_offline',
-    {
-      p_actor_id: user.id,
-      p_cycle_id: cycleId,
-    }
-  )
-
-  if (offlineError) {
-    console.error('Failed to take schedule block offline:', offlineError)
-    redirect('/publish?error=take_offline_failed')
-  }
-
-  const hasOfflineRow = Array.isArray(offlineRows) ? offlineRows.length > 0 : Boolean(offlineRows)
-  if (!hasOfflineRow) {
-    redirect('/publish?error=take_offline_state_changed')
-  }
-
-  await closePendingShiftPostsForShiftIds(
+  const lifecycle = await takeScheduleBlockOfflineLifecycle({
     supabase,
-    ((currentShifts ?? []) as Array<{ id: string | null }>)
-      .map((shift) => shift.id)
-      .filter((id): id is string => Boolean(id)),
-    OFFLINE_SHIFT_BOARD_CLOSURE_REASON
-  )
-
-  await writeAuditLog(supabase, {
-    userId: user.id,
-    action: 'schedule_block_taken_offline',
-    targetType: 'schedule_cycle',
-    targetId: cycleId,
+    mutationClient: admin,
+    actorId: user.id,
+    cycleId,
   })
+  if (!lifecycle.ok) {
+    if (lifecycle.reason === 'not_live') {
+      redirect('/publish?error=take_offline_not_live')
+    }
+    if (lifecycle.reason === 'state_changed') {
+      redirect('/publish?error=take_offline_state_changed')
+    }
+    if (lifecycle.reason === 'cycle_lookup_failed') {
+      console.error('Failed to load cycle for take offline:', lifecycle.error)
+    } else if (lifecycle.reason === 'shift_lookup_failed') {
+      console.error('Failed to load shifts for take offline cleanup:', lifecycle.error)
+    } else if (lifecycle.reason === 'mutation_failed') {
+      console.error('Failed to take schedule block offline:', lifecycle.error)
+    }
+    redirect('/publish?error=take_offline_failed')
+  }
 
   revalidatePath('/publish')
   revalidatePath('/schedule')
@@ -248,41 +201,23 @@ export async function archiveCycleAction(formData: FormData) {
   }
 
   const supabase = await createClient()
-  const { data: cycle, error: cycleError } = await supabase
-    .from('schedule_cycles')
-    .select('id, published, archived_at, site_id')
-    .eq('id', cycleId)
-    .maybeSingle()
-
-  if (cycleError || !cycle) {
-    console.error('Failed to load cycle for archival:', cycleError)
-    redirect('/publish?error=cycle_archive_failed')
-  }
-
-  if (cycle.published) {
-    redirect('/publish?error=archive_live_cycle')
-  }
-
-  if (!siteId || cycle.site_id !== siteId) {
-    redirect('/publish?error=cycle_archive_failed')
-  }
-
-  const { error: archiveError } = await supabase
-    .from('schedule_cycles')
-    .update({ archived_at: new Date().toISOString(), status: 'archived' })
-    .eq('id', cycleId)
-
-  if (archiveError) {
-    console.error('Failed to archive cycle:', archiveError)
-    redirect('/publish?error=cycle_archive_failed')
-  }
-
-  await writeAuditLog(supabase, {
-    userId: user.id,
-    action: 'schedule_block_archived',
-    targetType: 'schedule_cycle',
-    targetId: cycleId,
+  const lifecycle = await archiveScheduleBlockLifecycle({
+    supabase,
+    actorId: user.id,
+    managerSiteId: siteId,
+    cycleId,
   })
+  if (!lifecycle.ok) {
+    if (lifecycle.reason === 'live') {
+      redirect('/publish?error=archive_live_cycle')
+    }
+    if (lifecycle.reason === 'cycle_lookup_failed') {
+      console.error('Failed to load cycle for archival:', lifecycle.error)
+    } else if (lifecycle.reason === 'mutation_failed') {
+      console.error('Failed to archive cycle:', lifecycle.error)
+    }
+    redirect('/publish?error=cycle_archive_failed')
+  }
 
   revalidatePath('/publish')
   revalidatePath('/schedule')
