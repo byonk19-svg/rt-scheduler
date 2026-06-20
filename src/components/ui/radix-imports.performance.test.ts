@@ -9,7 +9,6 @@ const uiFiles = [
   'src/components/ui/dialog.tsx',
   'src/components/ui/label.tsx',
   'src/components/ui/popover.tsx',
-  'src/components/ui/progress.tsx',
 ]
 
 describe('ui primitive import boundaries', () => {

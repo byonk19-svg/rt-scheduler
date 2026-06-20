@@ -20,6 +20,7 @@ function createSupabaseMock(options?: {
   cycleError?: { message: string } | null
   shiftsError?: { message: string } | null
   cycleUpdateError?: { message: string } | null
+  shiftPostUpdateError?: { message: string } | null
 }) {
   const state = {
     inserts: [] as Array<{ table: string; payload: Record<string, unknown> }>,
@@ -83,7 +84,7 @@ function createSupabaseMock(options?: {
             in(column: string, value: string[]) {
               if (table === 'shift_posts' && column === 'id') {
                 state.shiftPostUpdates.push({ payload, ids: value })
-                return Promise.resolve({ error: null })
+                return Promise.resolve({ error: options?.shiftPostUpdateError ?? null })
               }
 
               if (table === 'shift_post_interests' && column === 'shift_post_id') {
@@ -325,6 +326,46 @@ describe('takeScheduleBlockOfflineLifecycle', () => {
     })
 
     expect(mutationClient.rpc).not.toHaveBeenCalled()
+  })
+
+  it('reports success after the offline mutation when request cleanup fails', async () => {
+    const supabase = createSupabaseMock({
+      shiftPostUpdateError: { message: 'cleanup write failed' },
+    })
+    const mutationClient = createMutationClient()
+
+    await expect(
+      takeScheduleBlockOfflineLifecycle({
+        supabase: supabase as never,
+        mutationClient,
+        actorId: 'manager-1',
+        cycleId: 'cycle-1',
+      })
+    ).resolves.toEqual({ ok: true })
+
+    expect(mutationClient.rpc).toHaveBeenCalledWith('app_take_schedule_cycle_offline', {
+      p_actor_id: 'manager-1',
+      p_cycle_id: 'cycle-1',
+    })
+    expect(supabase.state.shiftPostUpdates).toEqual([
+      {
+        payload: {
+          status: 'denied',
+          override_reason:
+            'Schedule block was taken offline. Submit a new request after it is republished.',
+        },
+        ids: ['post-1'],
+      },
+    ])
+    expect(supabase.state.inserts).toContainEqual({
+      table: 'audit_log',
+      payload: {
+        user_id: 'manager-1',
+        action: 'schedule_block_taken_offline',
+        target_type: 'schedule_cycle',
+        target_id: 'cycle-1',
+      },
+    })
   })
 })
 

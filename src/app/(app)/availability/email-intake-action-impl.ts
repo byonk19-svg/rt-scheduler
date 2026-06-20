@@ -159,6 +159,3 @@ export async function deleteEmailIntakeAction(formData: FormData) {
   revalidatePath('/availability')
   redirect(buildEmailIntakeAvailabilityUrl({ success: 'email_intake_deleted' }))
 }
-
-export const reparseAvailabilityEmailIntakeAction = reparseEmailIntakeAction
-export const deleteAvailabilityEmailIntakeAction = deleteEmailIntakeAction

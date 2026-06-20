@@ -441,8 +441,6 @@ export function EmailIntakePanel({
   updateEmailIntakeItemRequestAction,
   deleteEmailIntakeAction,
   reparseEmailIntakeAction,
-  deleteAvailabilityEmailIntakeAction,
-  reparseAvailabilityEmailIntakeAction,
   updateEmailIntakeTherapistAction,
   therapistOptions,
   cycleOptions,
@@ -454,18 +452,13 @@ export function EmailIntakePanel({
   updateEmailIntakeItemRequestAction: (
     formData: FormData
   ) => void | Promise<void> | Promise<{ ok: true }>
-  deleteEmailIntakeAction?: (formData: FormData) => void | Promise<void>
-  reparseEmailIntakeAction?: (formData: FormData) => void | Promise<void>
-  deleteAvailabilityEmailIntakeAction?: (formData: FormData) => void | Promise<void>
-  reparseAvailabilityEmailIntakeAction?: (formData: FormData) => void | Promise<void>
+  deleteEmailIntakeAction: (formData: FormData) => void | Promise<void>
+  reparseEmailIntakeAction: (formData: FormData) => void | Promise<void>
   updateEmailIntakeTherapistAction: (formData: FormData) => void | Promise<void>
   therapistOptions: Array<{ id: string; fullName: string }>
   cycleOptions: Array<{ id: string; label: string }>
 }) {
   const [showHowItWorks, setShowHowItWorks] = useState(false)
-  const runDeleteEmailIntakeAction = deleteEmailIntakeAction ?? deleteAvailabilityEmailIntakeAction
-  const runReparseEmailIntakeAction =
-    reparseEmailIntakeAction ?? reparseAvailabilityEmailIntakeAction
 
   return (
     <div>
@@ -569,13 +562,13 @@ export function EmailIntakePanel({
                       ))}
                   </div>
                   <div className="flex flex-wrap justify-end gap-2">
-                    <form action={runReparseEmailIntakeAction}>
+                    <form action={reparseEmailIntakeAction}>
                       <input type="hidden" name="intake_id" value={row.id} />
                       <Button size="sm" type="submit" variant="outline">
                         Reparse
                       </Button>
                     </form>
-                    <form action={runDeleteEmailIntakeAction}>
+                    <form action={deleteEmailIntakeAction}>
                       <input type="hidden" name="intake_id" value={row.id} />
                       <Button size="sm" type="submit" variant="destructive">
                         Delete

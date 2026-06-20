@@ -3,7 +3,7 @@ import {
   OFFLINE_SHIFT_BOARD_CLOSURE_REASON,
   canTakeScheduleBlockOffline,
 } from '@/lib/schedule-lifecycle-matrix'
-import { closePendingShiftPostsForShiftIds } from '@/lib/shift-post-cleanup'
+import { ShiftPostCleanupError, closePendingShiftPostsForShiftIds } from '@/lib/shift-post-cleanup'
 import type { createClient } from '@/lib/supabase/server'
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
@@ -162,13 +162,19 @@ export async function takeScheduleBlockOfflineLifecycle(params: {
     return { ok: false, reason: 'state_changed' }
   }
 
-  await closePendingShiftPostsForShiftIds(
-    supabase,
-    ((currentShifts ?? []) as Array<{ id: string | null }>)
-      .map((shift) => shift.id)
-      .filter((id): id is string => Boolean(id)),
-    OFFLINE_SHIFT_BOARD_CLOSURE_REASON
-  )
+  try {
+    await closePendingShiftPostsForShiftIds(
+      supabase,
+      ((currentShifts ?? []) as Array<{ id: string | null }>)
+        .map((shift) => shift.id)
+        .filter((id): id is string => Boolean(id)),
+      OFFLINE_SHIFT_BOARD_CLOSURE_REASON
+    )
+  } catch (error) {
+    if (!(error instanceof ShiftPostCleanupError)) {
+      throw error
+    }
+  }
 
   await writeAuditLog(supabase, {
     userId: actorId,

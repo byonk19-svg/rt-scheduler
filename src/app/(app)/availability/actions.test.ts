@@ -41,10 +41,10 @@ import {
   copyAvailabilityFromPreviousCycleAction,
   closeAvailabilityWindowAction,
   deleteAvailabilityEntryAction,
-  deleteAvailabilityEmailIntakeAction,
+  deleteEmailIntakeAction,
   deleteManagerAvailabilityRequestAction,
   deleteManagerPlannerDateAction,
-  reparseAvailabilityEmailIntakeAction,
+  reparseEmailIntakeAction,
   reopenAvailabilityWindowAction,
   saveManagerAvailabilityRequestsAction,
   saveManagerPlannerDatesAction,
@@ -1692,7 +1692,7 @@ describe('availability actions', () => {
     const formData = new FormData()
     formData.set('intake_id', 'intake-1')
 
-    await expect(reparseAvailabilityEmailIntakeAction(formData)).rejects.toThrow(
+    await expect(reparseEmailIntakeAction(formData)).rejects.toThrow(
       'REDIRECT:/availability?success=email_intake_reparsed&tab=intake'
     )
 
@@ -1752,7 +1752,7 @@ describe('availability actions', () => {
     const formData = new FormData()
     formData.set('intake_id', 'intake-1')
 
-    await expect(deleteAvailabilityEmailIntakeAction(formData)).rejects.toThrow(
+    await expect(deleteEmailIntakeAction(formData)).rejects.toThrow(
       'REDIRECT:/availability?success=email_intake_deleted&tab=intake'
     )
 

@@ -3,6 +3,14 @@ type SupabaseLike = {
   from: (table: string) => any
 }
 
+export class ShiftPostCleanupError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message)
+    this.name = 'ShiftPostCleanupError'
+    this.cause = options?.cause
+  }
+}
+
 export async function closePendingShiftPostsForShiftIds(
   supabase: SupabaseLike,
   shiftIds: string[],
@@ -19,7 +27,9 @@ export async function closePendingShiftPostsForShiftIds(
 
   if (pendingPostsError) {
     console.error('Could not load pending shift posts for cleanup:', pendingPostsError)
-    return
+    throw new ShiftPostCleanupError('Could not load pending shift posts for cleanup.', {
+      cause: pendingPostsError,
+    })
   }
 
   const postIds = ((pendingPosts ?? []) as Array<{ id: string | null }>)
@@ -39,7 +49,9 @@ export async function closePendingShiftPostsForShiftIds(
 
   if (postUpdateError) {
     console.error('Could not close stale shift posts during cleanup:', postUpdateError)
-    return
+    throw new ShiftPostCleanupError('Could not close stale shift posts during cleanup.', {
+      cause: postUpdateError,
+    })
   }
 
   const { error: interestUpdateError } = await supabase
@@ -53,6 +65,9 @@ export async function closePendingShiftPostsForShiftIds(
 
   if (interestUpdateError) {
     console.error('Could not close stale pickup interests during cleanup:', interestUpdateError)
+    throw new ShiftPostCleanupError('Could not close stale pickup interests during cleanup.', {
+      cause: interestUpdateError,
+    })
   }
 }
 
@@ -71,7 +86,9 @@ export async function preserveShiftPostHistoryBeforeShiftDeletion(
 
   if (linkedPostsError) {
     console.error('Could not load shift posts before shift deletion:', linkedPostsError)
-    return
+    throw new ShiftPostCleanupError('Could not load shift posts before shift deletion.', {
+      cause: linkedPostsError,
+    })
   }
 
   const allPostIds = ((linkedPosts ?? []) as Array<{ id: string | null; status: string | null }>)
@@ -101,7 +118,10 @@ export async function preserveShiftPostHistoryBeforeShiftDeletion(
         'Could not preserve pending shift posts before shift deletion:',
         pendingUpdateError
       )
-      return
+      throw new ShiftPostCleanupError(
+        'Could not preserve pending shift posts before shift deletion.',
+        { cause: pendingUpdateError }
+      )
     }
 
     const { error: interestUpdateError } = await supabase
@@ -115,6 +135,9 @@ export async function preserveShiftPostHistoryBeforeShiftDeletion(
 
     if (interestUpdateError) {
       console.error('Could not close pickup interests before shift deletion:', interestUpdateError)
+      throw new ShiftPostCleanupError('Could not close pickup interests before shift deletion.', {
+        cause: interestUpdateError,
+      })
     }
   }
 
@@ -130,6 +153,12 @@ export async function preserveShiftPostHistoryBeforeShiftDeletion(
     console.error(
       'Could not preserve shift post history before shift deletion:',
       historyUpdateError
+    )
+    throw new ShiftPostCleanupError(
+      'Could not preserve shift post history before shift deletion.',
+      {
+        cause: historyUpdateError,
+      }
     )
   }
 }

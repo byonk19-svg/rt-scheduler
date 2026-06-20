@@ -357,6 +357,19 @@ async function renderScheduleGridFeedbackHarness(
   `)
 }
 
+function collectDuplicateKeyWarnings(page: Page) {
+  const warnings: string[] = []
+  page.on('console', (message) => {
+    if (message.type() !== 'error' && message.type() !== 'warning') return
+
+    const text = message.text()
+    if (text.includes('Encountered two children with the same key')) {
+      warnings.push(text)
+    }
+  })
+  return warnings
+}
+
 describe('ScheduleGrid feedback rendering', () => {
   let browser: Awaited<ReturnType<typeof chromium.launch>>
 
@@ -403,6 +416,29 @@ describe('ScheduleGrid feedback rendering', () => {
           .getByText('2026-05-04 day shift')
           .first()
           .waitFor({ state: 'visible' })
+      } finally {
+        await page.close()
+      }
+    },
+    PLAYWRIGHT_TEST_TIMEOUT
+  )
+
+  it(
+    'renders readiness issue rows without duplicate React key warnings',
+    async () => {
+      const page = await browser.newPage()
+      const duplicateKeyWarnings = collectDuplicateKeyWarnings(page)
+      try {
+        await renderScheduleGridFeedbackHarness(page, {
+          cellStatus: 'off',
+          isPublished: false,
+          errors: {},
+        })
+
+        await page.getByRole('button', { name: 'Pre-flight' }).click()
+        await page.getByText('Pre-flight summary').waitFor({ state: 'visible' })
+
+        expect(duplicateKeyWarnings).toEqual([])
       } finally {
         await page.close()
       }

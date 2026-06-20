@@ -41,9 +41,9 @@ Use `can(role, permission, context?)` for both UI gating and server-side authori
 
 ## Dependency Posture
 
-- Local production dependency audit was rechecked on May 20, 2026 with `npm audit --omit=dev`; it passed with `0` vulnerabilities.
+- Local production dependency audit was rechecked on June 21, 2026 with `npm audit --omit=dev`; it passed with `0` vulnerabilities.
 - Current dependency-security patch line:
   - `next`, `@next/env`, and `eslint-config-next` at `16.2.6`
-  - `@sentry/nextjs` at `10.53.1`
+  - `@sentry/core` and `@sentry/nextjs` at `10.59.0`
   - `@supabase/supabase-js` at `2.106.1`
-  - targeted `fast-uri` `3.1.2` override for the remaining transitive production advisory
+  - targeted `fast-uri` `3.1.2` override remains in place

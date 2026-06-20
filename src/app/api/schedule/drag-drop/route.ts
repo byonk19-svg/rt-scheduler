@@ -44,6 +44,7 @@ import {
 } from '@/lib/schedule-mutations/validate-therapist'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import {
+  ShiftPostCleanupError,
   closePendingShiftPostsForShiftIds,
   preserveShiftPostHistoryBeforeShiftDeletion,
 } from '@/lib/shift-post-cleanup'
@@ -79,6 +80,22 @@ function scheduleMutationErrorResponse(
   extra?: Record<string, unknown>
 ) {
   return NextResponse.json({ error, code, ...extra }, { status })
+}
+
+function scheduleCleanupErrorResponse(error: unknown) {
+  if (error instanceof ShiftPostCleanupError) {
+    return scheduleMutationErrorResponse(
+      'Could not preserve linked Shift Board requests. Try again before changing this schedule.',
+      ERROR_CODES.internalError,
+      500
+    )
+  }
+  throw error
+}
+
+function ignorePostMutationCleanupError(error: unknown) {
+  if (error instanceof ShiftPostCleanupError) return
+  throw error
 }
 
 async function getCoverageCountForSlot(
@@ -740,11 +757,15 @@ export async function POST(request: Request) {
     }
 
     if (cycle.published || preliminaryActive) {
-      await closePendingShiftPostsForShiftIds(
-        supabase,
-        [shift.id],
-        'Schedule changed after this request was posted.'
-      )
+      try {
+        await closePendingShiftPostsForShiftIds(
+          supabase,
+          [shift.id],
+          'Schedule changed after this request was posted.'
+        )
+      } catch (error) {
+        ignorePostMutationCleanupError(error)
+      }
     }
 
     await notifyPublishedShiftMoved(supabase, {
@@ -842,11 +863,15 @@ export async function POST(request: Request) {
       )
     }
 
-    await preserveShiftPostHistoryBeforeShiftDeletion(
-      supabase,
-      [shift.id],
-      'Schedule changed after this request was posted.'
-    )
+    try {
+      await preserveShiftPostHistoryBeforeShiftDeletion(
+        supabase,
+        [shift.id],
+        'Schedule changed after this request was posted.'
+      )
+    } catch (error) {
+      return scheduleCleanupErrorResponse(error)
+    }
 
     const { error } = await supabase
       .from('shifts')
@@ -1129,11 +1154,15 @@ export async function POST(request: Request) {
       `${payload.cycleId}:${payload.therapistId}:${payload.date}:${payload.shiftType}`
 
     if (cycle.published || preliminaryActive) {
-      await closePendingShiftPostsForShiftIds(
-        supabase,
-        [leadShiftId],
-        'Schedule changed after this request was posted.'
-      )
+      try {
+        await closePendingShiftPostsForShiftIds(
+          supabase,
+          [leadShiftId],
+          'Schedule changed after this request was posted.'
+        )
+      } catch (error) {
+        ignorePostMutationCleanupError(error)
+      }
     }
 
     const shouldLogPostPublishModification = await shouldLogPostPublishModificationForSlot(

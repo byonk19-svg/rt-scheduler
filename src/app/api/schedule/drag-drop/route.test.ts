@@ -67,6 +67,9 @@ type Scenario = {
   insertError?: { code?: string; message?: string } | null
   designatedLeadRpcError?: { code?: string; message?: string } | null
   pendingShiftPosts?: Array<{ id: string; shift_id: string | null }>
+  shiftPostSelectError?: { message: string } | null
+  shiftPostUpdateError?: { message: string } | null
+  shiftPostInterestUpdateError?: { message: string } | null
   hasActivePreliminary?: boolean
 }
 
@@ -90,6 +93,7 @@ function makeSupabaseMock(scenario: Scenario) {
     filters: Record<string, unknown>
     payload: Record<string, unknown>
   }> = []
+  const deletedShiftIds: string[] = []
 
   const auth = {
     getUser: async () => ({ data: { user: { id: 'manager-1' } } }),
@@ -274,6 +278,9 @@ function makeSupabaseMock(scenario: Scenario) {
       }
 
       if (table === 'shift_posts') {
+        if (scenario.shiftPostSelectError) {
+          return { data: null, error: scenario.shiftPostSelectError }
+        }
         const targetShiftIds = Array.isArray(state.filters['in:shift_id'])
           ? (state.filters['in:shift_id'] as string[])
           : []
@@ -306,13 +313,23 @@ function makeSupabaseMock(scenario: Scenario) {
           filters: { ...state.filters },
           payload: state.insertPayload ?? {},
         })
+        if (scenario.shiftPostUpdateError) {
+          return { data: null, error: scenario.shiftPostUpdateError }
+        }
       }
 
       if (table === 'shift_post_interests' && state.op === 'update') {
+        if (scenario.shiftPostInterestUpdateError) {
+          return { data: null, error: scenario.shiftPostInterestUpdateError }
+        }
         updatedShiftPostInterests.push({
           filters: { ...state.filters },
           payload: state.insertPayload ?? {},
         })
+      }
+
+      if (table === 'shifts' && state.op === 'delete' && typeof state.filters.id === 'string') {
+        deletedShiftIds.push(state.filters.id)
       }
 
       return { data: null, error: null }
@@ -399,7 +416,15 @@ function makeSupabaseMock(scenario: Scenario) {
     return builder
   }
 
-  return { auth, from, rpc, insertedShiftPayloads, updatedShiftPosts, updatedShiftPostInterests }
+  return {
+    auth,
+    from,
+    rpc,
+    insertedShiftPayloads,
+    updatedShiftPosts,
+    updatedShiftPostInterests,
+    deletedShiftIds,
+  }
 }
 
 describe('drag-drop API behavior', () => {
@@ -1080,6 +1105,50 @@ describe('drag-drop API behavior', () => {
     })
   })
 
+  it('still reports a designated lead update when post-lead Shift Board cleanup fails', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: ['scheduled', 'scheduled'],
+      weeklyShifts: [],
+      cyclePublished: true,
+      leadTherapistEligible: true,
+      existingShiftForLead: { id: 'shift-existing', status: 'scheduled' },
+      pendingShiftPosts: [{ id: 'post-1', shift_id: 'shift-existing' }],
+      shiftPostUpdateError: { message: 'cleanup update failed' },
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'set_lead',
+          cycleId: 'cycle-1',
+          therapistId: 'therapist-lead',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      message: 'Designated lead updated.',
+    })
+    expect(supabase.rpc).toHaveBeenCalled()
+    expect(supabase.updatedShiftPosts).toContainEqual({
+      filters: expect.objectContaining({
+        'in:id': ['post-1'],
+      }),
+      payload: expect.objectContaining({
+        status: 'denied',
+      }),
+    })
+  })
+
   it('blocks designated lead when therapist is not eligible', async () => {
     vi.mocked(createClient).mockResolvedValue(
       makeSupabaseMock({
@@ -1304,6 +1373,47 @@ describe('drag-drop API behavior', () => {
     })
   })
 
+  it('does not delete a shift when linked Shift Board cleanup fails', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: [],
+      weeklyShifts: [],
+      cyclePublished: true,
+      removableShift: {
+        id: 'shift-1',
+        cycle_id: 'cycle-1',
+        user_id: 'therapist-2',
+        date: '2026-03-12',
+        shift_type: 'night',
+        role: 'staff',
+      },
+      pendingShiftPosts: [{ id: 'post-1', shift_id: 'shift-1' }],
+      shiftPostSelectError: { message: 'cleanup read failed' },
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'remove',
+          cycleId: 'cycle-1',
+          shiftId: 'shift-1',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(500)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'internal_error',
+      error:
+        'Could not preserve linked Shift Board requests. Try again before changing this schedule.',
+    })
+    expect(supabase.deletedShiftIds).toEqual([])
+  })
+
   it('notifies the affected therapist when a published shift is moved', async () => {
     vi.mocked(createClient).mockResolvedValue(
       makeSupabaseMock({
@@ -1345,6 +1455,53 @@ describe('drag-drop API behavior', () => {
       expect.objectContaining({
         eventType: 'published_schedule_changed',
         message: 'Your published schedule changed: your shift moved from Mar 12 day to Mar 13 day.',
+      })
+    )
+  })
+
+  it('still reports a moved published shift when post-move Shift Board cleanup fails', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: ['scheduled'],
+      weeklyShifts: [],
+      cyclePublished: true,
+      removableShift: {
+        id: 'shift-1',
+        cycle_id: 'cycle-1',
+        user_id: 'therapist-2',
+        date: '2026-03-12',
+        shift_type: 'day',
+        role: 'staff',
+      },
+      pendingShiftPosts: [{ id: 'post-1', shift_id: 'shift-1' }],
+      shiftPostUpdateError: { message: 'cleanup update failed' },
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'move',
+          cycleId: 'cycle-1',
+          shiftId: 'shift-1',
+          targetDate: '2026-03-13',
+          targetShiftType: 'day',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      message: 'Shift moved.',
+    })
+    expect(notifyUsers).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'published_schedule_changed',
       })
     )
   })

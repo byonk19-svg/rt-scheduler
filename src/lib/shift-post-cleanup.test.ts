@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  ShiftPostCleanupError,
   closePendingShiftPostsForShiftIds,
   preserveShiftPostHistoryBeforeShiftDeletion,
 } from '@/lib/shift-post-cleanup'
@@ -101,6 +102,30 @@ describe('preserveShiftPostHistoryBeforeShiftDeletion', () => {
       },
     ])
   })
+
+  it('fails closed when linked shift posts cannot be loaded before deletion', async () => {
+    const supabase = {
+      from(table: string) {
+        if (table !== 'shift_posts') throw new Error(`Unexpected table ${table}`)
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(async () => ({
+              data: null,
+              error: { message: 'database unavailable' },
+            })),
+          })),
+        }
+      },
+    }
+
+    await expect(
+      preserveShiftPostHistoryBeforeShiftDeletion(
+        supabase as never,
+        ['shift-1'],
+        'Schedule changed after this request was posted.'
+      )
+    ).rejects.toBeInstanceOf(ShiftPostCleanupError)
+  })
 })
 
 describe('closePendingShiftPostsForShiftIds', () => {
@@ -132,5 +157,36 @@ describe('closePendingShiftPostsForShiftIds', () => {
         statuses: ['pending', 'selected'],
       },
     ])
+  })
+
+  it('fails closed when pending shift posts cannot be denied', async () => {
+    const supabase = {
+      from(table: string) {
+        if (table !== 'shift_posts') throw new Error(`Unexpected table ${table}`)
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => ({
+              eq: vi.fn(async () => ({
+                data: [{ id: 'post-pending' }],
+                error: null,
+              })),
+            })),
+          })),
+          update: vi.fn(() => ({
+            in: vi.fn(async () => ({
+              error: { message: 'update failed' },
+            })),
+          })),
+        }
+      },
+    }
+
+    await expect(
+      closePendingShiftPostsForShiftIds(
+        supabase as never,
+        ['shift-1'],
+        'Schedule block was taken offline. Submit a new request after it is republished.'
+      )
+    ).rejects.toBeInstanceOf(ShiftPostCleanupError)
   })
 })

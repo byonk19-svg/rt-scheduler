@@ -24,9 +24,7 @@ export {
 
 export {
   applyEmailAvailabilityImportAction,
-  deleteAvailabilityEmailIntakeAction,
   deleteEmailIntakeAction,
-  reparseAvailabilityEmailIntakeAction,
   reparseEmailIntakeAction,
   updateEmailIntakeItemRequestAction,
   updateEmailIntakeTherapistAction,
