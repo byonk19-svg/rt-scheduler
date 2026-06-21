@@ -263,6 +263,8 @@ function createAdminMock(state: {
   cyclePublished: boolean
   cycleStatus: string
   offlineRpcCalls: string[]
+  deniedShiftPostIds: string[]
+  declinedShiftPostInterestIds: string[]
 }) {
   return {
     rpc(fn: string, args: { p_cycle_id?: string }) {
@@ -270,6 +272,8 @@ function createAdminMock(state: {
         state.cyclePublished = false
         state.cycleStatus = 'offline'
         state.offlineRpcCalls.push('cycle-1')
+        state.deniedShiftPostIds = ['post-1']
+        state.declinedShiftPostInterestIds = ['post-1']
         return Promise.resolve({ data: [{ id: 'cycle-1' }], error: null })
       }
       return Promise.resolve({ data: null, error: { message: 'unexpected rpc' } })
@@ -319,7 +323,7 @@ describe('takeScheduleBlockOfflineAction', () => {
     vi.clearAllMocks()
   })
 
-  it('takes the live block offline, keeps shifts, and closes pending shift-board posts', async () => {
+  it('takes the live block offline, keeps shifts, and closes pending shift-board posts through the RPC', async () => {
     const supabase = createSupabaseMock({
       userId: 'manager-1',
       role: 'manager',

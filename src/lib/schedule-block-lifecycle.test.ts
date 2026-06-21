@@ -18,9 +18,7 @@ function createSupabaseMock(options?: {
     site_id?: string | null
   } | null
   cycleError?: { message: string } | null
-  shiftsError?: { message: string } | null
   cycleUpdateError?: { message: string } | null
-  shiftPostUpdateError?: { message: string } | null
 }) {
   const state = {
     inserts: [] as Array<{ table: string; payload: Record<string, unknown> }>,
@@ -84,7 +82,7 @@ function createSupabaseMock(options?: {
             in(column: string, value: string[]) {
               if (table === 'shift_posts' && column === 'id') {
                 state.shiftPostUpdates.push({ payload, ids: value })
-                return Promise.resolve({ error: options?.shiftPostUpdateError ?? null })
+                return Promise.resolve({ error: null })
               }
 
               if (table === 'shift_post_interests' && column === 'shift_post_id') {
@@ -118,7 +116,7 @@ function createSupabaseMock(options?: {
           if (table === 'shifts' && filters.get('cycle_id') === 'cycle-1') {
             result = {
               data: [{ id: 'shift-1' }, { id: 'shift-2' }],
-              error: options?.shiftsError ?? null,
+              error: null,
             }
           }
 
@@ -242,7 +240,7 @@ describe('publishScheduleBlockLifecycle', () => {
 })
 
 describe('takeScheduleBlockOfflineLifecycle', () => {
-  it('takes a live final Schedule Block offline, closes requests, and writes audit', async () => {
+  it('takes a live final Schedule Block offline through the atomic RPC and writes audit', async () => {
     const supabase = createSupabaseMock()
     const mutationClient = createMutationClient()
 
@@ -259,23 +257,8 @@ describe('takeScheduleBlockOfflineLifecycle', () => {
       p_actor_id: 'manager-1',
       p_cycle_id: 'cycle-1',
     })
-    expect(supabase.state.shiftPostUpdates).toEqual([
-      {
-        payload: {
-          status: 'denied',
-          override_reason:
-            'Schedule block was taken offline. Submit a new request after it is republished.',
-        },
-        ids: ['post-1'],
-      },
-    ])
-    expect(supabase.state.shiftPostInterestUpdates).toEqual([
-      {
-        payload: expect.objectContaining({ status: 'declined' }),
-        ids: ['post-1'],
-        statuses: ['pending', 'selected'],
-      },
-    ])
+    expect(supabase.state.shiftPostUpdates).toEqual([])
+    expect(supabase.state.shiftPostInterestUpdates).toEqual([])
     expect(supabase.state.inserts).toContainEqual({
       table: 'audit_log',
       payload: {
@@ -309,9 +292,12 @@ describe('takeScheduleBlockOfflineLifecycle', () => {
     expect(supabase.state.shiftPostUpdates).toEqual([])
   })
 
-  it('stops before the RPC when shift lookup fails', async () => {
-    const supabase = createSupabaseMock({ shiftsError: { message: 'shift read failed' } })
-    const mutationClient = createMutationClient()
+  it('returns state_changed when the atomic offline RPC observes a stale live-state race', async () => {
+    const supabase = createSupabaseMock()
+    const mutationClient = createMutationClient({
+      data: null,
+      error: { message: 'Only live Final Schedule Blocks can be taken offline.' },
+    })
 
     await expect(
       takeScheduleBlockOfflineLifecycle({
@@ -320,52 +306,14 @@ describe('takeScheduleBlockOfflineLifecycle', () => {
         actorId: 'manager-1',
         cycleId: 'cycle-1',
       })
-    ).resolves.toMatchObject({
+    ).resolves.toEqual({
       ok: false,
-      reason: 'shift_lookup_failed',
-    })
+      reason: 'state_changed',
+      error: { message: 'Only live Final Schedule Blocks can be taken offline.' },
+    } satisfies TakeScheduleBlockOfflineLifecycleResult)
 
-    expect(mutationClient.rpc).not.toHaveBeenCalled()
-  })
-
-  it('reports success after the offline mutation when request cleanup fails', async () => {
-    const supabase = createSupabaseMock({
-      shiftPostUpdateError: { message: 'cleanup write failed' },
-    })
-    const mutationClient = createMutationClient()
-
-    await expect(
-      takeScheduleBlockOfflineLifecycle({
-        supabase: supabase as never,
-        mutationClient,
-        actorId: 'manager-1',
-        cycleId: 'cycle-1',
-      })
-    ).resolves.toEqual({ ok: true })
-
-    expect(mutationClient.rpc).toHaveBeenCalledWith('app_take_schedule_cycle_offline', {
-      p_actor_id: 'manager-1',
-      p_cycle_id: 'cycle-1',
-    })
-    expect(supabase.state.shiftPostUpdates).toEqual([
-      {
-        payload: {
-          status: 'denied',
-          override_reason:
-            'Schedule block was taken offline. Submit a new request after it is republished.',
-        },
-        ids: ['post-1'],
-      },
-    ])
-    expect(supabase.state.inserts).toContainEqual({
-      table: 'audit_log',
-      payload: {
-        user_id: 'manager-1',
-        action: 'schedule_block_taken_offline',
-        target_type: 'schedule_cycle',
-        target_id: 'cycle-1',
-      },
-    })
+    expect(supabase.state.shiftPostUpdates).toEqual([])
+    expect(supabase.state.inserts).toEqual([])
   })
 })
 

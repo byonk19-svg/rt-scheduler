@@ -1,9 +1,5 @@
 import { writeAuditLog } from '@/lib/audit-log'
-import {
-  OFFLINE_SHIFT_BOARD_CLOSURE_REASON,
-  canTakeScheduleBlockOffline,
-} from '@/lib/schedule-lifecycle-matrix'
-import { ShiftPostCleanupError, closePendingShiftPostsForShiftIds } from '@/lib/shift-post-cleanup'
+import { canTakeScheduleBlockOffline } from '@/lib/schedule-lifecycle-matrix'
 import type { createClient } from '@/lib/supabase/server'
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
@@ -62,12 +58,7 @@ export type TakeScheduleBlockOfflineLifecycleResult =
   | { ok: true }
   | {
       ok: false
-      reason:
-        | 'cycle_lookup_failed'
-        | 'not_live'
-        | 'shift_lookup_failed'
-        | 'mutation_failed'
-        | 'state_changed'
+      reason: 'cycle_lookup_failed' | 'not_live' | 'mutation_failed' | 'state_changed'
       error?: unknown
     }
 
@@ -87,6 +78,13 @@ function classifyPublishMutationFailure(message: string | undefined) {
   if (/Need to Work|Need Off|availability/i.test(normalized)) return 'availability_rule_violation'
   if (/designated lead|lead-capable assigned/i.test(normalized)) return 'shift_rule_violation'
   if (/draft or preliminary/i.test(normalized)) return 'invalid_state'
+  return 'mutation_failed'
+}
+
+function classifyTakeOfflineMutationFailure(message: string | undefined) {
+  if (/only live final schedule blocks can be taken offline/i.test(message ?? '')) {
+    return 'state_changed'
+  }
   return 'mutation_failed'
 }
 
@@ -136,15 +134,6 @@ export async function takeScheduleBlockOfflineLifecycle(params: {
     return { ok: false, reason: 'not_live' }
   }
 
-  const { data: currentShifts, error: shiftsError } = await supabase
-    .from('shifts')
-    .select('id')
-    .eq('cycle_id', cycleId)
-
-  if (shiftsError) {
-    return { ok: false, reason: 'shift_lookup_failed', error: shiftsError }
-  }
-
   const { data: offlineRows, error: offlineError } = await mutationClient.rpc(
     'app_take_schedule_cycle_offline',
     {
@@ -154,26 +143,16 @@ export async function takeScheduleBlockOfflineLifecycle(params: {
   )
 
   if (offlineError) {
-    return { ok: false, reason: 'mutation_failed', error: offlineError }
+    return {
+      ok: false,
+      reason: classifyTakeOfflineMutationFailure(offlineError.message),
+      error: offlineError,
+    }
   }
 
   const hasOfflineRow = Array.isArray(offlineRows) ? offlineRows.length > 0 : Boolean(offlineRows)
   if (!hasOfflineRow) {
     return { ok: false, reason: 'state_changed' }
-  }
-
-  try {
-    await closePendingShiftPostsForShiftIds(
-      supabase,
-      ((currentShifts ?? []) as Array<{ id: string | null }>)
-        .map((shift) => shift.id)
-        .filter((id): id is string => Boolean(id)),
-      OFFLINE_SHIFT_BOARD_CLOSURE_REASON
-    )
-  } catch (error) {
-    if (!(error instanceof ShiftPostCleanupError)) {
-      throw error
-    }
   }
 
   await writeAuditLog(supabase, {

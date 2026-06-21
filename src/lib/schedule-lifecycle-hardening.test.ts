@@ -263,6 +263,8 @@ describe('schedule lifecycle hardening', () => {
     expect(atomicOfflineCleanupMigrationSource).toContain('with posts_to_close as')
     expect(atomicOfflineCleanupMigrationSource).toContain("set status = 'denied'")
     expect(atomicOfflineCleanupMigrationSource).toContain("set status = 'declined'")
+    expect(scheduleBlockLifecycleSource).toContain('app_take_schedule_cycle_offline')
+    expect(scheduleBlockLifecycleSource).not.toContain('closePendingShiftPostsForShiftIds')
     expect(blockRuleMigrationSource).toContain('Resolve preliminary requests before publishing.')
     expect(blockRuleMigrationSource).toContain(
       'Final publish requires exactly one lead-capable assigned Designated Lead for every date and shift.'

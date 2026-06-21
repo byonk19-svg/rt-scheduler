@@ -124,8 +124,6 @@ export async function takeScheduleBlockOfflineAction(formData: FormData) {
     }
     if (lifecycle.reason === 'cycle_lookup_failed') {
       console.error('Failed to load cycle for take offline:', lifecycle.error)
-    } else if (lifecycle.reason === 'shift_lookup_failed') {
-      console.error('Failed to load shifts for take offline cleanup:', lifecycle.error)
     } else if (lifecycle.reason === 'mutation_failed') {
       console.error('Failed to take schedule block offline:', lifecycle.error)
     }
