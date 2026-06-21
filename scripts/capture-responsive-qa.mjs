@@ -16,8 +16,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import {
+  RESPONSIVE_QA_REQUIRED_CSS_VARIABLES,
   buildResponsiveQaCaptureConfig,
+  isResponsiveQaNextStaticAssetUrl,
   shouldFailResponsiveQaRun,
+  summarizeResponsiveQaPageValidation,
 } from './lib/responsive-qa-capture-core.mjs'
 
 const { loadEnvConfig } = nextEnv
@@ -38,6 +41,126 @@ function cacheBustRelPath(relPath) {
 
 function sanitizeFilename(name) {
   return name.replace(/[^\w-]+/g, '_').slice(0, 120)
+}
+
+function compactUrl(value) {
+  try {
+    const url = new URL(String(value))
+    return `${url.pathname}${url.search}`
+  } catch {
+    return String(value)
+  }
+}
+
+function createStaticAssetFailureTracker(page) {
+  const failures = []
+  const seen = new Set()
+
+  function record(failure) {
+    if (!isResponsiveQaNextStaticAssetUrl(failure.url)) return
+
+    const key = [
+      failure.kind,
+      failure.url,
+      failure.status ?? '',
+      failure.errorText ?? '',
+      failure.resourceType ?? '',
+    ].join('|')
+    if (seen.has(key)) return
+
+    seen.add(key)
+    failures.push(failure)
+  }
+
+  function onRequestFailed(request) {
+    const failure = request.failure()
+    record({
+      kind: 'requestfailed',
+      url: compactUrl(request.url()),
+      method: request.method(),
+      resourceType: request.resourceType(),
+      errorText: failure?.errorText ?? 'request failed',
+    })
+  }
+
+  function onResponse(response) {
+    if (response.status() < 400) return
+
+    record({
+      kind: 'response',
+      url: compactUrl(response.url()),
+      method: response.request().method(),
+      resourceType: response.request().resourceType(),
+      status: response.status(),
+      statusText: response.statusText(),
+    })
+  }
+
+  page.on('requestfailed', onRequestFailed)
+  page.on('response', onResponse)
+
+  return {
+    failures,
+    dispose() {
+      page.off('requestfailed', onRequestFailed)
+      page.off('response', onResponse)
+    },
+  }
+}
+
+async function probeAppliedCss(page) {
+  try {
+    return await page.evaluate((requiredVariables) => {
+      const rootStyle = window.getComputedStyle(document.documentElement)
+      const bodyStyle = window.getComputedStyle(document.body)
+      const presentVariables = requiredVariables.filter(
+        (variable) => rootStyle.getPropertyValue(variable).trim().length > 0
+      )
+
+      const linkedNextStylesheets = [...document.querySelectorAll('link[rel~="stylesheet"]')]
+        .map((link) => link.href)
+        .filter((href) => {
+          try {
+            return new URL(href, document.baseURI).pathname.startsWith('/_next/static/')
+          } catch {
+            return false
+          }
+        })
+        .map((href) => {
+          const url = new URL(href, document.baseURI)
+          return `${url.pathname}${url.search}`
+        })
+        .slice(0, 20)
+
+      const loadedNextStylesheetCount = [...document.styleSheets].filter((sheet) => {
+        if (!sheet.href) return false
+        try {
+          return new URL(sheet.href, document.baseURI).pathname.startsWith('/_next/static/')
+        } catch {
+          return false
+        }
+      }).length
+
+      return {
+        hasRequiredCssVariables: presentVariables.length === requiredVariables.length,
+        presentVariables,
+        linkedNextStylesheets,
+        loadedNextStylesheetCount,
+        styleTagCount: document.querySelectorAll('style').length,
+        bodyBackgroundColor: bodyStyle.backgroundColor,
+        bodyColor: bodyStyle.color,
+      }
+    }, RESPONSIVE_QA_REQUIRED_CSS_VARIABLES)
+  } catch (error) {
+    return {
+      hasRequiredCssVariables: false,
+      presentVariables: [],
+      linkedNextStylesheets: [],
+      loadedNextStylesheetCount: 0,
+      styleTagCount: 0,
+      evaluationError: error instanceof Error ? error.message : String(error),
+    }
+  }
 }
 
 function createCookieJar() {
@@ -144,13 +267,25 @@ async function createAuthenticatedPage(browser, viewport, account, outDir, label
 
 async function captureRoute(page, outDir, route) {
   const url = `${config.baseURL}${cacheBustRelPath(route.path)}`
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
-  await page.waitForTimeout(700)
+  const staticAssetTracker = createStaticAssetFailureTracker(page)
+  let validation
+
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
+    await page.waitForTimeout(700)
+
+    validation = summarizeResponsiveQaPageValidation({
+      staticAssetFailures: staticAssetTracker.failures,
+      cssProbe: await probeAppliedCss(page),
+    })
+  } finally {
+    staticAssetTracker.dispose()
+  }
 
   const file = path.join(outDir, `${sanitizeFilename(route.name)}.png`)
   await page.screenshot({ path: file, fullPage: true })
-  return { file, finalUrl: page.url() }
+  return { file, finalUrl: page.url(), validation }
 }
 
 function summarizeAuthError(error) {
@@ -226,6 +361,25 @@ async function captureOne(page, viewportName, route, outDir, summary) {
       finalUrl: captured.finalUrl,
       file: captured.file,
     })
+
+    if (captured.validation && !captured.validation.ok) {
+      for (const validationError of captured.validation.errors) {
+        summary.errors.push({
+          type: validationError.type,
+          viewport: viewportName,
+          persona: route.persona,
+          name: route.name,
+          path: route.path,
+          finalUrl: captured.finalUrl,
+          file: captured.file,
+          error: validationError.message,
+          details: validationError,
+        })
+        console.error(
+          `Invalid ${viewportName}/${route.persona}/${route.name}: ${validationError.message}`
+        )
+      }
+    }
     console.log(`Wrote ${captured.file}`)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

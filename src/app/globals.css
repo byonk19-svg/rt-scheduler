@@ -451,6 +451,10 @@ html {
     inset 0 1px 0 color-mix(in srgb, var(--sidebar-primary) 10%, transparent);
 }
 
+.shadow-tw-mobile-nav {
+  box-shadow: 0 -8px 24px color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
 .shadow-tw-shell-control-hover {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--sidebar-ring) 35%, transparent),

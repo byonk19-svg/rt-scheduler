@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   RESPONSIVE_QA_ROUTE_GROUPS,
+  isResponsiveQaNextStaticAssetUrl,
   buildResponsiveQaCaptureConfig,
   parseResponsiveQaArgs,
   shouldFailResponsiveQaRun,
+  summarizeResponsiveQaPageValidation,
 } from '../../scripts/lib/responsive-qa-capture-core.mjs'
 
 type ResponsiveQaConfig = {
@@ -28,6 +30,16 @@ const shouldFailRun = shouldFailResponsiveQaRun as unknown as (summary: {
   errors?: unknown[]
   authFailures?: number
 }) => boolean
+const summarizePageValidation = summarizeResponsiveQaPageValidation as unknown as (args: {
+  staticAssetFailures?: Array<Record<string, unknown>>
+  cssProbe?: {
+    hasRequiredCssVariables: boolean
+    presentVariables: string[]
+    linkedNextStylesheets?: string[]
+    loadedNextStylesheetCount?: number
+    styleTagCount?: number
+  }
+}) => { ok: boolean; errors: Array<{ type: string; message: string }> }
 
 describe('responsive QA capture config', () => {
   it('parses flag values with space, equals, and booleans', () => {
@@ -145,5 +157,72 @@ describe('responsive QA capture config', () => {
         env: {},
       })
     ).toThrow(/Unknown responsive QA viewport/)
+  })
+})
+
+describe('responsive QA page validation', () => {
+  it('identifies Next static asset urls only', () => {
+    expect(isResponsiveQaNextStaticAssetUrl('/_next/static/chunks/app/page.js')).toBe(true)
+    expect(
+      isResponsiveQaNextStaticAssetUrl('http://127.0.0.1:3000/_next/static/css/app.css?v=1')
+    ).toBe(true)
+    expect(isResponsiveQaNextStaticAssetUrl('/_next/image?url=%2Flogo.png')).toBe(false)
+    expect(isResponsiveQaNextStaticAssetUrl('/api/schedule')).toBe(false)
+  })
+
+  it('passes when required CSS variables are present and static assets loaded', () => {
+    expect(
+      summarizePageValidation({
+        staticAssetFailures: [],
+        cssProbe: {
+          hasRequiredCssVariables: true,
+          presentVariables: ['--background', '--foreground', '--border'],
+          linkedNextStylesheets: ['/_next/static/css/app.css'],
+          loadedNextStylesheetCount: 1,
+          styleTagCount: 0,
+        },
+      })
+    ).toEqual({ ok: true, errors: [] })
+  })
+
+  it('fails when any Next static asset request failed', () => {
+    const validation = summarizePageValidation({
+      staticAssetFailures: [
+        {
+          kind: 'requestfailed',
+          url: '/_next/static/css/app.css',
+          resourceType: 'stylesheet',
+          errorText: 'net::ERR_ABORTED',
+        },
+      ],
+      cssProbe: {
+        hasRequiredCssVariables: true,
+        presentVariables: ['--background', '--foreground', '--border'],
+      },
+    })
+
+    expect(validation.ok).toBe(false)
+    expect(validation.errors.map((error) => error.type)).toContain('next-static-asset-failed')
+  })
+
+  it('fails when app CSS variables were not applied', () => {
+    const validation = summarizePageValidation({
+      staticAssetFailures: [],
+      cssProbe: {
+        hasRequiredCssVariables: false,
+        presentVariables: [],
+        linkedNextStylesheets: ['/_next/static/css/app.css'],
+        loadedNextStylesheetCount: 0,
+        styleTagCount: 0,
+      },
+    })
+
+    expect(validation.ok).toBe(false)
+    expect(validation.errors).toMatchObject([
+      {
+        type: 'missing-applied-css',
+      },
+    ])
+    expect(validation.errors[0]?.message).toContain('--background')
   })
 })

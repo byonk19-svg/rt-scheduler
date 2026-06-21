@@ -1,4 +1,5 @@
 const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'y', 'on'])
+export const RESPONSIVE_QA_REQUIRED_CSS_VARIABLES = ['--background', '--foreground', '--border']
 
 export const RESPONSIVE_QA_VIEWPORTS = [
   {
@@ -191,6 +192,89 @@ export function buildResponsiveQaCaptureConfig({ argv = [], env = {}, cwd = proc
     personas,
     routes,
     cwd,
+  }
+}
+
+export function isResponsiveQaNextStaticAssetUrl(value) {
+  try {
+    const url = new URL(String(value), 'http://responsive-qa.local')
+    return url.pathname.startsWith('/_next/static/')
+  } catch {
+    return false
+  }
+}
+
+function dedupeAssetFailures(failures) {
+  const seen = new Set()
+  const unique = []
+
+  for (const failure of failures) {
+    const key = [
+      failure.kind,
+      failure.url,
+      failure.status ?? '',
+      failure.errorText ?? '',
+      failure.resourceType ?? '',
+    ].join('|')
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(failure)
+  }
+
+  return unique
+}
+
+export function summarizeResponsiveQaPageValidation({
+  staticAssetFailures = [],
+  cssProbe = null,
+} = {}) {
+  const errors = []
+  const uniqueStaticAssetFailures = dedupeAssetFailures(staticAssetFailures)
+
+  if (uniqueStaticAssetFailures.length > 0) {
+    const sampledFailures = uniqueStaticAssetFailures.slice(0, 10)
+    errors.push({
+      type: 'next-static-asset-failed',
+      message: `${uniqueStaticAssetFailures.length} Next static asset request${
+        uniqueStaticAssetFailures.length === 1 ? '' : 's'
+      } failed during capture.`,
+      staticAssetFailures: sampledFailures,
+      truncatedStaticAssetFailures: Math.max(
+        0,
+        uniqueStaticAssetFailures.length - sampledFailures.length
+      ),
+    })
+  }
+
+  const presentVariables = Array.isArray(cssProbe?.presentVariables)
+    ? cssProbe.presentVariables
+    : []
+  const missingVariables = RESPONSIVE_QA_REQUIRED_CSS_VARIABLES.filter(
+    (variable) => !presentVariables.includes(variable)
+  )
+
+  if (cssProbe?.hasRequiredCssVariables !== true || missingVariables.length > 0) {
+    errors.push({
+      type: 'missing-applied-css',
+      message:
+        missingVariables.length > 0
+          ? `Applied app CSS is missing required variables: ${missingVariables.join(', ')}.`
+          : 'Applied app CSS could not be verified.',
+      expectedVariables: RESPONSIVE_QA_REQUIRED_CSS_VARIABLES,
+      presentVariables,
+      missingVariables,
+      linkedNextStylesheets: cssProbe?.linkedNextStylesheets ?? [],
+      loadedNextStylesheetCount: cssProbe?.loadedNextStylesheetCount ?? 0,
+      styleTagCount: cssProbe?.styleTagCount ?? 0,
+      evaluationError: cssProbe?.evaluationError,
+      bodyBackgroundColor: cssProbe?.bodyBackgroundColor,
+      bodyColor: cssProbe?.bodyColor,
+    })
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
   }
 }
 

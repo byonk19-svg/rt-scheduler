@@ -481,7 +481,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
         </div>
 
         <nav
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-sidebar-border/80 bg-sidebar/95 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 text-sidebar-foreground shadow-[0_-8px_24px_rgba(0,0,0,0.16)] backdrop-blur md:hidden"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-sidebar-border/80 bg-sidebar/95 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 text-sidebar-foreground shadow-tw-mobile-nav backdrop-blur md:hidden"
           aria-label="Mobile primary navigation"
         >
           <div className="mx-auto grid max-w-md grid-cols-5 items-center gap-1">
