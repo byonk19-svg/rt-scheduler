@@ -7,12 +7,13 @@ import {
 } from '@/lib/availability-destructive-confirmation'
 
 describe('confirmAvailabilityDestructiveAction', () => {
-  it('does not prompt when there are no unsaved changes', () => {
+  it('does not prompt when there are no unsaved changes or current selections', () => {
     const confirm = vi.fn(() => false)
 
     expect(
       confirmAvailabilityDestructiveAction({
         hasUnsavedChanges: false,
+        hasExistingSelections: false,
         message: COPY_PREVIOUS_AVAILABILITY_CONFIRMATION,
         confirm,
       })
@@ -31,6 +32,20 @@ describe('confirmAvailabilityDestructiveAction', () => {
       })
     ).toBe(true)
     expect(confirm).toHaveBeenCalledWith(CLEAR_AVAILABILITY_CONFIRMATION)
+  })
+
+  it('prompts when current saved selections would be replaced even without unsaved changes', () => {
+    const confirm = vi.fn(() => false)
+
+    expect(
+      confirmAvailabilityDestructiveAction({
+        hasUnsavedChanges: false,
+        hasExistingSelections: true,
+        message: COPY_PREVIOUS_AVAILABILITY_CONFIRMATION,
+        confirm,
+      })
+    ).toBe(false)
+    expect(confirm).toHaveBeenCalledWith(COPY_PREVIOUS_AVAILABILITY_CONFIRMATION)
   })
 
   it('cancels when the user declines a destructive availability action', () => {

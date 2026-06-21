@@ -413,6 +413,8 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(src).not.toContain('new Date(`${date}T00:00:00`).getDate()')
     expect(src).toContain('function copyPreviousCycleOverrides()')
     expect(src).toContain('function clearOverrides()')
+    expect(src).toContain('const hasCurrentSelections')
+    expect(src).toContain('hasExistingSelections: hasCurrentSelections')
     expect(src).toContain('if (availabilityLocked) return')
     expect(src).toContain('confirmAvailabilityDestructiveAction')
     expect(src).toContain('COPY_PREVIOUS_AVAILABILITY_CONFIRMATION')

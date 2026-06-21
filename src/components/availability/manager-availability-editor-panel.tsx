@@ -114,11 +114,21 @@ export function ManagerAvailabilityEditorPanel({
   const saveAction = isPlannerMode
     ? saveManagerPlannerDatesAction
     : saveManagerAvailabilityRequestsAction
+  const hasExistingSelections = Object.values(dayStates).some(
+    (state) => state.draftSelection || state.savedPlanner || (state.requestTypes?.length ?? 0) > 0
+  )
+  const selectedDatesHaveSelections = selectedDates.some((date) => {
+    const state = dayStates[date]
+    return Boolean(
+      state?.draftSelection || state?.savedPlanner || (state?.requestTypes?.length ?? 0) > 0
+    )
+  })
 
   function handleCopyPreviousBlockClick(event: MouseEvent<HTMLButtonElement>) {
     if (
       !confirmAvailabilityDestructiveAction({
         hasUnsavedChanges,
+        hasExistingSelections,
         message: COPY_PREVIOUS_AVAILABILITY_CONFIRMATION,
         confirm: (message) => window.confirm(message),
       })
@@ -131,6 +141,7 @@ export function ManagerAvailabilityEditorPanel({
     if (
       !confirmAvailabilityDestructiveAction({
         hasUnsavedChanges,
+        hasExistingSelections: selectedDatesHaveSelections,
         message: CLEAR_AVAILABILITY_CONFIRMATION,
         confirm: (message) => window.confirm(message),
       })

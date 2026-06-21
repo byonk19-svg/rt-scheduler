@@ -311,6 +311,7 @@ export function TherapistAvailabilityWorkspace({
     if (
       !confirmAvailabilityDestructiveAction({
         hasUnsavedChanges,
+        hasExistingSelections: hasCurrentSelections,
         message: CLEAR_AVAILABILITY_CONFIRMATION,
         confirm: (message) => window.confirm(message),
       })
@@ -327,6 +328,7 @@ export function TherapistAvailabilityWorkspace({
     if (
       !confirmAvailabilityDestructiveAction({
         hasUnsavedChanges,
+        hasExistingSelections: hasCurrentSelections,
         message: COPY_PREVIOUS_AVAILABILITY_CONFIRMATION,
         confirm: (message) => window.confirm(message),
       })
@@ -368,6 +370,9 @@ export function TherapistAvailabilityWorkspace({
   const regularShiftLabel = regularShiftType === 'night' ? 'Night shift' : 'Day shift'
   const reviewNeedOffSummary = formatReviewDateList(cannotWorkDates, draftNotesByDate)
   const reviewNeedToWorkSummary = formatReviewDateList(canWorkDates, draftNotesByDate)
+  const hasCurrentSelections =
+    hasCycleSpecificChanges ||
+    Object.values(draftNotesByDate).some((note) => note.trim().length > 0)
   const reviewBlockLabel = selectedCycle
     ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
     : 'No Schedule Block selected'
