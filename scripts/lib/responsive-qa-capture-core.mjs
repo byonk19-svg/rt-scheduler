@@ -134,6 +134,11 @@ export function buildResponsiveQaCaptureConfig({ argv = [], env = {}, cwd = proc
   const defaultPersonas =
     effectiveMode === 'public' ? ['public'] : ['public', 'manager', 'therapist']
   const requestedPersonas = normalizeCsv(args.personas ?? env.RESPONSIVE_QA_PERSONAS)
+  if (effectiveMode === 'public' && requestedPersonas?.some((persona) => persona !== 'public')) {
+    throw new Error(
+      'Authenticated responsive QA personas require Supabase auth env vars. Use --mode=seeded with auth env or --personas=public.'
+    )
+  }
   const selectedPersonas = pickNamed(
     Object.keys(RESPONSIVE_QA_ROUTE_GROUPS).map((name) => ({ name })),
     requestedPersonas ?? defaultPersonas,
@@ -148,6 +153,8 @@ export function buildResponsiveQaCaptureConfig({ argv = [], env = {}, cwd = proc
   const routes = personas.flatMap((persona) =>
     RESPONSIVE_QA_ROUTE_GROUPS[persona].map((route) => ({ ...route, persona }))
   )
+  const requiresAuthenticatedCoverage =
+    effectiveMode === 'seeded' && personas.some((persona) => persona !== 'public')
 
   const baseURL = String(args['base-url'] ?? env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3000')
     .trim()
@@ -162,12 +169,12 @@ export function buildResponsiveQaCaptureConfig({ argv = [], env = {}, cwd = proc
     requestedMode,
     effectiveMode,
     reducedMode: effectiveMode === 'public',
+    requiresAuthenticatedCoverage,
     authEnvAvailable,
     baseURL,
     outputDir,
     latestDir: 'artifacts/responsive-qa/latest',
     headed: isTruthy(args.headed ?? env.RESPONSIVE_QA_HEADED),
-    strictAuth: requestedMode === 'seeded',
     manager: {
       email:
         args['manager-email'] ??
@@ -185,4 +192,8 @@ export function buildResponsiveQaCaptureConfig({ argv = [], env = {}, cwd = proc
     routes,
     cwd,
   }
+}
+
+export function shouldFailResponsiveQaRun(summary = {}) {
+  return (summary.errors?.length ?? 0) > 0 || (summary.authFailures ?? 0) > 0
 }

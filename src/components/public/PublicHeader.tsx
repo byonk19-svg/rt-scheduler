@@ -88,6 +88,7 @@ export default function PublicHeader({ className }: { className?: string }) {
             variant="ghost"
             size="sm"
             className={cn(
+              'min-h-11',
               isDark
                 ? 'text-white/80 hover:bg-white/10 hover:text-white'
                 : 'text-foreground/80 hover:bg-card/75'
@@ -99,7 +100,7 @@ export default function PublicHeader({ className }: { className?: string }) {
             asChild
             size="sm"
             className={cn(
-              'rounded-lg px-5',
+              'min-h-11 rounded-lg px-5',
               isDark
                 ? 'bg-[var(--attention)] text-[var(--marketing-hero-bg)] hover:bg-[var(--attention)]/90 shadow-none font-bold'
                 : 'rounded-xl shadow-tw-primary-glow'

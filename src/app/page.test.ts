@@ -19,6 +19,7 @@ describe('public homepage redesign contract', () => {
     expect(pageSource).toContain('<Link href="/login">Sign in</Link>')
     expect(pageSource).toContain('<Link href="/signup">Request access</Link>')
     expect(publicHeaderSource).toContain("ctaLabel: 'Request access'")
+    expect(publicHeaderSource).toContain('min-h-11')
   })
 
   it('keeps the approval note and the design handoff feature strip', () => {

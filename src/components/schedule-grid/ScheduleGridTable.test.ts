@@ -391,10 +391,13 @@ describe('ScheduleGridTable', () => {
     const assignedCell = getCellButton(html, 'u1', '2026-05-04')
     const offCell = getCellButton(html, 'u1', '2026-05-03')
 
-    expect(html).toContain('border-teal-700')
-    expect(assignedCell).toContain('ring-teal-700/30')
+    expect(html).toContain('border-primary/45')
+    expect(html).toContain('bg-[var(--info-subtle)]')
+    expect(html).not.toContain('inset_3px')
+    expect(html).not.toContain('rgb(15_118_110)')
+    expect(assignedCell).toContain('ring-primary/30')
     expect(assignedCell).toContain('bg-yellow-200')
-    expect(offCell).not.toContain('ring-teal-700/30')
+    expect(offCell).not.toContain('ring-primary/30')
   })
 
   it('shows daily totals', () => {

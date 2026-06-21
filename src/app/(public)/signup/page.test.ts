@@ -31,4 +31,12 @@ describe('public signup shell', () => {
     expect(signupPageSource).toContain('Your account will be reviewed by a manager.')
     expect(signupPageSource).toContain('receive access once')
   })
+
+  it('stacks required name fields on narrow screens', () => {
+    expect(signupPageSource).toContain('grid grid-cols-1 gap-2 sm:grid-cols-2')
+  })
+
+  it('keeps the submit action touch-safe on mobile', () => {
+    expect(signupPageSource).toContain('className="min-h-11 w-full"')
+  })
 })

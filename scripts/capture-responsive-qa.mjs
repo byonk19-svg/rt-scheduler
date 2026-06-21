@@ -15,7 +15,10 @@ import { chromium } from 'playwright'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import { buildResponsiveQaCaptureConfig } from './lib/responsive-qa-capture-core.mjs'
+import {
+  buildResponsiveQaCaptureConfig,
+  shouldFailResponsiveQaRun,
+} from './lib/responsive-qa-capture-core.mjs'
 
 const { loadEnvConfig } = nextEnv
 
@@ -197,7 +200,7 @@ async function captureAuthenticated(browser, viewport, persona, viewportOutDir, 
       })
     }
     console.warn(`Skipped ${viewport.name}/${persona}: ${reason}`)
-    if (config.strictAuth) {
+    if (config.requiresAuthenticatedCoverage) {
       summary.authFailures += 1
     }
     return
@@ -249,6 +252,7 @@ async function main() {
     mode: config.effectiveMode,
     requestedMode: config.requestedMode,
     reducedMode: config.reducedMode,
+    requiresAuthenticatedCoverage: config.requiresAuthenticatedCoverage,
     viewports: config.viewports.map((viewport) => ({
       name: viewport.name,
       width: viewport.options.viewport.width,
@@ -305,7 +309,7 @@ async function main() {
     `Summary: ${summary.shots.length} screenshots, ${summary.errors.length} errors, ${summary.skipped.length} skipped.`
   )
 
-  if (summary.errors.length > 0 || (config.strictAuth && summary.authFailures > 0)) {
+  if (shouldFailResponsiveQaRun(summary)) {
     process.exitCode = 1
   }
 }

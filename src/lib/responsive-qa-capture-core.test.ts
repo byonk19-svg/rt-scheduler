@@ -4,12 +4,14 @@ import {
   RESPONSIVE_QA_ROUTE_GROUPS,
   buildResponsiveQaCaptureConfig,
   parseResponsiveQaArgs,
+  shouldFailResponsiveQaRun,
 } from '../../scripts/lib/responsive-qa-capture-core.mjs'
 
 type ResponsiveQaConfig = {
   requestedMode: 'auto' | 'public' | 'seeded'
   effectiveMode: 'public' | 'seeded'
   reducedMode: boolean
+  requiresAuthenticatedCoverage: boolean
   baseURL: string
   outputDir: string
   viewports: Array<{ name: string; options: { viewport: { width: number; height: number } } }>
@@ -22,6 +24,10 @@ const buildConfig = buildResponsiveQaCaptureConfig as unknown as (args: {
   env?: Record<string, string>
   cwd?: string
 }) => ResponsiveQaConfig
+const shouldFailRun = shouldFailResponsiveQaRun as unknown as (summary: {
+  errors?: unknown[]
+  authFailures?: number
+}) => boolean
 
 describe('responsive QA capture config', () => {
   it('parses flag values with space, equals, and booleans', () => {
@@ -43,6 +49,7 @@ describe('responsive QA capture config', () => {
     })
 
     expect(config.effectiveMode).toBe('seeded')
+    expect(config.requiresAuthenticatedCoverage).toBe(true)
     expect(config.viewports.map((viewport) => viewport.name)).toEqual([
       'desktop',
       'tablet',
@@ -70,6 +77,7 @@ describe('responsive QA capture config', () => {
 
     expect(config.effectiveMode).toBe('public')
     expect(config.reducedMode).toBe(true)
+    expect(config.requiresAuthenticatedCoverage).toBe(false)
     expect(config.personas).toEqual(['public'])
     expect(config.routes).toEqual(
       RESPONSIVE_QA_ROUTE_GROUPS.public.map((route) => ({ ...route, persona: 'public' }))
@@ -95,11 +103,38 @@ describe('responsive QA capture config', () => {
       'manager',
       'manager',
     ])
+    expect(config.requiresAuthenticatedCoverage).toBe(true)
+  })
+
+  it('does not require authenticated coverage when only public routes are selected', () => {
+    const config = buildConfig({
+      argv: ['--personas=public'],
+      env: {
+        NEXT_PUBLIC_SUPABASE_URL: 'https://project.supabase.co',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon',
+      },
+    })
+
+    expect(config.effectiveMode).toBe('seeded')
+    expect(config.personas).toEqual(['public'])
+    expect(config.requiresAuthenticatedCoverage).toBe(false)
+  })
+
+  it('fails runs when authenticated coverage was required but auth failed', () => {
+    expect(shouldFailRun({ errors: [], authFailures: 1 })).toBe(true)
+    expect(shouldFailRun({ errors: [{}], authFailures: 0 })).toBe(true)
+    expect(shouldFailRun({ errors: [], authFailures: 0 })).toBe(false)
   })
 
   it('rejects seeded mode without Supabase auth env vars', () => {
     expect(() => buildConfig({ argv: ['--mode=seeded'], env: {} })).toThrow(
       /NEXT_PUBLIC_SUPABASE_URL/
+    )
+  })
+
+  it('rejects explicit authenticated personas when auth env is missing', () => {
+    expect(() => buildConfig({ argv: ['--personas=manager'], env: {} })).toThrow(
+      /Authenticated responsive QA personas require Supabase auth env vars/
     )
   })
 

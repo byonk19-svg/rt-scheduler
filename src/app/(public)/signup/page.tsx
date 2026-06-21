@@ -181,7 +181,7 @@ export default function SignUpPage() {
           )}
 
           <form onSubmit={handleSubmit} className="mt-4 space-y-2.5">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="firstName">
                   First name{' '}
@@ -295,7 +295,7 @@ export default function SignUpPage() {
               </p>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="min-h-11 w-full" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
