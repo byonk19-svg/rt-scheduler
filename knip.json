@@ -4,5 +4,6 @@
   "ignoreIssues": {
     "src/lib/supabase/database.types.ts": ["exports", "types"],
     "src/components/ui/{alert-dialog,badge,button,card,dialog,popover,table}.tsx": ["exports"]
-  }
+  },
+  "tags": ["-knipignore"]
 }

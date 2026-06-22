@@ -26,7 +26,7 @@ type PlannerOverrideTargetRow = {
   source: string | null
 }
 
-export type ManagerAvailabilityPlannerTarget = {
+type ManagerAvailabilityPlannerTarget = {
   cycle: {
     start_date: string
     end_date: string

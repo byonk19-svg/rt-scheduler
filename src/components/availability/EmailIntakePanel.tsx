@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
-export type EmailIntakePanelItemRow = {
+type EmailIntakePanelItemRow = {
   id: string
   sourceType: 'body' | 'attachment'
   sourceLabel: string

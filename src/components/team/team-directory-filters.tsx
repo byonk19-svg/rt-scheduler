@@ -5,10 +5,10 @@ import type { ReactNode } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-export type TeamDirectoryRoleFilter = 'all' | 'manager' | 'lead' | 'therapist'
-export type TeamDirectoryShiftFilter = 'all' | 'day' | 'night'
-export type TeamDirectoryEmploymentFilter = 'all' | 'full_time' | 'part_time' | 'prn'
-export type TeamDirectoryStatusFilter = 'all' | 'active' | 'inactive' | 'fmla'
+type TeamDirectoryRoleFilter = 'all' | 'manager' | 'lead' | 'therapist'
+type TeamDirectoryShiftFilter = 'all' | 'day' | 'night'
+type TeamDirectoryEmploymentFilter = 'all' | 'full_time' | 'part_time' | 'prn'
+type TeamDirectoryStatusFilter = 'all' | 'active' | 'inactive' | 'fmla'
 
 export type TeamDirectoryFilterState = {
   search: string

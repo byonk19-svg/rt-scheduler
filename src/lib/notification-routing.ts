@@ -3,9 +3,9 @@ import {
   isTerminalRequestNotification,
 } from '@/lib/notification-lifecycle'
 
-export type NotificationRouteRole = 'manager' | 'therapist' | 'lead' | null
+type NotificationRouteRole = 'manager' | 'therapist' | 'lead' | null
 
-export type NotificationRouteItem = {
+type NotificationRouteItem = {
   id?: string
   event_type: string
   title?: string | null

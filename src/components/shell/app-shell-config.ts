@@ -3,14 +3,14 @@ import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 export const APP_HEADER_HEIGHT = 64
 export const APP_PAGE_MAX_WIDTH_CLASS = 'mx-auto max-w-[96rem] px-4 md:px-6'
 
-export type ShellNavItem = {
+type ShellNavItem = {
   href: string
   label: string
   active: (pathname: string) => boolean
   badgeCount?: number
 }
 
-export type ShellSection = {
+type ShellSection = {
   key: string
   label: string
   href: string
@@ -19,7 +19,7 @@ export type ShellSection = {
   subItems: ShellNavItem[]
 }
 
-export type ShellContext = {
+type ShellContext = {
   primaryKey: string | null
   primaryItems: ShellNavItem[]
   localNav: { ariaLabel: string; items: ShellNavItem[] } | null
