@@ -648,7 +648,7 @@ export function OnboardingScheduleSetup({
                 ) : null}
               </div>
 
-              <div className="sticky bottom-0 z-10 -mx-4 mt-2.5 flex items-center justify-between gap-3 border-t border-border/70 bg-card/95 px-4 py-1.5 shadow-[0_-10px_28px_-24px_rgba(15,23,42,0.45)] backdrop-blur sm:-mx-5 sm:px-5">
+              <div className="teamwise-sticky-footer-chrome sticky bottom-0 z-10 -mx-4 mt-2.5 flex items-center justify-between gap-3 border-t border-border/70 bg-card/95 px-4 py-1.5 shadow-tw-sticky-footer sm:-mx-5 sm:px-5">
                 {step === 1 ? (
                   <span aria-hidden="true" />
                 ) : (

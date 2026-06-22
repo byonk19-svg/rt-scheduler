@@ -173,7 +173,7 @@ async function loadHasActionableAvailabilityCycle(
   )
 }
 
-export async function loadMutableStaffOnboardingContext() {
+async function loadMutableStaffOnboardingContext() {
   return loadBaseStaffOnboardingContext()
 }
 
@@ -194,39 +194,6 @@ export async function loadStaffOnboardingContext() {
     ...context,
     status: buildOnboardingStatus(context.profile, hasActionableAvailabilityCycle),
   }
-}
-
-export async function completeStaffOnboardingAction() {
-  'use server'
-
-  const context = await loadMutableStaffOnboardingContext()
-
-  if (!context.status.isRequired) {
-    redirect('/dashboard')
-  }
-
-  if (context.status.hasRecordedCompletion) {
-    redirect('/dashboard?success=onboarding_complete')
-  }
-
-  if (!context.status.isComplete) {
-    redirect('/onboarding?error=incomplete')
-  }
-
-  const { error } = await context.supabase
-    .from('profiles')
-    .update({ staff_onboarding_completed_at: new Date().toISOString() })
-    .eq('id', context.user.id)
-
-  if (error) {
-    console.error('Failed to complete staff onboarding:', error)
-    redirect('/onboarding?error=complete_failed')
-  }
-
-  revalidatePath('/onboarding')
-  revalidatePath('/dashboard')
-
-  redirect('/dashboard?success=onboarding_complete')
 }
 
 export async function completeScheduleSetupOnboardingAction(formData: FormData) {

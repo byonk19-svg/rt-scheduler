@@ -32,12 +32,7 @@ export default function HomePage() {
         {/* grid texture */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
+          className="teamwise-public-grid-bg teamwise-public-grid-bg-lg pointer-events-none absolute inset-0 opacity-[0.04]"
         />
         {/* amber right stripe */}
         <div

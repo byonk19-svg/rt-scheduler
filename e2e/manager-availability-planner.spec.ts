@@ -28,8 +28,13 @@ function formatCalendarLabel(isoDate: string): string {
   })
 }
 
-async function selectCalendarDay(root: Locator, isoDate: string) {
-  const target = root.getByRole('button', { name: formatCalendarLabel(isoDate) })
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+async function selectCalendarDay(root: Locator, isoDate: string, expectedStatus?: string) {
+  const dateLabel = formatCalendarLabel(isoDate)
+  const target = root.getByRole('button', { name: new RegExp(`^${escapeRegex(dateLabel)}\\.`) })
   const hasSelectedCounter = await root
     .getByText(/\d+ selected/)
     .first()
@@ -51,6 +56,16 @@ async function selectCalendarDay(root: Locator, isoDate: string) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     await expect(target).toBeVisible({ timeout: 10_000 })
     await target.click()
+    if (expectedStatus) {
+      const matchedStatus = await expect
+        .poll(() => target.getAttribute('data-status'), { timeout: 5_000 })
+        .toBe(expectedStatus)
+        .then(
+          () => true,
+          () => false
+        )
+      if (matchedStatus) return
+    }
     const changed = await expect
       .poll(() => selectedCount(), { timeout: 5_000 })
       .toBeGreaterThan(before)
@@ -58,7 +73,13 @@ async function selectCalendarDay(root: Locator, isoDate: string) {
         () => true,
         () => false
       )
-    if (changed) return
+    if (!expectedStatus && changed) return
+  }
+  if (expectedStatus) {
+    await expect
+      .poll(() => target.getAttribute('data-status'), { timeout: 10_000 })
+      .toBe(expectedStatus)
+    return
   }
   await expect.poll(() => selectedCount(), { timeout: 10_000 }).toBeGreaterThan(before)
 }
@@ -66,6 +87,26 @@ async function selectCalendarDay(root: Locator, isoDate: string) {
 async function gotoAvailability(page: Page, url: string) {
   await gotoWithRetry(page, url)
   await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => undefined)
+}
+
+async function clickAndAcceptAvailabilityConfirmation(
+  page: Page,
+  target: Locator,
+  expectedMessage: RegExp
+) {
+  const dialogPromise = new Promise<void>((resolve, reject) => {
+    page.once('dialog', async (dialog) => {
+      try {
+        expect(dialog.message()).toMatch(expectedMessage)
+        await dialog.accept()
+        resolve()
+      } catch (error) {
+        reject(error)
+      }
+    })
+  })
+  await target.click()
+  await dialogPromise
 }
 
 async function selectPlannerCycle(page: Page, cycleId: string) {
@@ -433,8 +474,8 @@ test.describe.serial('/availability manager planner', () => {
 
     await openPlanningAssumptions(editor)
     await editor.getByRole('button', { name: /^Available$/ }).click()
-    await selectCalendarDay(editor, ctx!.therapistWillWorkDate)
-    await selectCalendarDay(editor, ctx!.therapistCannotWorkDate)
+    await selectCalendarDay(editor, ctx!.therapistWillWorkDate, 'will_work')
+    await selectCalendarDay(editor, ctx!.therapistCannotWorkDate, 'will_work')
     await editor.getByRole('button', { name: /^Save for E2E$/ }).click()
 
     await expect
@@ -464,7 +505,7 @@ test.describe.serial('/availability manager planner', () => {
     await openPlanningAssumptions(refreshedEditor)
     await refreshedEditor.getByRole('button', { name: /^Unavailable$/ }).click()
     await expect(refreshedEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeDisabled()
-    await selectCalendarDay(refreshedEditor, ctx!.therapistCannotWorkDate)
+    await selectCalendarDay(refreshedEditor, ctx!.therapistCannotWorkDate, 'cannot_work')
     await expect(refreshedEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeEnabled()
     await refreshedEditor.getByRole('button', { name: /^Save for E2E$/ }).click()
 
@@ -493,7 +534,11 @@ test.describe.serial('/availability manager planner', () => {
     await openPlanningAssumptions(clearedEditor)
     await clearedEditor.getByRole('button', { name: /^Unavailable$/ }).click()
     await expect(clearedEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeDisabled()
-    await clearedEditor.getByRole('button', { name: 'Clear selected dates' }).click()
+    await clickAndAcceptAvailabilityConfirmation(
+      page,
+      clearedEditor.getByRole('button', { name: 'Clear selected dates' }),
+      /Clearing availability changes/
+    )
     await expect(clearedEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeEnabled()
     await clearedEditor.getByRole('button', { name: /^Save for E2E$/ }).click()
 
@@ -522,9 +567,7 @@ test.describe.serial('/availability manager planner', () => {
     const clearSelectedDates = managerRequestEditor.getByRole('button', {
       name: 'Clear selected dates',
     })
-    if (await clearSelectedDates.isEnabled({ timeout: 2_000 }).catch(() => false)) {
-      await clearSelectedDates.click()
-    }
+    await expect(clearSelectedDates).toBeDisabled()
     await managerRequestEditor.getByRole('button', { name: /^Need Off$/ }).click()
     await selectCalendarDay(managerRequestEditor, ctx!.therapistCannotWorkDate)
     await expect(managerRequestEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeEnabled({
@@ -571,7 +614,8 @@ test.describe.serial('/availability manager planner', () => {
     )
     const prnEditor = page.locator('[data-availability-editor]')
     await prnEditor.getByRole('button', { name: /^Need to Work$/ }).click()
-    await selectCalendarDay(prnEditor, ctx!.prnWillWorkDate)
+    await selectCalendarDay(prnEditor, ctx!.prnWillWorkDate, 'request_to_work')
+    await expect(prnEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeEnabled()
     await prnEditor.getByRole('button', { name: /^Save for E2E$/ }).click()
 
     await expect

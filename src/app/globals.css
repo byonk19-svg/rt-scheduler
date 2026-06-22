@@ -281,6 +281,17 @@ html {
   background-size: 28px 28px;
 }
 
+.teamwise-public-grid-bg {
+  background-image:
+    linear-gradient(color-mix(in srgb, white 100%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, white 100%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.teamwise-public-grid-bg-lg {
+  background-size: 40px 40px;
+}
+
 .teamwise-surface {
   background: var(--card);
 }
@@ -419,6 +430,19 @@ html {
   box-shadow:
     0 1px 3px color-mix(in srgb, var(--foreground) 8%, transparent),
     0 16px 40px color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+.shadow-tw-sticky-footer {
+  box-shadow: 0 -10px 28px -24px color-mix(in srgb, var(--foreground) 45%, transparent);
+}
+
+.shadow-tw-selected-chip {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.teamwise-sticky-footer-chrome {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 /* App shell fixed chrome — teal depth + warm top edge (tokens only; no raw rgba in TSX) */
