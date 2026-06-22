@@ -82,7 +82,7 @@ function describeRequestTypes(requestTypes: CalendarDayState['requestTypes']): s
   )
 }
 
-export function buildManagerAvailabilityDayLabel({
+function buildManagerAvailabilityDayLabel({
   dateLabel,
   isInCycle,
   state,

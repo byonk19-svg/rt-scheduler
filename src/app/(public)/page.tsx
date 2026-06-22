@@ -34,12 +34,6 @@ export default function HomePage() {
           aria-hidden
           className="teamwise-public-grid-bg teamwise-public-grid-bg-lg pointer-events-none absolute inset-0 opacity-[0.04]"
         />
-        {/* amber right stripe */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute bottom-0 right-0 top-0 w-[5px] bg-[var(--attention)] opacity-80"
-        />
-
         <div className="relative mx-auto w-full max-w-5xl px-12 pb-20 pt-16">
           {/* eyebrow */}
           <div className="mb-8 flex items-center gap-3">

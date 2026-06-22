@@ -105,7 +105,7 @@ function resolveScheduleGridMutationErrorCodeMessage(
   }
 }
 
-export function resolveScheduleGridMutationErrorMessage(
+function resolveScheduleGridMutationErrorMessage(
   action: ScheduleGridMutationAction,
   error: CoverageMutationError
 ) {

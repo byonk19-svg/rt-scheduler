@@ -402,9 +402,15 @@ export function TherapistAvailabilityWorkspace({
   const selectedDayOptionClass = (active: boolean, tone: 'can' | 'cant' | 'neutral') =>
     cn(
       'flex min-h-10 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
-      active && tone === 'can' && 'bg-[color:color-mix(in_srgb,var(--success-subtle)_55%,white)]',
-      active && tone === 'cant' && 'bg-[color:color-mix(in_srgb,var(--error-subtle)_55%,white)]',
-      active && tone === 'neutral' && 'bg-[color:color-mix(in_srgb,var(--muted)_46%,white)]',
+      active &&
+        tone === 'can' &&
+        'bg-[color:color-mix(in_srgb,var(--success-subtle)_55%,var(--background))]',
+      active &&
+        tone === 'cant' &&
+        'bg-[color:color-mix(in_srgb,var(--error-subtle)_55%,var(--background))]',
+      active &&
+        tone === 'neutral' &&
+        'bg-[color:color-mix(in_srgb,var(--muted)_46%,var(--background))]',
       !active && 'bg-background hover:bg-muted/[0.08]'
     )
 
@@ -473,7 +479,7 @@ export function TherapistAvailabilityWorkspace({
         <section className="rounded-[1.25rem] border border-border/70 bg-card px-5 py-4 shadow-tw-2xs-soft">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--success-subtle)_55%,white)] text-[var(--primary)]">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--success-subtle)_55%,var(--card))] text-[var(--primary)]">
                 <CalendarDays className="h-5 w-5" aria-hidden />
               </div>
               <div className="space-y-1">
@@ -529,7 +535,7 @@ export function TherapistAvailabilityWorkspace({
           <input key={`cannot-${date}`} type="hidden" name="cannot_work_dates" value={date} />
         ))}
 
-        <div className="space-y-2 border-b border-border/60 bg-[color:color-mix(in_srgb,var(--background)_42%,white)] px-5 py-3 sm:px-6">
+        <div className="space-y-2 border-b border-border/60 bg-[color:color-mix(in_srgb,var(--background)_42%,var(--card))] px-5 py-3 sm:px-6">
           <div className="grid overflow-hidden rounded-[1rem] border border-border/70 bg-background xl:grid-cols-[15.5rem_minmax(0,1fr)]">
             <section className="px-3.5 py-3">
               <Label
@@ -766,12 +772,12 @@ export function TherapistAvailabilityWorkspace({
                               : displayState === 'cannot_work'
                                 ? 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)] hover:border-[var(--error-text)]'
                                 : displayState === 'normal_work'
-                                  ? 'border-[color:color-mix(in_srgb,var(--success-border)_22%,var(--border))] bg-[color:color-mix(in_srgb,var(--success-subtle)_10%,white)] text-foreground hover:border-[var(--success-border)] hover:bg-[color:color-mix(in_srgb,var(--success-subtle)_24%,white)]'
+                                  ? 'border-[color:color-mix(in_srgb,var(--success-border)_22%,var(--border))] bg-[color:color-mix(in_srgb,var(--success-subtle)_10%,var(--background))] text-foreground hover:border-[var(--success-border)] hover:bg-[color:color-mix(in_srgb,var(--success-subtle)_24%,var(--background))]'
                                   : displayState === 'normal_off'
-                                    ? 'border-border/60 bg-[color:color-mix(in_srgb,var(--muted)_22%,white)] text-foreground hover:border-[var(--error-border)] hover:bg-[color:color-mix(in_srgb,var(--error-subtle)_18%,white)]'
-                                    : 'border-border/55 bg-background text-foreground hover:border-primary/40 hover:bg-[color:color-mix(in_srgb,var(--primary)_5%,white)]',
+                                    ? 'border-border/60 bg-[color:color-mix(in_srgb,var(--muted)_22%,var(--background))] text-foreground hover:border-[var(--error-border)] hover:bg-[color:color-mix(in_srgb,var(--error-subtle)_18%,var(--background))]'
+                                    : 'border-border/55 bg-background text-foreground hover:border-primary/40 hover:bg-[color:color-mix(in_srgb,var(--primary)_5%,var(--background))]',
                             selectedDate === date &&
-                              'border-primary bg-[color:color-mix(in_srgb,var(--primary)_8%,white)] shadow-tw-day-selected ring-2 ring-primary/35',
+                              'border-primary bg-[color:color-mix(in_srgb,var(--primary)_8%,var(--background))] shadow-tw-day-selected ring-2 ring-primary/35',
                             date === todayKey && selectedDate !== date && 'shadow-tw-ring-attention'
                           )}
                         >
@@ -792,9 +798,9 @@ export function TherapistAvailabilityWorkspace({
                               className={cn(
                                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.58rem] font-semibold tracking-[0.04em]',
                                 displayState === 'can_work' &&
-                                  'bg-[color:color-mix(in_srgb,var(--success-subtle)_80%,white)] text-[var(--success-text)]',
+                                  'bg-[color:color-mix(in_srgb,var(--success-subtle)_80%,var(--background))] text-[var(--success-text)]',
                                 displayState === 'cannot_work' &&
-                                  'bg-[color:color-mix(in_srgb,var(--error-subtle)_80%,white)] text-[var(--error-text)]'
+                                  'bg-[color:color-mix(in_srgb,var(--error-subtle)_80%,var(--background))] text-[var(--error-text)]'
                               )}
                             >
                               {displayState === 'can_work' ? (
@@ -869,7 +875,7 @@ export function TherapistAvailabilityWorkspace({
           </div>
 
           <aside className="flex flex-col gap-3 xl:self-start">
-            <section className="order-2 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm xl:order-1">
+            <section className="order-2 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,var(--card))] px-4 py-4 shadow-tw-sm xl:order-1">
               <h3 className="text-[0.95rem] font-semibold text-foreground">
                 Review before submitting
               </h3>
@@ -912,7 +918,7 @@ export function TherapistAvailabilityWorkspace({
               ) : null}
             </section>
 
-            <section className="order-3 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm xl:order-2">
+            <section className="order-3 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,var(--card))] px-4 py-4 shadow-tw-sm xl:order-2">
               <h3 className="text-[0.95rem] font-semibold text-foreground">
                 Current starting point
               </h3>
@@ -999,7 +1005,7 @@ export function TherapistAvailabilityWorkspace({
               </div>
             </section>
 
-            <section className="order-1 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm xl:order-3">
+            <section className="order-1 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,var(--card))] px-4 py-4 shadow-tw-sm xl:order-3">
               <h3 className="text-[0.95rem] font-semibold text-foreground">Selected day</h3>
               {!selectedDate ? (
                 <p className="mt-2 text-sm text-muted-foreground">

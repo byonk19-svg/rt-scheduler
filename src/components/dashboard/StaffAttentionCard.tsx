@@ -41,13 +41,13 @@ function attentionCardClasses(
   dueTone: TherapistAvailabilityDueStatus['tone'] | null
 ): string {
   if (state === 'availability_submitted') {
-    return 'border-[var(--success-border)]/60 bg-[color:color-mix(in_srgb,var(--success-subtle)_28%,white)]'
+    return 'border-[var(--success-border)]/60 bg-[color:color-mix(in_srgb,var(--success-subtle)_28%,var(--card))]'
   }
   if (dueTone === 'past') {
-    return 'border-[var(--error-border)]/60 bg-[color:color-mix(in_srgb,var(--error-subtle)_22%,white)]'
+    return 'border-[var(--error-border)]/60 bg-[color:color-mix(in_srgb,var(--error-subtle)_22%,var(--card))]'
   }
   if (dueTone === 'urgent') {
-    return 'border-[var(--warning-border)]/60 bg-[color:color-mix(in_srgb,var(--warning-subtle)_24%,white)]'
+    return 'border-[var(--warning-border)]/60 bg-[color:color-mix(in_srgb,var(--warning-subtle)_24%,var(--card))]'
   }
   return 'border-border bg-card'
 }
