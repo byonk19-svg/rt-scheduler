@@ -14,6 +14,22 @@ async function expectTouchSafe(locator: import('@playwright/test').Locator) {
   expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44)
 }
 
+test('landing page exposes public navigation', async ({ page }) => {
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await expect(
+    page.getByRole('heading', { name: 'Scheduling that keeps care moving.' })
+  ).toBeVisible()
+
+  const main = page.locator('#main-content')
+  await main.getByRole('link', { name: 'Sign in' }).click()
+  await expect(page).toHaveURL(/\/login(?:[/?].*)?$/)
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await page.locator('#main-content').getByRole('link', { name: 'Request access' }).click()
+  await expect(page).toHaveURL(/\/signup(?:[/?].*)?$/)
+  await expect(page.getByRole('heading', { name: 'Request access' })).toBeVisible()
+})
+
 test('login page renders', async ({ page }) => {
   await page.goto('/login', { waitUntil: 'domcontentloaded' })
   await expect(page.getByLabel('Email address')).toBeVisible()
