@@ -36,6 +36,43 @@ test('login page renders', async ({ page }) => {
   await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible()
 })
 
+test('password reset submits a generic reset-link request', async ({ page }) => {
+  const recoverRequests: string[] = []
+  const recoverHeaders = {
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+    'access-control-allow-methods': 'POST, OPTIONS',
+  }
+
+  await page.route('**/auth/v1/recover**', async (route) => {
+    if (route.request().method() === 'POST') {
+      recoverRequests.push(route.request().postData() ?? '')
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: recoverHeaders,
+      body: '{}',
+    })
+  })
+
+  await page.goto('/login', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('link', { name: 'Forgot password?' }).click()
+  await expect(page).toHaveURL(/\/reset-password(?:[/?].*)?$/)
+  await expect(page.getByRole('heading', { name: 'Forgot your password?' })).toBeVisible()
+  await page.waitForLoadState('networkidle')
+
+  await page.getByLabel('Email address').fill('casey@example.test')
+  await page.getByRole('button', { name: 'Send reset link' }).click()
+
+  await expect(page.getByText(/If an account exists for that email/i)).toBeVisible()
+  await expect.poll(() => recoverRequests.length).toBe(1)
+  expect(recoverRequests[0]).toContain('casey@example.test')
+
+  await page.locator('#main-content').getByRole('link', { name: 'Back to sign in' }).click()
+  await expect(page).toHaveURL(/\/login(?:[/?].*)?$/)
+})
+
 test('signup page renders', async ({ page }) => {
   await page.goto('/signup', { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { name: 'Request access' })).toBeVisible()

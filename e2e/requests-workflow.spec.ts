@@ -637,7 +637,7 @@ test.describe.serial('requests workflow', () => {
     })
     const boardReviewStep = page.getByText('Review board request').first()
     if (!(await boardReviewStep.isVisible({ timeout: 2_000 }).catch(() => false))) {
-      await page.getByRole('button', { name: 'Post to the board' }).click()
+      await page.getByRole('button', { name: 'Post an open coverage request' }).click()
       await expect(boardReviewStep).toBeVisible({ timeout: 10_000 })
     }
     await page.getByRole('button', { name: 'Continue' }).click()
