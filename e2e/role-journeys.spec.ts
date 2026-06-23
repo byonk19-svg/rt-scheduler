@@ -1513,7 +1513,11 @@ test.describe.serial('role journeys', () => {
     await expect(page).toHaveURL(/\/dashboard\/manager(?:[/?].*)?$/)
     await expect(page.getByRole('heading', { name: 'Manager Dashboard' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Needs your attention' })).toBeVisible()
-    await expect(page.getByText(/coverage safety issues/i).first()).toBeVisible()
+    await expect(page.getByText(/shift missing a lead today/i).first()).toBeVisible()
+    await expect(page.getByText(/Assign leads/i).first()).toBeVisible()
+    await expect(
+      page.getByText(/Assign visible leads before routine planning/i).first()
+    ).toBeVisible()
 
     await page.goto(`/availability?cycle=${ctx!.draftCycle.id}&therapist=${ctx!.therapist.id}`)
     await expect(page.getByRole('heading', { name: 'Availability Manager' }).first()).toBeVisible()

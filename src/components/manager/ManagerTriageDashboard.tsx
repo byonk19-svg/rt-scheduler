@@ -193,6 +193,7 @@ function getCycleStepState(args: {
 
 function getManagerChecklistSteps(args: {
   coverageIssueCount: number | '--'
+  missingLeadCount: number
   openAssignmentCount: number | '--'
   needsReviewCount: number | '--'
   needsReviewDetail: string
@@ -201,11 +202,15 @@ function getManagerChecklistSteps(args: {
   currentCycleStatus: string
   currentCycleDetail: string
 }) {
+  const hasCoverageIssues = args.coverageIssueCount !== '--' && args.coverageIssueCount > 0
+  const hasLeadIssues = args.missingLeadCount > 0
+  const todaySafetyIssueCount =
+    (args.coverageIssueCount === '--' ? 0 : args.coverageIssueCount) + args.missingLeadCount
   const coverageValue =
-    args.coverageIssueCount === '--'
+    args.coverageIssueCount === '--' && !hasLeadIssues
       ? LOADING_LABEL
-      : args.coverageIssueCount > 0
-        ? `${pluralize(args.coverageIssueCount, 'coverage issue')}`
+      : todaySafetyIssueCount > 0
+        ? `${pluralize(todaySafetyIssueCount, 'today safety issue')}`
         : 'Covered today'
   const reviewValue =
     args.needsReviewCount === '--'
@@ -224,14 +229,19 @@ function getManagerChecklistSteps(args: {
     {
       label: 'Make today safe',
       value: coverageValue,
-      detail:
-        args.coverageIssueCount !== '--' && args.coverageIssueCount > 0
-          ? 'Fix today first before routine planning.'
+      detail: hasCoverageIssues
+        ? hasLeadIssues
+          ? 'Fix coverage gaps and assign visible leads before routine planning.'
+          : 'Fix today first before routine planning.'
+        : hasLeadIssues
+          ? 'Assign visible leads before routine planning.'
           : 'No coverage safety issue is showing for today.',
       tone:
-        args.coverageIssueCount !== '--' && args.coverageIssueCount > 0
-          ? ('warning' as const)
-          : ('success' as const),
+        args.coverageIssueCount === '--'
+          ? ('muted' as const)
+          : todaySafetyIssueCount > 0
+            ? ('warning' as const)
+            : ('success' as const),
     },
     {
       label: 'Clear manager decisions',
@@ -324,6 +334,7 @@ export function ManagerTriageDashboard({
   })
   const managerChecklistSteps = getManagerChecklistSteps({
     coverageIssueCount,
+    missingLeadCount,
     openAssignmentCount,
     needsReviewCount,
     needsReviewDetail,

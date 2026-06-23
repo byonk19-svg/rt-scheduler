@@ -117,6 +117,31 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('href="/schedule"')
   })
 
+  it('keeps checklist safety state aligned when today is staffed but missing a lead', () => {
+    const html = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        ...baseProps,
+        todayCoverageCovered: 17,
+        todayCoverageTotal: 17,
+        todayStaffedShifts: [
+          { label: 'Adrienne S.', detail: 'Day shift | Lead' },
+          { label: 'Alyce L.', detail: 'Day shift | Staff' },
+          { label: 'Barbara J.', detail: 'Night shift | Staff' },
+        ],
+        dayShiftsFilled: 21,
+        dayShiftsTotal: 21,
+        nightShiftsFilled: 21,
+        nightShiftsTotal: 21,
+      })
+    )
+
+    expect(html).toContain('1 today safety issue')
+    expect(html).toContain('1 shift missing a lead today')
+    expect(html).toContain('Assign visible leads before routine planning.')
+    expect(html).toContain('Assign leads')
+    expect(html).not.toContain('Covered today')
+  })
+
   it('promotes a large review queue above lower-count coverage warnings', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
