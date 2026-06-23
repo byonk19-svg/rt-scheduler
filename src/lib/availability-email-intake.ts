@@ -47,7 +47,7 @@ export type ParsedAvailabilityEmailItem = {
   rawText: string
 }
 
-export type ParsedAvailabilityEmailBatch = {
+type ParsedAvailabilityEmailBatch = {
   items: ParsedAvailabilityEmailItem[]
   itemCount: number
   autoAppliedCount: number
@@ -74,7 +74,7 @@ export type ParsedAvailabilityEmailBatchItem = ParsedAvailabilityEmailItem & {
   ocrError: string | null
 }
 
-export type ParsedAvailabilityEmailBatchResult = {
+type ParsedAvailabilityEmailBatchResult = {
   items: ParsedAvailabilityEmailBatchItem[]
   batchStatus: AvailabilityEmailBatchStatus
   batchSummary: ParsedAvailabilityEmailBatch

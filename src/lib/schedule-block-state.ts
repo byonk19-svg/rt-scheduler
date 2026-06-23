@@ -28,7 +28,7 @@ export function resolveScheduleBlockState(input: ScheduleBlockStateInput): Sched
   return 'created'
 }
 
-export function getScheduleBlockStateLabel(state: ScheduleBlockState): string {
+function getScheduleBlockStateLabel(state: ScheduleBlockState): string {
   switch (state) {
     case 'created':
     case 'shifts_assigned':

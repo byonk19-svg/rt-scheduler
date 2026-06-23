@@ -2,7 +2,6 @@
 
 import { parseRole } from '@/lib/auth/roles'
 import {
-  MAX_WORK_DAYS_PER_WEEK,
   getDefaultWeeklyLimitForEmploymentType,
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
@@ -33,7 +32,7 @@ export async function getRoleForUser(userId: string) {
   return parseRole(profile?.role)
 }
 
-export type TherapistWeeklyLimitProfile = {
+type TherapistWeeklyLimitProfile = {
   max_work_days_per_week: number | null
   employment_type: string | null
 }
@@ -43,21 +42,6 @@ export function getWeeklyLimitFromProfile(
 ): number {
   const employmentDefault = getDefaultWeeklyLimitForEmploymentType(profile?.employment_type)
   return sanitizeWeeklyLimit(profile?.max_work_days_per_week, employmentDefault)
-}
-
-export async function getTherapistWeeklyLimit(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  therapistId: string
-): Promise<number> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('max_work_days_per_week, employment_type')
-    .eq('id', therapistId)
-    .maybeSingle()
-
-  if (error) return MAX_WORK_DAYS_PER_WEEK
-
-  return getWeeklyLimitFromProfile((data ?? null) as TherapistWeeklyLimitProfile | null)
 }
 
 export async function countWorkingScheduledForSlot(

@@ -11,13 +11,21 @@
 
 import nextEnv from '@next/env'
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { chromium } from 'playwright'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import {
+  RESPONSIVE_QA_REQUIRED_CSS_VARIABLES,
+  buildResponsiveQaAuthInstructions,
   buildResponsiveQaCaptureConfig,
+  buildResponsiveQaDisposableAuthPlan,
+  isResponsiveQaBlockedAuthenticatedUrl,
+  isResponsiveQaNextStaticAssetUrl,
   shouldFailResponsiveQaRun,
+  summarizeResponsiveQaAuthError,
+  summarizeResponsiveQaPageValidation,
 } from './lib/responsive-qa-capture-core.mjs'
 
 const { loadEnvConfig } = nextEnv
@@ -38,6 +46,126 @@ function cacheBustRelPath(relPath) {
 
 function sanitizeFilename(name) {
   return name.replace(/[^\w-]+/g, '_').slice(0, 120)
+}
+
+function compactUrl(value) {
+  try {
+    const url = new URL(String(value))
+    return `${url.pathname}${url.search}`
+  } catch {
+    return String(value)
+  }
+}
+
+function createStaticAssetFailureTracker(page) {
+  const failures = []
+  const seen = new Set()
+
+  function record(failure) {
+    if (!isResponsiveQaNextStaticAssetUrl(failure.url)) return
+
+    const key = [
+      failure.kind,
+      failure.url,
+      failure.status ?? '',
+      failure.errorText ?? '',
+      failure.resourceType ?? '',
+    ].join('|')
+    if (seen.has(key)) return
+
+    seen.add(key)
+    failures.push(failure)
+  }
+
+  function onRequestFailed(request) {
+    const failure = request.failure()
+    record({
+      kind: 'requestfailed',
+      url: compactUrl(request.url()),
+      method: request.method(),
+      resourceType: request.resourceType(),
+      errorText: failure?.errorText ?? 'request failed',
+    })
+  }
+
+  function onResponse(response) {
+    if (response.status() < 400) return
+
+    record({
+      kind: 'response',
+      url: compactUrl(response.url()),
+      method: response.request().method(),
+      resourceType: response.request().resourceType(),
+      status: response.status(),
+      statusText: response.statusText(),
+    })
+  }
+
+  page.on('requestfailed', onRequestFailed)
+  page.on('response', onResponse)
+
+  return {
+    failures,
+    dispose() {
+      page.off('requestfailed', onRequestFailed)
+      page.off('response', onResponse)
+    },
+  }
+}
+
+async function probeAppliedCss(page) {
+  try {
+    return await page.evaluate((requiredVariables) => {
+      const rootStyle = window.getComputedStyle(document.documentElement)
+      const bodyStyle = window.getComputedStyle(document.body)
+      const presentVariables = requiredVariables.filter(
+        (variable) => rootStyle.getPropertyValue(variable).trim().length > 0
+      )
+
+      const linkedNextStylesheets = [...document.querySelectorAll('link[rel~="stylesheet"]')]
+        .map((link) => link.href)
+        .filter((href) => {
+          try {
+            return new URL(href, document.baseURI).pathname.startsWith('/_next/static/')
+          } catch {
+            return false
+          }
+        })
+        .map((href) => {
+          const url = new URL(href, document.baseURI)
+          return `${url.pathname}${url.search}`
+        })
+        .slice(0, 20)
+
+      const loadedNextStylesheetCount = [...document.styleSheets].filter((sheet) => {
+        if (!sheet.href) return false
+        try {
+          return new URL(sheet.href, document.baseURI).pathname.startsWith('/_next/static/')
+        } catch {
+          return false
+        }
+      }).length
+
+      return {
+        hasRequiredCssVariables: presentVariables.length === requiredVariables.length,
+        presentVariables,
+        linkedNextStylesheets,
+        loadedNextStylesheetCount,
+        styleTagCount: document.querySelectorAll('style').length,
+        bodyBackgroundColor: bodyStyle.backgroundColor,
+        bodyColor: bodyStyle.color,
+      }
+    }, RESPONSIVE_QA_REQUIRED_CSS_VARIABLES)
+  } catch (error) {
+    return {
+      hasRequiredCssVariables: false,
+      presentVariables: [],
+      linkedNextStylesheets: [],
+      loadedNextStylesheetCount: 0,
+      styleTagCount: 0,
+      evaluationError: error instanceof Error ? error.message : String(error),
+    }
+  }
 }
 
 function createCookieJar() {
@@ -85,6 +213,169 @@ async function signInWithPassword(email, password) {
   return jar.entries()
 }
 
+async function listAllAuthUsers(adminClient) {
+  const users = []
+  let page = 1
+
+  while (true) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 200 })
+    if (error) throw error
+
+    const batch = data?.users ?? []
+    users.push(...batch)
+    if (batch.length < 200) break
+    page += 1
+  }
+
+  return users
+}
+
+async function ensureDisposableAuthUser(adminClient, usersByEmail, { email, password, metadata }) {
+  const key = String(email).trim().toLowerCase()
+  const existing = usersByEmail.get(key)
+  if (existing?.id) {
+    const { error } = await adminClient.auth.admin.updateUserById(existing.id, {
+      password,
+      email_confirm: true,
+      user_metadata: metadata,
+    })
+    if (error) throw error
+    return existing.id
+  }
+
+  const { data, error } = await adminClient.auth.admin.createUser({
+    email: key,
+    password,
+    email_confirm: true,
+    user_metadata: metadata,
+  })
+  if (error) throw error
+
+  return data.user.id
+}
+
+async function provisionDisposableResponsiveQaAuth() {
+  buildResponsiveQaDisposableAuthPlan({
+    managerEmail: config.manager.email,
+    therapistEmail: config.therapist.email,
+  })
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error(
+      'Disposable responsive QA provisioning requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+    )
+  }
+
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const authUsers = await listAllAuthUsers(adminClient)
+  const usersByEmail = new Map(
+    authUsers.map((user) => [
+      String(user.email ?? '')
+        .trim()
+        .toLowerCase(),
+      user,
+    ])
+  )
+
+  const managerUserId = await ensureDisposableAuthUser(adminClient, usersByEmail, {
+    email: config.manager.email,
+    password: config.manager.password,
+    metadata: {
+      full_name: 'Responsive QA Manager',
+      role: 'manager',
+      shift_type: 'day',
+    },
+  })
+  const therapistUserId = await ensureDisposableAuthUser(adminClient, usersByEmail, {
+    email: config.therapist.email,
+    password: config.therapist.password,
+    metadata: {
+      full_name: 'Responsive QA Therapist',
+      role: 'therapist',
+      shift_type: 'day',
+    },
+  })
+
+  const plan = buildResponsiveQaDisposableAuthPlan({
+    managerEmail: config.manager.email,
+    therapistEmail: config.therapist.email,
+    managerUserId,
+    therapistUserId,
+  })
+
+  const { error: siteError } = await adminClient.from('sites').upsert(plan.site, {
+    onConflict: 'id',
+  })
+  if (siteError) throw siteError
+
+  const { error: profileError } = await adminClient.from('profiles').upsert(plan.profiles, {
+    onConflict: 'id',
+  })
+  if (profileError) throw profileError
+
+  const { error: patternError } = await adminClient
+    .from('work_patterns')
+    .upsert(plan.workPatterns, {
+      onConflict: 'therapist_id',
+    })
+  if (patternError) throw patternError
+
+  console.log('Provisioned disposable responsive QA auth profiles.')
+  console.log(`Site: ${plan.site.id}`)
+  console.log(`Manager: ${config.manager.email}`)
+  console.log(`Therapist: ${config.therapist.email}`)
+}
+
+async function cleanupDisposableResponsiveQaAuth() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error(
+      'Disposable responsive QA cleanup requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+    )
+  }
+
+  const plan = buildResponsiveQaDisposableAuthPlan({
+    managerEmail: config.manager.email,
+    therapistEmail: config.therapist.email,
+  })
+
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const authUsers = await listAllAuthUsers(adminClient)
+  const disposableEmails = new Set(plan.profiles.map((profile) => profile.email))
+  const disposableUsers = authUsers.filter((user) => {
+    const email = String(user.email ?? '')
+      .trim()
+      .toLowerCase()
+    return disposableEmails.has(email)
+  })
+  const userIds = disposableUsers.map((user) => user.id).filter(Boolean)
+
+  if (userIds.length > 0) {
+    const { error: patternError } = await adminClient
+      .from('work_patterns')
+      .delete()
+      .in('therapist_id', userIds)
+    if (patternError) throw patternError
+
+    const { error: profileError } = await adminClient.from('profiles').delete().in('id', userIds)
+    if (profileError) throw profileError
+  }
+
+  for (const user of disposableUsers) {
+    const { error } = await adminClient.auth.admin.deleteUser(user.id)
+    if (error) throw error
+  }
+
+  console.log('Cleaned up disposable responsive QA auth profiles.')
+}
+
 function toPlaywrightCookies(jarEntries) {
   const { hostname } = new URL(config.baseURL)
   const host = hostname === 'localhost' || hostname === '127.0.0.1' ? hostname : hostname
@@ -129,10 +420,12 @@ async function createAuthenticatedPage(browser, viewport, account, outDir, label
     })
     await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
 
-    if (/\/login(?:[/?#]|$)/i.test(page.url())) {
+    if (isResponsiveQaBlockedAuthenticatedUrl(page.url())) {
       const snap = path.join(outDir, `_session-failed-${label}.png`)
       await page.screenshot({ path: snap, fullPage: true }).catch(() => {})
-      throw new Error(`Authenticated session redirected to login. See ${snap}.`)
+      throw new Error(
+        `Authenticated session did not reach the app dashboard; landed on ${page.url()}. See ${snap}.`
+      )
     }
 
     return { context, page }
@@ -144,24 +437,25 @@ async function createAuthenticatedPage(browser, viewport, account, outDir, label
 
 async function captureRoute(page, outDir, route) {
   const url = `${config.baseURL}${cacheBustRelPath(route.path)}`
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
-  await page.waitForTimeout(700)
+  const staticAssetTracker = createStaticAssetFailureTracker(page)
+  let validation
+
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
+    await page.waitForTimeout(700)
+
+    validation = summarizeResponsiveQaPageValidation({
+      staticAssetFailures: staticAssetTracker.failures,
+      cssProbe: await probeAppliedCss(page),
+    })
+  } finally {
+    staticAssetTracker.dispose()
+  }
 
   const file = path.join(outDir, `${sanitizeFilename(route.name)}.png`)
   await page.screenshot({ path: file, fullPage: true })
-  return { file, finalUrl: page.url() }
-}
-
-function summarizeAuthError(error) {
-  const message = error instanceof Error ? error.message : String(error)
-  if (/invalid login credentials/i.test(message)) {
-    return 'Seeded credentials were rejected. Run npm run seed:functional or set SHOT_* credentials.'
-  }
-  if (/NEXT_PUBLIC_SUPABASE/i.test(message)) {
-    return 'Supabase auth env vars are missing.'
-  }
-  return message
+  return { file, finalUrl: page.url(), validation }
 }
 
 async function capturePublic(browser, viewport, viewportOutDir, summary) {
@@ -185,12 +479,18 @@ async function captureAuthenticated(browser, viewport, persona, viewportOutDir, 
   const routes = config.routes.filter((route) => route.persona === persona)
   if (routes.length === 0) return
 
-  let session
-  try {
-    session = await createAuthenticatedPage(browser, viewport, account, viewportOutDir, persona)
-  } catch (error) {
-    const reason = summarizeAuthError(error)
-    for (const route of routes) {
+  for (const route of routes) {
+    let session
+    try {
+      session = await createAuthenticatedPage(
+        browser,
+        viewport,
+        account,
+        viewportOutDir,
+        `${persona}-${route.name}`
+      )
+    } catch (error) {
+      const reason = summarizeResponsiveQaAuthError(error, config)
       summary.skipped.push({
         viewport: viewport.name,
         persona,
@@ -198,20 +498,18 @@ async function captureAuthenticated(browser, viewport, persona, viewportOutDir, 
         path: route.path,
         reason,
       })
+      console.warn(`Skipped ${viewport.name}/${persona}/${route.name}: ${reason}`)
+      if (config.requiresAuthenticatedCoverage) {
+        summary.authFailures += 1
+      }
+      continue
     }
-    console.warn(`Skipped ${viewport.name}/${persona}: ${reason}`)
-    if (config.requiresAuthenticatedCoverage) {
-      summary.authFailures += 1
-    }
-    return
-  }
 
-  try {
-    for (const route of routes) {
+    try {
       await captureOne(session.page, viewport.name, route, viewportOutDir, summary)
+    } finally {
+      await session.context.close()
     }
-  } finally {
-    await session.context.close()
   }
 }
 
@@ -226,6 +524,58 @@ async function captureOne(page, viewportName, route, outDir, summary) {
       finalUrl: captured.finalUrl,
       file: captured.file,
     })
+
+    if (route.persona !== 'public' && isResponsiveQaBlockedAuthenticatedUrl(captured.finalUrl)) {
+      summary.authFailures += 1
+      summary.errors.push({
+        type: 'authenticated-route-blocked',
+        viewport: viewportName,
+        persona: route.persona,
+        name: route.name,
+        path: route.path,
+        finalUrl: captured.finalUrl,
+        file: captured.file,
+        error: `Authenticated route landed on ${compactUrl(captured.finalUrl)}.`,
+      })
+      console.error(
+        `Invalid ${viewportName}/${route.persona}/${route.name}: authenticated route landed on ${compactUrl(captured.finalUrl)}`
+      )
+    }
+
+    if (captured.validation && !captured.validation.ok) {
+      for (const validationError of captured.validation.errors) {
+        summary.errors.push({
+          type: validationError.type,
+          viewport: viewportName,
+          persona: route.persona,
+          name: route.name,
+          path: route.path,
+          finalUrl: captured.finalUrl,
+          file: captured.file,
+          error: validationError.message,
+          details: validationError,
+        })
+        console.error(
+          `Invalid ${viewportName}/${route.persona}/${route.name}: ${validationError.message}`
+        )
+      }
+    }
+    for (const validationWarning of captured.validation?.warnings ?? []) {
+      summary.warnings.push({
+        type: validationWarning.type,
+        viewport: viewportName,
+        persona: route.persona,
+        name: route.name,
+        path: route.path,
+        finalUrl: captured.finalUrl,
+        file: captured.file,
+        warning: validationWarning.message,
+        details: validationWarning,
+      })
+      console.warn(
+        `Warning ${viewportName}/${route.persona}/${route.name}: ${validationWarning.message}`
+      )
+    }
     console.log(`Wrote ${captured.file}`)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -266,6 +616,7 @@ async function main() {
     shots: [],
     skipped: [],
     errors: [],
+    warnings: [],
     authFailures: 0,
   }
 
@@ -275,9 +626,23 @@ async function main() {
   if (config.reducedMode) {
     console.log('Reduced mode: capturing public pages only because authenticated QA is disabled.')
   }
-
-  const browser = await chromium.launch({ headless: !config.headed })
+  if (config.requiresAuthenticatedCoverage) {
+    console.log('Authenticated coverage requested.')
+    console.log(`Manager account: ${config.manager.email}`)
+    console.log(`Therapist account: ${config.therapist.email}`)
+    console.log('Safe disposable auth path:')
+    for (const line of buildResponsiveQaAuthInstructions(config)) {
+      console.log(`- ${line}`)
+    }
+  }
+  const shouldCleanupDisposableAuth = config.provisionAuth
+  let browser = null
   try {
+    if (config.provisionAuth) {
+      await provisionDisposableResponsiveQaAuth()
+    }
+
+    browser = await chromium.launch({ headless: !config.headed })
     for (const viewport of config.viewports) {
       const viewportOutDir = path.join(outDir, viewport.name)
       await fs.mkdir(viewportOutDir, { recursive: true })
@@ -296,7 +661,21 @@ async function main() {
       }
     }
   } finally {
-    await browser.close()
+    if (browser) {
+      await browser.close()
+    }
+    if (shouldCleanupDisposableAuth) {
+      try {
+        await cleanupDisposableResponsiveQaAuth()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        summary.errors.push({
+          type: 'disposable-auth-cleanup-failed',
+          error: message,
+        })
+        console.error(`Disposable responsive QA cleanup failed: ${message}`)
+      }
+    }
   }
 
   await fs.writeFile(path.join(outDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf8')
@@ -306,7 +685,7 @@ async function main() {
   console.log(`\nDone. This run: ${outDir}`)
   console.log(`Mirror (always newest): ${latestDir}`)
   console.log(
-    `Summary: ${summary.shots.length} screenshots, ${summary.errors.length} errors, ${summary.skipped.length} skipped.`
+    `Summary: ${summary.shots.length} screenshots, ${summary.errors.length} errors, ${summary.warnings.length} warnings, ${summary.skipped.length} skipped.`
   )
 
   if (shouldFailResponsiveQaRun(summary)) {

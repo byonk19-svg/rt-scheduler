@@ -395,7 +395,7 @@ export function AvailabilityStatusSummary({
                   className={cn(
                     'rounded-[0.9rem] border px-3 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
                     isSelected
-                      ? 'border-primary/35 bg-[color:rgba(15,118,110,0.045)] shadow-tw-inset-highlight-soft'
+                      ? 'border-primary/35 bg-primary/5 shadow-tw-inset-highlight-soft'
                       : 'border-border/60 bg-background/85 hover:border-border'
                   )}
                   onClick={() => onPickTherapist?.(row.therapistId)}

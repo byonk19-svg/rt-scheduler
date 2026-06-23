@@ -1,8 +1,8 @@
 import type { RequestType, RequestVisibility } from '@/lib/request-workflow'
 
-export type RequestComposerStepId = 1 | 2 | 3
+type RequestComposerStepId = 1 | 2 | 3
 
-export type RequestComposerStep = {
+type RequestComposerStep = {
   id: RequestComposerStepId
   displayStep: number
   label: 'Request details' | 'Choose teammate' | 'Final message / review'

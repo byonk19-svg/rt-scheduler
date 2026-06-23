@@ -11,6 +11,10 @@ import { createClient } from '@/lib/supabase/server'
 
 import { buildScheduleActionUrl, getRoleForUser } from './helpers'
 
+/**
+ * Retained schedule lifecycle surface; do not delete from static import analysis alone.
+ * @knipignore
+ */
 export async function applyTemplateAction(formData: FormData) {
   const supabase = await createClient()
   const {

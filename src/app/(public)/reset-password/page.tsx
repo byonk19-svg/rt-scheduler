@@ -44,21 +44,11 @@ export default function ResetPasswordPage() {
   return (
     <main className="flex min-h-[calc(100vh-73px)]">
       {/* Left brand panel — desktop only */}
-      <aside className="relative hidden overflow-hidden bg-[var(--marketing-hero-bg)] lg:flex lg:w-[440px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-12">
+      <aside className="relative hidden overflow-hidden border-r border-white/[0.08] bg-[var(--marketing-hero-bg)] lg:flex lg:w-[440px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-12">
         {/* subtle grid texture */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.055]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
-            backgroundSize: '32px 32px',
-          }}
-        />
-        {/* amber right stripe */}
-        <div
-          aria-hidden
-          className="absolute right-0 top-0 h-full w-[4px] bg-[var(--attention)] opacity-70"
+          className="teamwise-public-grid-bg pointer-events-none absolute inset-0 opacity-[0.055]"
         />
         <div className="relative flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-tw-md-soft">

@@ -1,4 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreFiles": ["scripts/playwright-web-server.mjs"]
+  "ignoreFiles": ["scripts/playwright-web-server.mjs"],
+  "ignoreIssues": {
+    "src/lib/supabase/database.types.ts": ["exports", "types"],
+    "src/components/ui/{alert-dialog,badge,button,card,dialog,popover,table}.tsx": ["exports"]
+  },
+  "tags": ["-knipignore"]
 }

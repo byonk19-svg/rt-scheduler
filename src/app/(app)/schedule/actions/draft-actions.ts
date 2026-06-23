@@ -219,6 +219,10 @@ export async function generateDraftScheduleAction(formData: FormData) {
   )
 }
 
+/**
+ * Retained schedule lifecycle surface; do not delete from static import analysis alone.
+ * @knipignore
+ */
 export async function resetDraftScheduleAction(formData: FormData) {
   const supabase = await createClient()
   const {

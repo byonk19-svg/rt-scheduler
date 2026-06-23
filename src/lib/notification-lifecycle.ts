@@ -12,7 +12,7 @@ export type NotificationLifecyclePolicy = {
   actionExpectation: string
 }
 
-export const REQUEST_TERMINAL_EVENTS = [
+const REQUEST_TERMINAL_EVENTS = [
   'request_approved',
   'request_denied',
   'direct_request_declined',

@@ -41,6 +41,10 @@ function isReadOnlyScheduleBlock(cycle: ShiftMutationCycle): boolean {
   return cycle.status === 'offline' || cycle.status === 'archived' || Boolean(cycle.archived_at)
 }
 
+/**
+ * Retained schedule lifecycle surface; do not delete from static import analysis alone.
+ * @knipignore
+ */
 export async function addShiftAction(formData: FormData) {
   const supabase = await createClient()
   const {
@@ -233,6 +237,10 @@ export async function addShiftAction(formData: FormData) {
   redirect(buildReturnUrl(cycleId, { ...viewParams, success: 'shift_added' }))
 }
 
+/**
+ * Retained schedule lifecycle surface; do not delete from static import analysis alone.
+ * @knipignore
+ */
 export async function deleteShiftAction(formData: FormData) {
   const supabase = await createClient()
   const {
@@ -312,6 +320,10 @@ export async function deleteShiftAction(formData: FormData) {
   redirect(buildScheduleUrl(cycleId, view, { success: 'shift_deleted' }))
 }
 
+/**
+ * Retained schedule lifecycle surface; do not delete from static import analysis alone.
+ * @knipignore
+ */
 export async function setDesignatedLeadAction(formData: FormData) {
   const supabase = await createClient()
   const {

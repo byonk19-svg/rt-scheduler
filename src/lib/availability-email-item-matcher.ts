@@ -5,7 +5,7 @@ export type AvailabilityEmailEmployeeCandidate = {
   fullName: string
 }
 
-export type AvailabilityEmailEmployeeMatch = {
+type AvailabilityEmailEmployeeMatch = {
   extractedName: string | null
   matchedTherapistId: string | null
   confidence: 'high' | 'medium' | 'low'

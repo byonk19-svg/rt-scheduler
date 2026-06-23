@@ -1,6 +1,6 @@
 export type AuditLogActionTone = 'muted' | 'info' | 'success' | 'warning' | 'error'
 
-export type AuditLogActionDisplay = {
+type AuditLogActionDisplay = {
   label: string
   tone: AuditLogActionTone
 }
