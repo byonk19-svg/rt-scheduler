@@ -9,6 +9,7 @@ import type { GridDataset } from '@/components/schedule-grid/schedule-grid-types
 import { generateDraftScheduleAction } from '@/app/(app)/schedule/actions/draft-actions'
 import { sendPreliminaryScheduleAction } from '@/app/(app)/schedule/actions/preliminary-actions'
 import { toggleCyclePublishedAction } from '@/app/(app)/schedule/actions/publish-actions'
+import { applyTemplateAction } from '@/app/(app)/schedule/actions/template-actions'
 import { getScheduleBlockLifecycleLabel } from '@/lib/schedule-block-state'
 
 import { loadScheduleGridData } from './schedule-grid-data'
@@ -95,6 +96,16 @@ function getScheduleFeedback(params: Record<string, string | string[] | undefine
       text: 'Schedule Block published and publish email processing started.',
     }
   }
+  if (success === 'template_applied') {
+    const imported = getSetupParam(params.imported) ?? '0'
+    const skipped = getSetupParam(params.skipped)
+    return {
+      tone: 'success' as const,
+      text: `Template applied: ${imported} ${
+        imported === '1' ? 'assignment was' : 'assignments were'
+      } imported${skipped ? `; ${skipped} inactive or unavailable rows skipped` : ''}.`,
+    }
+  }
   if (!error) return null
 
   const copy: Record<string, string> = {
@@ -126,6 +137,9 @@ function getScheduleFeedback(params: Record<string, string | string[] | undefine
     } in pre-flight before staff review.`,
     preliminary_cycle_archived: 'Archived Schedule Blocks cannot be sent to preliminary review.',
     preliminary_cycle_published: 'Published Schedule Blocks cannot be sent to preliminary review.',
+    template_apply_failed:
+      'Could not apply the selected template. Review the template and try again.',
+    template_cycle_not_draft: 'Templates can only be applied to draft Schedule Blocks.',
   }
 
   return {
@@ -266,6 +280,9 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
           result.dataset.interactionMode.canUseManagerToolbar
             ? toggleCyclePublishedAction
             : undefined
+        }
+        templateAction={
+          result.dataset.interactionMode.canUseManagerToolbar ? applyTemplateAction : undefined
         }
         preFlightSummary={result.preFlightSummary}
       />

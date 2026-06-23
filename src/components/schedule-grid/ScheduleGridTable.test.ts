@@ -47,6 +47,7 @@ function makeDataset(overrides: Partial<GridDataset> = {}): GridDataset {
     shiftType: 'day',
     interactionMode: MANAGER_EDIT_MODE,
     availableCycles: [{ id: 'c1', label: 'May 4 - May 5, 2026' }],
+    templateOptions: [],
     cycleDates: ['2026-05-03', '2026-05-04', '2026-05-05'],
     cycleDateRangeLabel: 'May 3 - May 5, 2026',
     isPublished: false,

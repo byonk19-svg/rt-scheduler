@@ -39,6 +39,7 @@ type ScheduleGridProps = {
   autoDraftAction?: (formData: FormData) => void | Promise<void>
   preliminaryAction?: (formData: FormData) => void | Promise<void>
   publishAction?: (formData: FormData) => void | Promise<void>
+  templateAction?: (formData: FormData) => void | Promise<void>
   preFlightSummary?: ScheduleGridPreFlightSummary | null
 }
 
@@ -244,6 +245,7 @@ export function ScheduleGrid({
   autoDraftAction,
   preliminaryAction,
   publishAction,
+  templateAction,
   preFlightSummary,
 }: ScheduleGridProps) {
   const router = useRouter()
@@ -553,6 +555,8 @@ export function ScheduleGrid({
           onPrint={() => window.print()}
           onPublish={publishAction ? () => publishFormRef.current?.requestSubmit() : undefined}
           publishLabel={publishLabel}
+          templateOptions={initialDataset.templateOptions}
+          templateAction={templateAction}
         />
         {showPreFlight && preFlightSummary ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-tw-2xs">

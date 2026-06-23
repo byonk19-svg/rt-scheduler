@@ -1,11 +1,14 @@
 'use client'
 
+import { useState, type FormEvent } from 'react'
 import {
   CalendarDays,
   CheckCircle,
   ClipboardCheck,
+  Layers,
   Moon,
   Printer,
+  Save,
   Send,
   Sun,
   Zap,
@@ -34,6 +37,8 @@ type ScheduleGridToolbarProps = {
   onPrint: () => void
   onPublish?: () => void
   publishLabel?: string
+  templateOptions?: Array<{ id: string; name: string; shiftCount: number; dayCount: number }>
+  templateAction?: (formData: FormData) => void | Promise<void>
 }
 
 function getScheduleToolbarNextStep(args: {
@@ -86,7 +91,13 @@ export function ScheduleGridToolbar({
   onPrint,
   onPublish,
   publishLabel = 'Publish',
+  templateOptions = [],
+  templateAction,
 }: ScheduleGridToolbarProps) {
+  const [templateName, setTemplateName] = useState('')
+  const [templateFeedback, setTemplateFeedback] = useState<string | null>(null)
+  const [templateError, setTemplateError] = useState<string | null>(null)
+  const [savingTemplate, setSavingTemplate] = useState(false)
   const preliminaryLabel =
     cycleStatus === 'preliminary' ? 'Refresh preliminary' : 'Send preliminary'
   const scheduleBlockStateLabel = getScheduleBlockLifecycleLabel({
@@ -105,6 +116,40 @@ export function ScheduleGridToolbar({
     hasPreliminary: Boolean(onSendPreliminary),
     hasPublish: Boolean(onPublish),
   })
+  const canUseTemplates = interactionMode.canUseManagerToolbar
+  const canApplyTemplate =
+    canUseTemplates && Boolean(templateAction) && !isPublished && cycleStatus === 'draft'
+
+  async function handleSaveTemplate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const name = templateName.trim()
+    if (!name || savingTemplate) return
+
+    setSavingTemplate(true)
+    setTemplateFeedback(null)
+    setTemplateError(null)
+    try {
+      const response = await fetch('/api/schedule/templates', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cycleId, name }),
+      })
+      const body = (await response.json().catch(() => null)) as { shift_count?: number } | null
+      if (!response.ok) {
+        throw new Error('save_failed')
+      }
+      setTemplateName('')
+      setTemplateFeedback(
+        `Template saved with ${body?.shift_count ?? 0} ${
+          body?.shift_count === 1 ? 'assignment' : 'assignments'
+        }.`
+      )
+    } catch {
+      setTemplateError('Could not save the template. Review this Schedule Block and try again.')
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
 
   return (
     <div className="rounded-lg border border-border/70 bg-card/95 px-3 py-2 shadow-tw-sm">
@@ -222,6 +267,83 @@ export function ScheduleGridToolbar({
           ) : null}
         </div>
       </div>
+      {canUseTemplates ? (
+        <details className="mt-2 rounded-md border border-border/60 bg-background/70 px-3 py-2 text-xs">
+          <summary className="flex cursor-pointer list-none items-center gap-2 font-bold text-foreground">
+            <Layers className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            Templates
+          </summary>
+          <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <form className="space-y-2" onSubmit={handleSaveTemplate}>
+              <label className="block text-[11px] font-bold text-muted-foreground">
+                Template name
+                <input
+                  value={templateName}
+                  onChange={(event) => setTemplateName(event.target.value)}
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm font-medium text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                  disabled={isPending || savingTemplate}
+                />
+              </label>
+              <Button
+                type="submit"
+                size="sm"
+                variant="outline"
+                className="h-8 text-muted-foreground"
+                disabled={!templateName.trim() || isPending || savingTemplate}
+              >
+                <Save className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                {savingTemplate ? 'Saving template' : 'Save as template'}
+              </Button>
+            </form>
+            <form action={templateAction} className="space-y-2">
+              <input type="hidden" name="new_cycle_id" value={cycleId} />
+              <label className="block text-[11px] font-bold text-muted-foreground">
+                Saved template
+                <select
+                  name="template_id"
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm font-medium text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                  disabled={!canApplyTemplate || templateOptions.length === 0 || isPending}
+                >
+                  {templateOptions.length > 0 ? (
+                    templateOptions.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name} ({template.shiftCount} assignments)
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No saved templates</option>
+                  )}
+                </select>
+              </label>
+              <Button
+                type="submit"
+                size="sm"
+                variant="outline"
+                className="h-8 text-muted-foreground"
+                disabled={!canApplyTemplate || templateOptions.length === 0 || isPending}
+              >
+                <Layers className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                Apply template
+              </Button>
+              {!canApplyTemplate ? (
+                <p className="text-[11px] leading-5 text-muted-foreground">
+                  Templates can be applied to draft Schedule Blocks.
+                </p>
+              ) : null}
+            </form>
+          </div>
+          {templateFeedback ? (
+            <p className="mt-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-2 py-1.5 font-medium text-[var(--success-text)]">
+              {templateFeedback}
+            </p>
+          ) : null}
+          {templateError ? (
+            <p className="mt-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-2 py-1.5 font-medium text-[var(--error-text)]">
+              {templateError}
+            </p>
+          ) : null}
+        </details>
+      ) : null}
       <div className="mt-2 rounded-md border border-border/60 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
         <span className="font-bold text-foreground">Next step: </span>
         {nextStep}

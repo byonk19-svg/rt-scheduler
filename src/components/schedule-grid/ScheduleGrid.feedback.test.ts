@@ -105,6 +105,7 @@ const scheduleGridFeedbackEntry = String.raw`
       canUpdateAssignmentStatus: true,
     },
     availableCycles: [{ id: 'cycle-1', label: 'May 4 - May 5, 2026' }],
+    templateOptions: [],
     cycleDates: ['2026-05-04'],
     cycleDateRangeLabel: 'May 4 - May 5, 2026',
     isPublished: scenario.isPublished ?? true,

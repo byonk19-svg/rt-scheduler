@@ -58,6 +58,12 @@ type ScheduleBlockShiftPostRow = {
   swap_shift_id: string | null
 }
 
+type CycleTemplateListRow = {
+  id: string
+  name: string
+  shift_data: Array<{ day_of_cycle: number }> | null
+}
+
 export type ScheduleGridServerData =
   | {
       status: 'ok'
@@ -214,6 +220,7 @@ export async function loadScheduleGridData(
   if (forceOffError) return scheduleLoadError('schedule Need Off overrides', forceOffError)
 
   const shifts = (shiftsData ?? []) as ShiftRow[]
+  const templateOptions = canManageCoverage ? await loadScheduleTemplateOptions() : []
   const scheduleTherapists = filterScheduleTherapistsForCycle({
     therapists: (therapistsData ?? []) as TherapistRow[],
     shifts,
@@ -244,6 +251,7 @@ export async function loadScheduleGridData(
       shiftType,
       interactionMode,
       availableCycles: buildAvailableCycleOptions(visibleCycles),
+      templateOptions,
       cycleDates,
       cycleDateRangeLabel: formatHumanCycleRange(cycle.start_date, cycle.end_date),
       isPublished,
@@ -327,6 +335,33 @@ export async function loadScheduleGridData(
           ),
         },
       }),
+    })
+  }
+
+  async function loadScheduleTemplateOptions() {
+    const templateQuery = supabase
+      .from('cycle_templates')
+      .select('id, name, shift_data')
+      .order('created_at', { ascending: false })
+
+    if (profile?.site_id) {
+      templateQuery.eq('site_id', profile.site_id)
+    }
+
+    const { data, error } = await templateQuery
+    if (error) {
+      console.error('Could not load schedule templates:', error)
+      return []
+    }
+
+    return ((data ?? []) as CycleTemplateListRow[]).map((row) => {
+      const shiftData = Array.isArray(row.shift_data) ? row.shift_data : []
+      return {
+        id: row.id,
+        name: row.name,
+        shiftCount: shiftData.length,
+        dayCount: new Set(shiftData.map((item) => item.day_of_cycle)).size,
+      }
     })
   }
 

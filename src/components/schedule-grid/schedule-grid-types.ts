@@ -48,6 +48,7 @@ export type GridDataset = {
   shiftType: 'day' | 'night'
   interactionMode: ScheduleInteractionMode
   availableCycles: Array<{ id: string; label: string }>
+  templateOptions: Array<{ id: string; name: string; shiftCount: number; dayCount: number }>
   cycleDates: string[]
   cycleDateRangeLabel: string
   isPublished: boolean

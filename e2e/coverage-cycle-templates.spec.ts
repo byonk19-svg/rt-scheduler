@@ -130,23 +130,21 @@ test.describe.serial('coverage cycle templates', () => {
   test('manager saves a published cycle as a template and applies it to a draft', async ({
     page,
   }) => {
-    test.skip(true, 'Cycle template controls are no longer exposed on the unified Schedule grid.')
     test.skip(!ctx, 'Supabase service env values are required to run cycle-template e2e.')
 
     const templateName = `E2E Template ${randomString('template')}`
     createdTemplateNames.push(templateName)
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/coverage?cycle=${ctx!.publishedCycleId}&view=week&shift=day`)
-    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await page.goto(`/schedule?cycle=${ctx!.publishedCycleId}&shift=day`)
+    await expect(page.getByRole('heading', { name: 'Team Schedule' })).toBeVisible()
 
-    await page.locator('#main-content details summary').click()
-    await page.getByText('Save as template', { exact: true }).click()
-    await expect(page.getByRole('dialog', { name: /Save as template/i })).toBeVisible()
+    await page.locator('details').filter({ hasText: 'Templates' }).locator('summary').click()
     await page.getByLabel('Template name').fill(templateName)
-    await page.getByLabel('Description').fill('Saved by Playwright from a published cycle.')
-    await page.getByRole('button', { name: 'Save template' }).click()
-    await expect(page.getByText('Template saved.')).toBeVisible({ timeout: 15_000 })
+    await page.getByRole('button', { name: 'Save as template' }).click()
+    await expect(page.getByText('Template saved with 2 assignments.')).toBeVisible({
+      timeout: 15_000,
+    })
 
     await expect
       .poll(
@@ -163,11 +161,12 @@ test.describe.serial('coverage cycle templates', () => {
       )
       .toBe(2)
 
-    await page.goto(`/coverage?cycle=${ctx!.draftCycleId}&view=week&shift=day`)
-    await expect(page.getByText('No shifts assigned yet', { exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Start from template' }).click()
-    await expect(page.getByRole('dialog', { name: /Start from template/i })).toBeVisible()
-    await expect(page.getByText(templateName)).toBeVisible({ timeout: 15_000 })
+    await page.goto(`/schedule?cycle=${ctx!.draftCycleId}&shift=day`)
+    await expect(page.getByRole('heading', { name: 'Team Schedule' })).toBeVisible()
+    await page.locator('details').filter({ hasText: 'Templates' }).locator('summary').click()
+    await page
+      .getByLabel('Saved template')
+      .selectOption({ label: `${templateName} (2 assignments)` })
     await page.getByRole('button', { name: 'Apply template' }).click()
 
     await expect(page).toHaveURL(/success=template_applied/, { timeout: 30_000 })

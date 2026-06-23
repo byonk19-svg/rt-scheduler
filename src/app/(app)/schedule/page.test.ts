@@ -32,15 +32,21 @@ vi.mock('@/app/(app)/schedule/actions/publish-actions', () => ({
   toggleCyclePublishedAction: vi.fn(),
 }))
 
+vi.mock('@/app/(app)/schedule/actions/template-actions', () => ({
+  applyTemplateAction: vi.fn(),
+}))
+
 vi.mock('@/components/schedule-grid/ScheduleGrid', () => ({
   ScheduleGrid: ({
     initialDataset,
     initialShiftTab,
     preliminaryAction,
+    templateAction,
   }: {
     initialDataset: { cycleDateRangeLabel: string }
     initialShiftTab: 'Day' | 'Night'
     preliminaryAction?: unknown
+    templateAction?: unknown
   }) =>
     createElement(
       'section',
@@ -48,7 +54,8 @@ vi.mock('@/components/schedule-grid/ScheduleGrid', () => ({
       createElement('h2', null, 'Mock Schedule Grid'),
       createElement('p', null, initialDataset.cycleDateRangeLabel),
       createElement('p', null, initialShiftTab),
-      preliminaryAction ? createElement('p', null, 'Preliminary action wired') : null
+      preliminaryAction ? createElement('p', null, 'Preliminary action wired') : null,
+      templateAction ? createElement('p', null, 'Template action wired') : null
     ),
 }))
 
@@ -72,6 +79,7 @@ function okDataset() {
       canUpdateAssignmentStatus: true,
     },
     availableCycles: [{ id: 'cycle-2', label: 'May 3 - Jun 13, 2026' }],
+    templateOptions: [],
     cycleDates: ['2026-05-03', '2026-05-04'],
     cycleDateRangeLabel: 'May 3 - Jun 13, 2026',
     isPublished: false,
@@ -108,6 +116,7 @@ describe('schedule route', () => {
     expect(html).toContain('Mock Schedule Grid')
     expect(html).toContain('May 3 - Jun 13, 2026')
     expect(html).toContain('Preliminary action wired')
+    expect(html).toContain('Template action wired')
   })
 
   it('renders publish validation failures as visible manager feedback', async () => {
