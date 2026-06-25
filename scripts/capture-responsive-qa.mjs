@@ -454,8 +454,10 @@ async function captureRoute(page, outDir, route) {
   }
 
   const file = path.join(outDir, `${sanitizeFilename(route.name)}.png`)
+  const viewportFile = path.join(outDir, `${sanitizeFilename(route.name)}-viewport.png`)
+  await page.screenshot({ path: viewportFile, fullPage: false })
   await page.screenshot({ path: file, fullPage: true })
-  return { file, finalUrl: page.url(), validation }
+  return { file, viewportFile, finalUrl: page.url(), validation }
 }
 
 async function capturePublic(browser, viewport, viewportOutDir, summary) {
@@ -523,6 +525,7 @@ async function captureOne(page, viewportName, route, outDir, summary) {
       path: route.path,
       finalUrl: captured.finalUrl,
       file: captured.file,
+      viewportFile: captured.viewportFile,
     })
 
     if (route.persona !== 'public' && isResponsiveQaBlockedAuthenticatedUrl(captured.finalUrl)) {

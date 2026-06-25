@@ -15,4 +15,12 @@ describe('seed-users script', () => {
     expect(source).toContain('staff_onboarding_preferences_confirmed_at: isOnboardingComplete')
     expect(source).toContain('staff_onboarding_completed_at: isOnboardingComplete')
   })
+
+  it('marks seeded users approved and active so browser QA can log in', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts/seed-users.mjs'), 'utf8')
+
+    expect(source).toContain("access_status: 'approved'")
+    expect(source).toContain('is_active: true')
+    expect(source).toContain('archived_at: null')
+  })
 })

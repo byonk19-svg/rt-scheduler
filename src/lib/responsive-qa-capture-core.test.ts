@@ -263,6 +263,28 @@ describe('responsive QA capture config', () => {
     expect(config.requiresAuthenticatedCoverage).toBe(true)
   })
 
+  it('accepts staff as a therapist persona alias for common repo wording', () => {
+    const config = buildConfig({
+      argv: ['--mode=seeded', '--personas=manager,staff'],
+      env: {
+        NEXT_PUBLIC_SUPABASE_URL: 'https://project.supabase.co',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon',
+      },
+    })
+
+    expect(config.personas).toEqual(['manager', 'therapist'])
+    expect(config.routes.map((route) => route.persona)).toEqual([
+      'manager',
+      'manager',
+      'manager',
+      'manager',
+      'manager',
+      'therapist',
+      'therapist',
+      'therapist',
+    ])
+  })
+
   it('does not require authenticated coverage when only public routes are selected', () => {
     const config = buildConfig({
       argv: ['--personas=public'],

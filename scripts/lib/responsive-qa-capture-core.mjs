@@ -58,6 +58,9 @@ export const RESPONSIVE_QA_ROUTE_GROUPS = {
     { name: 'therapist-availability', path: '/therapist/availability' },
   ],
 }
+const RESPONSIVE_QA_PERSONA_ALIASES = {
+  staff: 'therapist',
+}
 
 export function parseResponsiveQaArgs(argv = []) {
   const args = {}
@@ -99,6 +102,11 @@ function normalizeCsv(value) {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function normalizePersonaNames(value) {
+  if (!value) return null
+  return value.map((name) => RESPONSIVE_QA_PERSONA_ALIASES[name] ?? name)
 }
 
 function pickNamed(items, requested, label) {
@@ -305,7 +313,9 @@ export function buildResponsiveQaCaptureConfig({ argv = [], env = {}, cwd = proc
 
   const defaultPersonas =
     effectiveMode === 'public' ? ['public'] : ['public', 'manager', 'therapist']
-  const requestedPersonas = normalizeCsv(args.personas ?? env.RESPONSIVE_QA_PERSONAS)
+  const requestedPersonas = normalizePersonaNames(
+    normalizeCsv(args.personas ?? env.RESPONSIVE_QA_PERSONAS)
+  )
   if (effectiveMode === 'public' && requestedPersonas?.some((persona) => persona !== 'public')) {
     throw new Error(
       'Authenticated responsive QA personas require Supabase auth env vars. Use --mode=seeded with auth env or --personas=public.'

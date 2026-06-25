@@ -11,6 +11,59 @@ USE CODEX NATIVE SUBAGENTS FOR INDEPENDENT PARALLEL SUBTASKS WHEN THAT IMPROVES 
 
 Repo-specific Codex guidance lives in `docs/CODEX_PROJECT_GUIDE.md`.
 
+## Repo-local Codex operating rules
+
+This repo is a Next.js App Router and Supabase scheduling system for respiratory therapy teams. Work from repository truth first: read `README.md`, `docs/CODEX_PROJECT_GUIDE.md`, `docs/WORKFLOWS.md`, `docs/SETUP.md`, and the relevant route, component, script, test, and migration files before changing behavior.
+
+### Commands
+
+- Install dependencies: `npm install`
+- Start dev server: `npm run dev`
+- Warm common local routes after `next dev` is ready: `npm run dev:warm`
+- Production-like local validation server: `npm run build` then `npm run start:prod:local` and browse `http://127.0.0.1:3001`
+- Lint: `npm run lint`
+- Typecheck: `npm run typecheck`
+- Unit/integration tests: `npm run test:unit`
+- Focused unit tests: `npm run test:unit -- <pattern>`
+- Playwright E2E: `npm run test:e2e`
+- Focused Playwright E2E: `npm run test:e2e -- <spec>`
+- Pickup concurrency E2E: `npm run test:e2e:pickup-concurrency`
+- Responsive browser QA capture: `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 npm run qa:responsive`
+- Therapist visual validation: `npm run screens:therapist`
+- Demo seed data: `npm run seed:demo`
+- Fuller UAT seed data: `npm run seed:functional`
+- Local quick gate: `npm run verify:quick -- --skip-cleanup`
+- Full local gate: `npm run verify:full`
+- Generated-artifact cleanup, only when safe: `npm run cleanup:local -- --execute`
+
+### Work style
+
+- Start with `git status -sb` and preserve unrelated local changes and artifacts.
+- Plan first for complex, cross-cutting, lifecycle, data-integrity, auth, scheduling, notification, or UI workflow work.
+- Prefer small, verifiable changes. Fix root causes, but keep the diff scoped to the user request.
+- Avoid broad refactors, rewrites, dependency swaps, styling sweeps, or architecture churn unless the user specifically asks for them.
+- Update relevant docs when behavior, commands, workflow expectations, environment requirements, or user-visible states change.
+- Do not commit or push unless the user explicitly asks.
+
+### Ask-before-proceeding gates
+
+Proceed autonomously on clear, reversible repo work. Stop and ask only when the next step requires or materially changes:
+
+- secrets, credentials, API keys, or private tokens
+- database migrations, RLS policy changes, production data, or destructive data operations
+- package installs, dependency upgrades, or lockfile-only churn
+- destructive filesystem or Git actions
+- auth/provider behavior, Supabase project configuration, email provider configuration, or third-party integrations
+- production, Vercel, cloud, cron, webhook, or live email behavior
+- unclear product decisions, safety decisions, or workflow semantics that cannot be inferred from repo docs/code
+
+### Browser dogfooding
+
+- For browser QA or product workflow checks, use `docs/testing/DOGFOOD_TESTING.md` and the reusable prompt in `docs/testing/CODEX_BROWSER_QA_PROMPT.md`.
+- Act like a manager, lead, therapist, or pending user trying to complete real work, not like a script only proving happy paths.
+- Prefer seeded or disposable test users from repo-local Supabase tooling. Do not depend on a human's signed-in browser session when automation can create its own state.
+- Record friction with evidence before proposing fixes. Do not make product fixes during a QA-only task unless the user explicitly switches from audit to implementation.
+
 <!-- omx:generated:agents-md -->
 
 # oh-my-codex - Intelligent Multi-Agent Orchestration
