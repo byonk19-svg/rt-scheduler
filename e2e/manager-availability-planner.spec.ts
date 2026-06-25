@@ -379,6 +379,31 @@ test.describe.serial('/availability manager planner', () => {
     expect(afterCycleNavigationCount).toBe(initialNavigationCount)
   })
 
+  test('manager empty submitted filters hide stale editable therapist details', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await gotoAvailability(
+      page,
+      `/availability?cycle=${ctx!.secondCycle.id}&therapist=${ctx!.therapist.id}&roster=missing`
+    )
+
+    await expect(page.getByRole('heading', { name: 'Availability Manager' })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.locator('[data-availability-editor]')).toBeVisible()
+
+    const emptySubmittedFilters = [/Submitted with requests 0/, /Submitted no requests 0/]
+    for (const filterName of emptySubmittedFilters) {
+      await page.getByRole('button', { name: filterName }).click()
+      await expect(page.getByText('No therapists match the current work queue view.')).toBeVisible()
+      await expect(page.getByText('No therapist selected')).toBeVisible()
+      await expect(page.locator('[data-availability-editor]')).toHaveCount(0)
+    }
+  })
+
   test('manager can reopen locked availability after draft work starts', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 

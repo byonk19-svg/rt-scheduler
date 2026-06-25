@@ -134,6 +134,23 @@ function isTherapistAvailabilityIntent(row: {
   )
 }
 
+function queueRowRequestCount(row: QueueRow) {
+  return row.overridesCount + (row.managerEnteredCount ?? 0)
+}
+
+function queueRowHasRequests(row: QueueRow) {
+  return row.submitted && queueRowRequestCount(row) > 0
+}
+
+function queueRowMatchesRosterFilter(row: QueueRow, filter: AvailabilityRosterFilter) {
+  if (filter === 'missing') return !row.submitted
+  if (filter === 'submitted') return row.submitted
+  if (filter === 'has_requests') return queueRowHasRequests(row)
+  if (filter === 'submitted_with_exceptions') return queueRowHasRequests(row)
+  if (filter === 'submitted_no_exceptions') return row.submitted && !queueRowHasRequests(row)
+  return true
+}
+
 function uniqueSortedDates(dates: string[]) {
   return [...new Set(dates)].sort((a, b) => a.localeCompare(b))
 }
@@ -308,6 +325,11 @@ export function ManagerSchedulingInputs({
     })
   }, [activeShift, queueRows, therapistSearch])
 
+  const activeQueueRows = useMemo(
+    () => filteredQueueRows.filter((row) => queueRowMatchesRosterFilter(row, activeRosterFilter)),
+    [activeRosterFilter, filteredQueueRows]
+  )
+
   const savedOverrides = useMemo(
     () =>
       overrides
@@ -340,7 +362,8 @@ export function ManagerSchedulingInputs({
     [availabilityEntries, selectedCycleId, selectedTherapistId]
   )
 
-  const rosterRow = queueRows.find((row) => row.therapistId === selectedTherapistId) ?? null
+  const rosterRow = activeQueueRows.find((row) => row.therapistId === selectedTherapistId) ?? null
+  const selectedPanelTherapist = rosterRow ? selectedTherapist : null
 
   const submissionStatus = rosterRow
     ? {
@@ -491,7 +514,7 @@ export function ManagerSchedulingInputs({
   const hasUnsavedChanges =
     baselineDates.length !== selectedDates.length ||
     baselineDates.some((date, index) => date !== selectedDates[index])
-  const selectedTherapistName = selectedTherapist?.full_name ?? 'No therapist selected'
+  const selectedTherapistName = selectedPanelTherapist?.full_name ?? 'No therapist selected'
   const missingSubmissionLabel = `${missingRows.length} therapist${missingRows.length === 1 ? '' : 's'} missing`
   const submittedSubmissionLabel = `${submittedRows.length} submitted`
 
@@ -701,24 +724,24 @@ export function ManagerSchedulingInputs({
         </div>
         <div className="min-h-0 rounded-[1.25rem] border border-border/70 bg-card px-4 py-4 shadow-tw-sm">
           <TherapistContextPanel
-            therapist={selectedTherapist}
+            therapist={selectedPanelTherapist}
             cycleLabel={
               selectedCycle
                 ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
                 : 'No Schedule Block selected'
             }
-            requestRows={therapistRequestRows}
+            requestRows={selectedPanelTherapist ? therapistRequestRows : []}
             submissionStatus={submissionStatus}
-            savedPlannerCount={savedOverrides.length}
+            savedPlannerCount={selectedPanelTherapist ? savedOverrides.length : 0}
             onClose={clearSelectedTherapist}
             mode={mode}
-            selectedDates={selectedDates}
-            dayStates={dayStates}
-            hasUnsavedChanges={hasUnsavedChanges}
+            selectedDates={selectedPanelTherapist ? selectedDates : []}
+            dayStates={selectedPanelTherapist ? dayStates : {}}
+            hasUnsavedChanges={selectedPanelTherapist ? hasUnsavedChanges : false}
             cycleStart={selectedCycle?.start_date ?? ''}
             cycleEnd={selectedCycle?.end_date ?? ''}
             selectedCycleId={selectedCycleId}
-            selectedTherapistId={selectedTherapistId}
+            selectedTherapistId={selectedPanelTherapist ? selectedTherapistId : ''}
             onModeChange={handleModeChange}
             onToggleDate={toggleDate}
             onClearSelectedDates={() => setSelectedDates([])}

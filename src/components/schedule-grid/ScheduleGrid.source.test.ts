@@ -195,6 +195,8 @@ describe('ScheduleGrid source invariants', () => {
     expect(dataCode).toContain('openShiftBoardRequests')
     expect(code).toContain('MAX_VISIBLE_PREFLIGHT_ISSUES')
     expect(code).toContain('Pre-flight readiness issues')
+    expect(code).toContain('blockingPreFlightIssueCount')
+    expect(code).toContain('preFlightIssueSummaryLabel')
     expect(code).toContain('data-readiness-issue-id')
     expect(code).toContain('issue.recommendedAction')
     expect(code).toContain('getReadinessTargetLabel')

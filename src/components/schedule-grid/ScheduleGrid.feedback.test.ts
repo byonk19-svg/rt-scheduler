@@ -396,7 +396,7 @@ describe('ScheduleGrid feedback rendering', () => {
         await page.getByRole('button', { name: 'Pre-flight' }).click()
 
         await page.getByText('Pre-flight summary').waitFor({ state: 'visible' })
-        await page.getByText('5 readiness issues').waitFor({ state: 'visible' })
+        await page.getByText('3 blocking issues + 2 warnings').waitFor({ state: 'visible' })
         await page.getByText('1 missing availability submission').waitFor({ state: 'visible' })
         await page.getByText('1 open Shift Board request').waitFor({ state: 'visible' })
         await page.getByText('Day shift is short 1 assignment').waitFor({ state: 'visible' })

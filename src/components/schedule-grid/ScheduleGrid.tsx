@@ -239,6 +239,10 @@ function getReadinessTargetLabel(
   return `${issue.target.date} ${issue.target.shiftType} shift - ${issue.therapistName ?? 'Therapist'}`
 }
 
+function pluralizeReadinessCount(count: number, singular: string) {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`
+}
+
 export function ScheduleGrid({
   initialDataset,
   initialShiftTab,
@@ -480,6 +484,23 @@ export function ScheduleGrid({
     preFlightSummary?.readinessIssues.slice(0, MAX_VISIBLE_PREFLIGHT_ISSUES) ?? []
   const hiddenPreFlightIssueCount =
     (preFlightSummary?.readinessIssues.length ?? 0) - visiblePreFlightIssues.length
+  const blockingPreFlightIssueCount =
+    preFlightSummary?.readinessIssues.filter((issue) => issue.severity === 'blocking').length ?? 0
+  const warningPreFlightIssueCount =
+    preFlightSummary?.readinessIssues.filter((issue) => issue.severity === 'warning').length ?? 0
+  const infoPreFlightIssueCount =
+    preFlightSummary?.readinessIssues.filter((issue) => issue.severity === 'info').length ?? 0
+  const preFlightIssueSummaryLabel = [
+    blockingPreFlightIssueCount > 0
+      ? pluralizeReadinessCount(blockingPreFlightIssueCount, 'blocking issue')
+      : null,
+    warningPreFlightIssueCount > 0
+      ? pluralizeReadinessCount(warningPreFlightIssueCount, 'warning')
+      : null,
+    infoPreFlightIssueCount > 0 ? pluralizeReadinessCount(infoPreFlightIssueCount, 'note') : null,
+  ]
+    .filter(Boolean)
+    .join(' + ')
   const missingAvailabilityIssueCount =
     preFlightSummary?.readinessIssues.filter(
       (issue) => issue.type === 'missing_availability_submission'
@@ -572,7 +593,7 @@ export function ScheduleGrid({
               </div>
               {preFlightSummary.readinessIssues.length > 0 ? (
                 <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-950">
-                  {preFlightSummary.readinessIssues.length} readiness issues
+                  {preFlightIssueSummaryLabel}
                 </span>
               ) : (
                 <span className="rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2 py-0.5 text-xs font-bold text-[var(--success-text)]">

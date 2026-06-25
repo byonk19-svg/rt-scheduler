@@ -208,6 +208,56 @@ describe('ManagerSchedulingInputs', () => {
     )
   })
 
+  it('does not keep an editable therapist detail visible when the active queue filter has no matching row', () => {
+    const html = renderToStaticMarkup(
+      createElement(ManagerSchedulingInputs, {
+        cycles: [
+          {
+            id: 'cycle-1',
+            label: 'Apr 2026',
+            start_date: '2026-03-22',
+            end_date: '2026-05-02',
+            published: false,
+            availability_due_at: null,
+          },
+        ],
+        therapists: [
+          {
+            id: 'therapist-1',
+            full_name: 'Barbara C.',
+            shift_type: 'day',
+            employment_type: 'full_time',
+          },
+        ],
+        overrides: [],
+        availabilityEntries: [],
+        initialCycleId: 'cycle-1',
+        initialTherapistId: 'therapist-1',
+        submittedRows: [],
+        missingRows: [
+          {
+            therapistId: 'therapist-1',
+            therapistName: 'Barbara C.',
+            overridesCount: 0,
+            lastUpdatedAt: null,
+            shiftType: 'day',
+            employmentType: 'full_time',
+          },
+        ],
+        initialRosterFilter: 'submitted_with_exceptions',
+        saveManagerPlannerDatesAction: async () => {},
+        saveManagerAvailabilityRequestsAction: async () => {},
+        copyAvailabilityFromPreviousCycleAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('No therapist selected')
+    expect(html).not.toContain(
+      'Barbara C.</p><p class="mt-1 text-xs leading-5 text-muted-foreground">Save manager edits'
+    )
+    expect(html).not.toContain('Save for Barbara C.')
+  })
+
   it('passes manager-entered availability provenance into the therapist detail panel', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
