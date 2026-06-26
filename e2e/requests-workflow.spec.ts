@@ -301,6 +301,132 @@ async function findRequestCard(
   return requestCard
 }
 
+type DirectSwapFixture = {
+  postId: string
+  requestMessage: string
+}
+
+async function createDirectSwapFixture(params: {
+  ctx: RequestsCtx
+  createdCycleIds: string[]
+  daysAhead: number
+  label: string
+  messagePrefix: string
+}): Promise<DirectSwapFixture> {
+  const { ctx, createdCycleIds, daysAhead, label, messagePrefix } = params
+  const cycleStart = nextSundayAfter(daysAhead)
+  const cycleKey = formatDateKey(addDays(cycleStart, 3))
+  const partnerKey = formatDateKey(addDays(cycleStart, 4))
+  const cycleInsert = await ctx.supabase
+    .from('schedule_cycles')
+    .insert({
+      label: `${label} ${randomString('cycle')}`,
+      start_date: formatDateKey(cycleStart),
+      end_date: formatDateKey(addDays(cycleStart, 41)),
+      site_id: ctx.siteId,
+      published: true,
+    })
+    .select('id')
+    .single()
+
+  if (cycleInsert.error || !cycleInsert.data) {
+    throw new Error(cycleInsert.error?.message ?? `Could not create ${label} cycle.`)
+  }
+  createdCycleIds.push(cycleInsert.data.id)
+
+  const shiftsInsert = await ctx.supabase
+    .from('shifts')
+    .insert([
+      {
+        cycle_id: cycleInsert.data.id,
+        user_id: ctx.requester.id,
+        date: cycleKey,
+        shift_type: 'day',
+        status: 'scheduled',
+        assignment_status: 'scheduled',
+        role: 'staff',
+        site_id: ctx.siteId,
+      },
+      {
+        cycle_id: cycleInsert.data.id,
+        user_id: ctx.scheduledPartner.id,
+        date: partnerKey,
+        shift_type: 'day',
+        status: 'scheduled',
+        assignment_status: 'scheduled',
+        role: 'staff',
+        site_id: ctx.siteId,
+      },
+    ])
+    .select('id, user_id')
+
+  if (shiftsInsert.error || !shiftsInsert.data) {
+    throw new Error(shiftsInsert.error?.message ?? `Could not create ${label} shifts.`)
+  }
+
+  const requesterShiftId =
+    shiftsInsert.data.find((row) => row.user_id === ctx.requester.id)?.id ?? null
+  const partnerShiftId =
+    shiftsInsert.data.find((row) => row.user_id === ctx.scheduledPartner.id)?.id ?? null
+  if (!requesterShiftId || !partnerShiftId) {
+    throw new Error(`Could not find both shifts for ${label} test.`)
+  }
+
+  const requestMessage = `${messagePrefix} ${randomString('direct')}`
+  const postInsert = await ctx.supabase
+    .from('shift_posts')
+    .insert({
+      shift_id: requesterShiftId,
+      posted_by: ctx.requester.id,
+      claimed_by: ctx.scheduledPartner.id,
+      swap_shift_id: partnerShiftId,
+      type: 'swap',
+      visibility: 'direct',
+      recipient_response: 'pending',
+      status: 'pending',
+      message: requestMessage,
+    })
+    .select('id')
+    .single()
+  if (postInsert.error || !postInsert.data) {
+    throw new Error(postInsert.error?.message ?? `Could not create ${label} request.`)
+  }
+
+  return {
+    postId: postInsert.data.id,
+    requestMessage,
+  }
+}
+
+async function expectManagerApproveBlocked(params: {
+  managerPage: Page
+  requestId: string
+  expectedError: string
+}) {
+  const { managerPage, requestId, expectedError } = params
+  const response = await managerPage.evaluate(async (id) => {
+    const result = await fetch('/api/shift-posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'review_request',
+        requestId: id,
+        decision: 'approve',
+      }),
+    })
+    const body = await result.json().catch(() => null)
+    return {
+      ok: result.ok,
+      status: result.status,
+      error: body?.error ?? '',
+    }
+  }, requestId)
+
+  expect(response.ok).toBe(false)
+  expect(response.status).toBe(400)
+  expect(response.error).toContain(expectedError)
+}
+
 function nextSundayAfter(daysAhead: number): Date {
   const target = addDays(new Date(), daysAhead)
   return addDays(target, (7 - target.getDay()) % 7)
@@ -985,6 +1111,140 @@ test.describe.serial('requests workflow', () => {
           { timeout: 20_000 }
         )
         .toBe(`${ctx!.scheduledPartner.id}:${ctx!.requester.id}`)
+    } finally {
+      await managerContext.close().catch(() => undefined)
+    }
+  })
+
+  test('direct request recipient can decline and manager cannot approve afterward', async ({
+    browser,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
+
+    const fixture = await createDirectSwapFixture({
+      ctx: ctx!,
+      createdCycleIds,
+      daysAhead: 1120,
+      label: 'Requests Direct Decline',
+      messagePrefix: 'Direct decline',
+    })
+
+    const recipientContext = await browser.newContext()
+    const recipientPage = await recipientContext.newPage()
+    try {
+      await loginAs(recipientPage, ctx!.scheduledPartner.email, ctx!.scheduledPartner.password)
+      const requestCard = await findRequestCard(
+        recipientPage,
+        fixture.requestMessage,
+        fixture.postId
+      )
+      const declineResponsePromise = waitForShiftPostMutation(recipientPage)
+      await requestCard.getByRole('button', { name: 'Decline' }).click()
+      const declineResponse = await declineResponsePromise
+      await expectShiftPostResponseOk(declineResponse)
+
+      await expect
+        .poll(
+          async () => {
+            const result = await ctx!.supabase
+              .from('shift_posts')
+              .select('recipient_response, status')
+              .eq('id', fixture.postId)
+              .maybeSingle()
+
+            if (result.error) throw new Error(result.error.message)
+            return `${result.data?.recipient_response ?? ''}:${result.data?.status ?? ''}`
+          },
+          { timeout: 20_000 }
+        )
+        .toBe('declined:denied')
+    } finally {
+      await recipientContext.close().catch(() => undefined)
+    }
+
+    const managerContext = await browser.newContext()
+    const managerPage = await managerContext.newPage()
+    try {
+      await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
+      await gotoWithRetry(managerPage, '/shift-board?tab=history')
+      const historyCard = managerPage
+        .locator('div.rounded-xl')
+        .filter({ has: managerPage.getByText(fixture.requestMessage) })
+        .first()
+      await expect(historyCard).toBeVisible({ timeout: 20_000 })
+      await expect(historyCard.getByText('Denied').first()).toBeVisible()
+      await expect(historyCard.getByRole('button', { name: 'Approve trade request' })).toHaveCount(
+        0
+      )
+      await expectManagerApproveBlocked({
+        managerPage,
+        requestId: fixture.postId,
+        expectedError: 'Only pending shift posts can be reviewed',
+      })
+    } finally {
+      await managerContext.close().catch(() => undefined)
+    }
+  })
+
+  test('requester can withdraw a direct request before teammate response and manager cannot approve afterward', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
+
+    const fixture = await createDirectSwapFixture({
+      ctx: ctx!,
+      createdCycleIds,
+      daysAhead: 1220,
+      label: 'Requests Direct Withdraw',
+      messagePrefix: 'Direct withdraw',
+    })
+
+    await loginAs(page, ctx!.requester.email, ctx!.requester.password)
+    const requesterCard = await findRequestCard(page, fixture.requestMessage, fixture.postId)
+    const withdrawResponsePromise = waitForShiftPostMutation(page)
+    await requesterCard.getByRole('button', { name: 'Withdraw request' }).click()
+    const withdrawResponse = await withdrawResponsePromise
+    await expectShiftPostResponseOk(withdrawResponse)
+
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('shift_posts')
+            .select('recipient_response, status')
+            .eq('id', fixture.postId)
+            .maybeSingle()
+
+          if (result.error) throw new Error(result.error.message)
+          return `${result.data?.recipient_response ?? ''}:${result.data?.status ?? ''}`
+        },
+        { timeout: 20_000 }
+      )
+      .toBe('pending:withdrawn')
+
+    await gotoWithRetry(page, `/requests/new?requestId=${fixture.postId}`)
+    await expect(page.getByText(fixture.requestMessage)).toHaveCount(0)
+
+    const managerContext = await browser.newContext()
+    const managerPage = await managerContext.newPage()
+    try {
+      await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
+      await gotoWithRetry(managerPage, '/shift-board?tab=history')
+      const historyCard = managerPage
+        .locator('div.rounded-xl')
+        .filter({ has: managerPage.getByText(fixture.requestMessage) })
+        .first()
+      await expect(historyCard).toBeVisible({ timeout: 20_000 })
+      await expect(historyCard.getByText('Withdrawn').first()).toBeVisible()
+      await expect(historyCard.getByRole('button', { name: 'Approve trade request' })).toHaveCount(
+        0
+      )
+      await expectManagerApproveBlocked({
+        managerPage,
+        requestId: fixture.postId,
+        expectedError: 'Only pending shift posts can be reviewed',
+      })
     } finally {
       await managerContext.close().catch(() => undefined)
     }
