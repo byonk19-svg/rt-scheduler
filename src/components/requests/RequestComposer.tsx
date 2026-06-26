@@ -170,10 +170,10 @@ export function RequestComposer({
     : 'Pick the shift you need covered, ask a specific teammate or post an open coverage request, and send it for review.'
 
   return (
-    <div className="relative left-1/2 w-[min(calc(100vw-5rem),1760px)] -translate-x-1/2 space-y-6 max-lg:left-auto max-lg:w-full max-lg:translate-x-0">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(520px,760px)] lg:items-center">
+    <div className="relative left-1/2 min-w-0 w-[min(calc(100vw-5rem),1760px)] -translate-x-1/2 space-y-5 max-lg:left-auto max-lg:w-full max-lg:translate-x-0">
+      <div className="fade-up teamwise-grid-bg-subtle grid gap-6 rounded-[1.25rem] border border-border/70 bg-card px-5 py-5 shadow-tw-panel lg:grid-cols-[minmax(0,1fr)_minmax(520px,760px)] lg:items-center">
         <div className="flex min-w-0 items-start gap-5">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)] shadow-tw-panel-inner-soft">
             <ArrowRightLeft className="h-8 w-8" />
           </div>
           <div className="max-w-xl">
@@ -187,8 +187,8 @@ export function RequestComposer({
         <StepRail steps={stepState.steps} currentDisplayStep={stepState.currentStep.displayStep} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(380px,430px)]">
-        <div className="space-y-3">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(380px,430px)]">
+        <div className="min-w-0 space-y-3">
           {error ? (
             <div className="flex items-center gap-2 rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
               <AlertCircle className="h-4 w-4 shrink-0" />
@@ -196,7 +196,7 @@ export function RequestComposer({
             </div>
           ) : null}
 
-          <section className="rounded-lg border border-border bg-card px-6 py-5 shadow-sm">
+          <section className="fade-up min-w-0 rounded-[1.15rem] border border-border bg-card px-6 py-5 shadow-tw-panel-inner-soft">
             <div className="grid gap-3">
               <div>
                 <p className="text-xl font-bold tracking-tight text-foreground">1. Your shift</p>
@@ -263,7 +263,7 @@ export function RequestComposer({
               </div>
             )}
 
-            <div className="mt-5 grid auto-cols-[minmax(126px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2">
+            <div className="mt-5 grid min-w-0 max-w-full auto-cols-[minmax(132px,1fr)] grid-flow-col gap-3 overflow-x-auto overscroll-x-contain pb-2">
               {visibleShiftChoices.map((shift) => (
                 <ShiftChoiceCard
                   key={shift.id}
@@ -337,7 +337,7 @@ export function RequestComposer({
           </section>
 
           {visibleTeammateStep ? (
-            <section className="rounded-lg border border-border bg-card shadow-sm">
+            <section className="fade-up min-w-0 overflow-hidden rounded-[1.15rem] border border-border bg-card shadow-tw-panel-inner-soft">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
                 <div>
                   <p className="text-xl font-bold tracking-tight text-foreground">
@@ -420,7 +420,7 @@ export function RequestComposer({
           ) : null}
 
           {selectedShiftData && !showsTeammateStep ? (
-            <section className="rounded-lg border border-border bg-card px-5 py-5 shadow-sm">
+            <section className="fade-up rounded-[1.15rem] border border-border bg-card px-5 py-5 shadow-tw-panel-inner-soft">
               <p className="text-xl font-bold tracking-tight text-foreground">
                 2. Review board request
               </p>
@@ -466,15 +466,23 @@ function StepRail({
   steps: Array<{ displayStep: number; label: string }>
 }) {
   return (
-    <div className="px-2 py-2">
-      <div className="grid gap-3 md:grid-cols-3">
+    <div className="rounded-2xl border border-border/70 bg-background/70 p-3 shadow-tw-panel-inner-soft">
+      <div className="grid gap-2 md:grid-cols-3">
         {steps.map((item, index) => {
           const active = currentDisplayStep >= item.displayStep
           return (
-            <div key={item.displayStep} className="flex items-center gap-3">
+            <div
+              key={item.displayStep}
+              className={cn(
+                'relative flex items-center gap-3 rounded-xl border px-3 py-2',
+                active
+                  ? 'border-[var(--info-border)] bg-[var(--info-subtle)]'
+                  : 'border-border bg-card/75'
+              )}
+            >
               <span
                 className={cn(
-                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm font-bold',
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-sm font-bold',
                   active
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-border bg-muted text-muted-foreground'
@@ -491,7 +499,7 @@ function StepRail({
                 {toStepLabel(item.label)}
               </span>
               {index < steps.length - 1 ? (
-                <span className="hidden h-px flex-1 bg-border md:block" />
+                <span className="absolute -right-2 top-1/2 hidden h-px w-2 bg-border md:block" />
               ) : null}
             </div>
           )
@@ -515,9 +523,9 @@ function SegmentButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'min-w-32 rounded-md px-4 py-2 text-sm font-semibold transition-colors',
+        'min-w-32 rounded-md px-4 py-2 text-sm font-semibold transition-[background-color,color,box-shadow]',
         selected
-          ? 'bg-card text-primary shadow-sm ring-1 ring-primary/30'
+          ? 'bg-card text-primary shadow-tw-selected-chip ring-1 ring-primary/30'
           : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
       )}
     >
@@ -543,9 +551,9 @@ function PathButton({
       aria-label={ariaLabel}
       onClick={onClick}
       className={cn(
-        'rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors',
+        'rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-[background-color,border-color,color,box-shadow]',
         selected
-          ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+          ? 'border-primary bg-primary text-primary-foreground shadow-tw-primary-glow'
           : 'border-border bg-card text-muted-foreground hover:bg-secondary'
       )}
     >
@@ -568,10 +576,10 @@ function ShiftChoiceCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        'min-h-24 rounded-xl border px-4 py-3 text-left transition-colors',
+        'min-h-24 rounded-xl border px-4 py-3 text-left transition-[background-color,border-color,box-shadow,transform]',
         selected
-          ? 'border-primary bg-[var(--success-subtle)]/50 shadow-sm'
-          : 'border-border bg-card hover:bg-secondary/50'
+          ? 'border-primary bg-[var(--success-subtle)]/50 shadow-tw-day-selected'
+          : 'border-border bg-card hover:-translate-y-0.5 hover:bg-secondary/50 hover:shadow-tw-day-hover'
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -760,144 +768,177 @@ function RequestPreview({
 
   return (
     <aside className="xl:sticky xl:top-16 xl:self-start">
-      <div className="rounded-lg border border-border bg-card px-6 py-6 shadow-sm">
-        <p className="text-xl font-bold tracking-tight text-foreground">Request preview</p>
-        <p className="mt-1 text-sm text-muted-foreground">Here is what this request looks like.</p>
+      <div className="fade-up overflow-hidden rounded-[1.25rem] border border-border bg-card shadow-tw-panel">
+        <div className="border-b border-border/70 bg-[color-mix(in_srgb,var(--primary)_8%,var(--card))] px-6 py-5">
+          <p className="text-xl font-bold tracking-tight text-foreground">Request preview</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Here is what this request looks like.
+          </p>
+        </div>
 
-        {showTradeCards ? (
-          <div className="mt-5 grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr] xl:grid-cols-[1fr_auto_1fr]">
-            <PreviewShiftCard
-              eyebrow="You give"
-              name="Your shift"
-              shiftLabel={
-                selectedShiftData
-                  ? `${selectedShiftData.date} - ${selectedShiftData.type}`
-                  : 'Select a shift'
-              }
-              isLead={selectedShiftData?.isLead ?? false}
-            />
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <ArrowRightLeft className="h-5 w-5" />
+        <div className="px-6 py-6">
+          {showTradeCards ? (
+            <div className="grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr] xl:grid-cols-[1fr_auto_1fr]">
+              <PreviewShiftCard
+                eyebrow="You give"
+                name="Your shift"
+                shiftLabel={
+                  selectedShiftData
+                    ? `${selectedShiftData.date} - ${selectedShiftData.type}`
+                    : 'Select a shift'
+                }
+                isLead={selectedShiftData?.isLead ?? false}
+              />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-tw-primary-glow">
+                <ArrowRightLeft className="h-5 w-5" />
+              </div>
+              <PreviewShiftCard
+                eyebrow={isOpenTeamSwap ? 'Manager finds' : 'You ask'}
+                name={
+                  selectedMember?.name ??
+                  (isOpenTeamSwap ? 'Open trade request' : 'Choose teammate')
+                }
+                shiftLabel={
+                  selectedMember?.currentShiftLabel ?? selectedMember?.shift ?? 'Pick a teammate'
+                }
+                isLead={selectedMember?.isLead ?? false}
+              />
             </div>
-            <PreviewShiftCard
-              eyebrow={isOpenTeamSwap ? 'Manager finds' : 'You ask'}
-              name={
-                selectedMember?.name ?? (isOpenTeamSwap ? 'Open trade request' : 'Choose teammate')
-              }
-              shiftLabel={
-                selectedMember?.currentShiftLabel ?? selectedMember?.shift ?? 'Pick a teammate'
-              }
-              isLead={selectedMember?.isLead ?? false}
-            />
-          </div>
-        ) : (
-          <div className="mt-5">
-            <PreviewShiftCard
-              eyebrow="You need covered"
-              name="Coverage request"
-              shiftLabel={
-                selectedShiftData
-                  ? `${selectedShiftData.date} - ${selectedShiftData.type}`
-                  : 'Select a shift'
-              }
-              isLead={selectedShiftData?.isLead ?? false}
-            />
-          </div>
-        )}
+          ) : (
+            <div>
+              <PreviewShiftCard
+                eyebrow="You need covered"
+                name="Coverage request"
+                shiftLabel={
+                  selectedShiftData
+                    ? `${selectedShiftData.date} - ${selectedShiftData.type}`
+                    : 'Select a shift'
+                }
+                isLead={selectedShiftData?.isLead ?? false}
+              />
+            </div>
+          )}
 
-        <div className="mt-5 space-y-3">
-          <div className="rounded-lg border border-border bg-muted/20 px-3 py-3">
-            <p className="text-sm font-semibold text-foreground">Request summary</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {getPreviewPathLabel({
-                isDirectSwap,
-                isOpenTeamSwap,
-                isTeamSuggestedSwap,
-                requestType,
-              })}
+          <div className="mt-5 space-y-3">
+            <div className="rounded-xl border border-border bg-muted/20 px-3 py-3">
+              <p className="text-sm font-semibold text-foreground">Request summary</p>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                {getPreviewPathLabel({
+                  isDirectSwap,
+                  isOpenTeamSwap,
+                  isTeamSuggestedSwap,
+                  requestType,
+                })}
+              </p>
+            </div>
+            <PreviewCheck complete={Boolean(selectedShiftData)} label="Selected shift" />
+            <PreviewShiftCard
+              eyebrow="Workflow"
+              name={
+                isOpenTeamSwap
+                  ? 'Open board path'
+                  : selectedMember?.name
+                    ? 'Teammate path'
+                    : 'Waiting on selection'
+              }
+              shiftLabel={
+                selectedMember?.verdict === 'needs_manager_review'
+                  ? 'Manager review needed'
+                  : selectedMember
+                    ? selectedVerdict.label
+                    : isOpenTeamSwap
+                      ? 'Manager will review possible partners.'
+                      : 'Pick the next owner.'
+              }
+              isLead={false}
+            />
+            <PreviewCheck
+              complete={Boolean(selectedMember) || isOpenTeamSwap || requestType === 'pickup'}
+              label={
+                isOpenTeamSwap
+                  ? 'Open trade request'
+                  : requestType === 'pickup'
+                    ? 'Coverage path selected'
+                    : 'Selected teammate'
+              }
+            />
+            <PreviewCheck
+              complete={Boolean(reviewReady)}
+              label={
+                selectedMember?.verdict === 'needs_manager_review'
+                  ? 'Manager review needed'
+                  : 'Coverage check ready'
+              }
+              detail={
+                selectedMember
+                  ? selectedVerdict.label
+                  : isOpenTeamSwap
+                    ? 'Manager will review possible partners.'
+                    : undefined
+              }
+            />
+          </div>
+
+          <div className="mt-5 space-y-2">
+            <label className="text-sm font-semibold text-foreground" htmlFor="request-message">
+              Message (optional)
+            </label>
+            <textarea
+              id="request-message"
+              value={message}
+              onChange={(event) => onMessageChange(event.target.value)}
+              rows={5}
+              maxLength={250}
+              placeholder={
+                requestType === 'swap'
+                  ? 'Hey! Would you be up for trading this shift?'
+                  : 'Can someone cover this shift for me?'
+              }
+              className="w-full resize-none rounded-xl border border-border bg-card px-3 py-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 placeholder:text-muted-foreground"
+            />
+            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <span>
+                {messageNeedsReview ? 'You changed teammates. Recheck this message.' : ' '}
+              </span>
+              <span>{messageCount}/250</span>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-2">
+            {step < 3 ? (
+              <Button
+                className="w-full shadow-tw-primary-glow"
+                disabled={!canContinue}
+                onClick={onNextStep}
+              >
+                Continue
+              </Button>
+            ) : (
+              <Button
+                className="w-full shadow-tw-primary-glow"
+                disabled={!canSubmit || submitting}
+                onClick={() => void onSubmit()}
+              >
+                <Send className="h-4 w-4" />
+                {submitLabel}
+              </Button>
+            )}
+            <Button className="w-full" variant="outline" onClick={onPrevStep}>
+              <Bookmark className="h-4 w-4" />
+              {step === 1 ? 'Cancel' : 'Back'}
+            </Button>
+          </div>
+
+          <div className="mt-5 flex gap-3 rounded-xl border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-3 text-sm leading-5 text-[var(--success-text)]">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              {isDirectSwap
+                ? 'After your teammate accepts, your manager will review the trade request.'
+                : isTeamSuggestedSwap
+                  ? 'Your suggested partner goes to manager review with the request.'
+                  : 'A manager reviews board requests before the schedule changes.'}
             </p>
           </div>
-          <PreviewCheck complete={Boolean(selectedShiftData)} label="Selected shift" />
-          <PreviewCheck
-            complete={Boolean(selectedMember) || isOpenTeamSwap || requestType === 'pickup'}
-            label={
-              isOpenTeamSwap
-                ? 'Open trade request'
-                : requestType === 'pickup'
-                  ? 'Coverage path selected'
-                  : 'Selected teammate'
-            }
-          />
-          <PreviewCheck
-            complete={Boolean(reviewReady)}
-            label={
-              selectedMember?.verdict === 'needs_manager_review'
-                ? 'Manager review needed'
-                : 'Coverage check ready'
-            }
-            detail={
-              selectedMember
-                ? selectedVerdict.label
-                : isOpenTeamSwap
-                  ? 'Manager will review possible partners.'
-                  : undefined
-            }
-          />
-        </div>
-
-        <div className="mt-5 space-y-2">
-          <label className="text-sm font-semibold text-foreground" htmlFor="request-message">
-            Message (optional)
-          </label>
-          <textarea
-            id="request-message"
-            value={message}
-            onChange={(event) => onMessageChange(event.target.value)}
-            rows={5}
-            maxLength={250}
-            placeholder={
-              requestType === 'swap'
-                ? 'Hey! Would you be up for trading this shift?'
-                : 'Can someone cover this shift for me?'
-            }
-            className="w-full resize-none rounded-lg border border-border bg-card px-3 py-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 placeholder:text-muted-foreground"
-          />
-          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-            <span>{messageNeedsReview ? 'You changed teammates. Recheck this message.' : ' '}</span>
-            <span>{messageCount}/250</span>
-          </div>
-        </div>
-
-        <div className="mt-5 space-y-2">
-          {step < 3 ? (
-            <Button className="w-full" disabled={!canContinue} onClick={onNextStep}>
-              Continue
-            </Button>
-          ) : (
-            <Button
-              className="w-full"
-              disabled={!canSubmit || submitting}
-              onClick={() => void onSubmit()}
-            >
-              <Send className="h-4 w-4" />
-              {submitLabel}
-            </Button>
-          )}
-          <Button className="w-full" variant="outline" onClick={onPrevStep}>
-            <Bookmark className="h-4 w-4" />
-            {step === 1 ? 'Cancel' : 'Back'}
-          </Button>
-        </div>
-
-        <div className="mt-5 flex gap-3 rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-3 text-sm text-[var(--success-text)]">
-          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>
-            {isDirectSwap
-              ? 'After your teammate accepts, your manager will review the trade request.'
-              : isTeamSuggestedSwap
-                ? 'Your suggested partner goes to manager review with the request.'
-                : 'A manager reviews board requests before the schedule changes.'}
-          </p>
         </div>
       </div>
     </aside>
@@ -916,7 +957,7 @@ function PreviewShiftCard({
   shiftLabel: string
 }) {
   return (
-    <div className="min-h-32 rounded-lg border border-border bg-card px-4 py-4">
+    <div className="min-h-32 rounded-xl border border-border bg-card px-4 py-4 shadow-tw-2xs-soft">
       <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
         {eyebrow}
       </p>

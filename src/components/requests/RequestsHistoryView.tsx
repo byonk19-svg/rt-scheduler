@@ -1,4 +1,13 @@
-import { AlertCircle, CalendarDays, CheckCircle2, Plus } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowRightLeft,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Inbox,
+  Plus,
+  ShieldCheck,
+} from 'lucide-react'
 
 import type { OpenRequest } from '@/components/requests/request-page-model'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
@@ -38,36 +47,53 @@ export function RequestsHistoryView({
   onWithdrawRequest,
 }: RequestsHistoryViewProps) {
   const isTherapistSwapsSurface = surface === 'therapist-swaps'
+  const heroTitle = isTherapistSwapsSurface ? 'Trade & Coverage Requests' : 'My Requests'
+  const heroSubtitle = isTherapistSwapsSurface
+    ? 'Track trade requests, coverage requests, teammate responses, and manager review for your published shifts.'
+    : 'Track what is waiting on you, your teammate, or the manager.'
 
   return (
-    <div className="space-y-3">
-      <ManagerWorkspaceHeader
-        title={isTherapistSwapsSurface ? 'Trade & Coverage Requests' : 'My Requests'}
-        subtitle={
-          isTherapistSwapsSurface
-            ? 'Track trade requests, coverage requests, teammate responses, and manager review for your published shifts.'
-            : 'Track what is waiting on you, your teammate, or the manager.'
-        }
-        summary={
-          <div className="flex flex-wrap items-center gap-2 text-foreground">
-            <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
-              {totalRequests} open total
-            </span>
-            <span className="inline-flex items-center rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-text)]">
-              {pendingCount} pending
-            </span>
-            <span className="inline-flex items-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--success-text)]">
-              {approvedCount} approved
-            </span>
+    <div className="relative left-1/2 w-[min(calc(100vw-5rem),1760px)] -translate-x-1/2 space-y-4 max-lg:left-auto max-lg:w-full max-lg:translate-x-0">
+      <section className="fade-up overflow-hidden rounded-[1.25rem] border border-border/70 bg-card shadow-tw-panel">
+        <div className="teamwise-grid-bg-subtle grid gap-5 px-5 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] lg:items-end">
+          <ManagerWorkspaceHeader
+            title={heroTitle}
+            subtitle={heroSubtitle}
+            compact
+            className="py-0"
+            summary={
+              <div className="flex flex-wrap items-center gap-2 text-foreground">
+                <RequestMetricPill
+                  icon={<Inbox className="h-3.5 w-3.5" />}
+                  label={`${totalRequests} open total`}
+                />
+                <RequestMetricPill
+                  icon={<Clock3 className="h-3.5 w-3.5" />}
+                  label={`${pendingCount} pending`}
+                  tone="warning"
+                />
+                <RequestMetricPill
+                  icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                  label={`${approvedCount} approved`}
+                  tone="success"
+                />
+              </div>
+            }
+            actions={
+              <Button size="sm" className="shadow-tw-primary-glow" onClick={onNewRequest}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                New request
+              </Button>
+            }
+          />
+
+          <div className="grid gap-2 rounded-2xl border border-border/70 bg-background/70 p-3 shadow-tw-panel-inner-soft">
+            <WorkflowStep icon={<ArrowRightLeft className="h-4 w-4" />} label="Request opened" />
+            <WorkflowStep icon={<Clock3 className="h-4 w-4" />} label="Teammate or board waits" />
+            <WorkflowStep icon={<ShieldCheck className="h-4 w-4" />} label="Manager decides" />
           </div>
-        }
-        actions={
-          <Button size="sm" onClick={onNewRequest}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New request
-          </Button>
-        }
-      />
+        </div>
+      </section>
 
       {error ? (
         <div className="flex items-center gap-2 rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
@@ -76,9 +102,9 @@ export function RequestsHistoryView({
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-border bg-card px-4 py-3">
-        <p className="text-xs font-semibold text-foreground">How requests work</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+      <div className="fade-up rounded-xl border border-border bg-card px-4 py-3 shadow-tw-sm">
+        <p className="text-xs font-semibold text-foreground">Current workflow</p>
+        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
           {isTherapistSwapsSurface
             ? 'Direct trade requests wait for your teammate first. Team-board trade requests wait for manager review. Each card shows the next step first.'
             : 'Direct requests wait for teammate response first. Board requests wait for manager review. Each card shows the next step first.'}
@@ -92,8 +118,8 @@ export function RequestsHistoryView({
           <SkeletonListItem />
         </div>
       ) : requests.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card px-6 py-10 text-center">
-          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-muted">
+        <div className="fade-up rounded-[1.25rem] border border-dashed border-border bg-card px-6 py-10 text-center shadow-tw-panel-inner-soft">
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-muted">
             <CalendarDays className="h-5 w-5 text-muted-foreground" />
           </div>
           <p className="mb-1 text-sm font-bold text-foreground">No requests yet</p>
@@ -123,7 +149,7 @@ export function RequestsHistoryView({
             <div
               key={request.id}
               className={cn(
-                'rounded-xl border bg-card p-4',
+                'fade-up overflow-hidden rounded-[1.15rem] border bg-card shadow-tw-panel-inner-soft transition-[border-color,box-shadow] hover:shadow-tw-panel',
                 isSelected
                   ? 'border-primary shadow-md ring-2 ring-primary/20'
                   : isPending
@@ -131,9 +157,9 @@ export function RequestsHistoryView({
                     : 'border-border'
               )}
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
+              <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,300px)]">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span
                       className={cn(
                         'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
@@ -158,22 +184,40 @@ export function RequestsHistoryView({
                   </div>
 
                   <p className="mt-3 text-base font-semibold text-foreground">{request.message}</p>
-                </div>
-                <span className="text-xs text-muted-foreground">{request.posted}</span>
-              </div>
 
-              <div className="mt-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Next step
-                </p>
-                <p className="mt-1 text-base font-semibold text-foreground">{request.stageLabel}</p>
-                {request.stageDetail ? (
-                  <p className="mt-1 text-sm text-muted-foreground">{request.stageDetail}</p>
-                ) : null}
+                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2 py-1">
+                    <CalendarDays className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs font-medium text-foreground">{request.shift}</span>
+                  </div>
+
+                  {request.swapWith ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {getRequestPartnerLabel(request)}:{' '}
+                      <span className="font-medium text-foreground">{request.swapWith}</span>
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Next step
+                    </p>
+                    <span className="text-xs text-muted-foreground">{request.posted}</span>
+                  </div>
+                  <p className="mt-2 text-base font-semibold text-foreground">
+                    {request.stageLabel}
+                  </p>
+                  {request.stageDetail ? (
+                    <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                      {request.stageDetail}
+                    </p>
+                  ) : null}
+                </div>
               </div>
 
               {isSelected ? (
-                <div className="mt-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3">
+                <div className="mx-4 mb-4 rounded-xl border border-border/70 bg-background/60 px-3 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Request timeline
                   </p>
@@ -207,20 +251,8 @@ export function RequestsHistoryView({
                 </div>
               ) : null}
 
-              <div className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2 py-1">
-                <CalendarDays className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs font-medium text-foreground">{request.shift}</span>
-              </div>
-
-              {request.swapWith ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {getRequestPartnerLabel(request)}:{' '}
-                  <span className="font-medium text-foreground">{request.swapWith}</span>
-                </p>
-              ) : null}
-
               {request.status === 'approved' ? (
-                <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[var(--success-text)]">
+                <div className="mx-4 mb-3 flex items-center gap-1.5 text-xs font-medium text-[var(--success-text)]">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   Approved by manager
                 </div>
@@ -228,7 +260,7 @@ export function RequestsHistoryView({
               {pickupInterestCopy ? (
                 <div
                   className={cn(
-                    'mt-2 flex items-center gap-1.5 text-xs font-medium',
+                    'mx-4 mb-3 flex items-center gap-1.5 text-xs font-medium',
                     request.status === 'selected'
                       ? 'text-[var(--success-text)]'
                       : 'text-muted-foreground'
@@ -239,7 +271,7 @@ export function RequestsHistoryView({
                 </div>
               ) : null}
               {request.visibility === 'direct' && request.recipientResponse ? (
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="mx-4 mb-3 text-xs text-muted-foreground">
                   Recipient response:{' '}
                   <span className="font-medium text-foreground capitalize">
                     {request.recipientResponse}
@@ -247,14 +279,14 @@ export function RequestsHistoryView({
                 </p>
               ) : null}
               {request.visibility === 'direct' && request.status === 'withdrawn' ? (
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="mx-4 mb-3 text-xs text-muted-foreground">
                   This direct request was withdrawn before final approval.
                 </p>
               ) : null}
               {request.visibility === 'direct' &&
               request.involvement === 'received_direct' &&
               request.recipientResponse === 'pending' ? (
-                <div className="mt-3 flex gap-2">
+                <div className="flex gap-2 border-t border-border/70 bg-background/45 px-4 py-3">
                   <Button
                     size="sm"
                     onClick={() => void onRespondDirectRequest(request.id, 'accepted')}
@@ -272,7 +304,7 @@ export function RequestsHistoryView({
               ) : request.involvement === 'posted' &&
                 request.requestKind !== 'call_in' &&
                 request.status === 'pending' ? (
-                <div className="mt-3 flex gap-2">
+                <div className="flex gap-2 border-t border-border/70 bg-background/45 px-4 py-3">
                   <Button
                     size="sm"
                     variant="outline"
@@ -283,7 +315,7 @@ export function RequestsHistoryView({
                 </div>
               ) : request.involvement === 'interest' &&
                 (request.status === 'pending' || request.status === 'selected') ? (
-                <div className="mt-3 flex gap-2">
+                <div className="flex gap-2 border-t border-border/70 bg-background/45 px-4 py-3">
                   <Button
                     size="sm"
                     variant="outline"
@@ -299,6 +331,43 @@ export function RequestsHistoryView({
           )
         })
       )}
+    </div>
+  )
+}
+
+function RequestMetricPill({
+  icon,
+  label,
+  tone = 'neutral',
+}: {
+  icon: React.ReactNode
+  label: string
+  tone?: 'neutral' | 'success' | 'warning'
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+        tone === 'success'
+          ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+          : tone === 'warning'
+            ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+            : 'border-border bg-card/90 text-foreground'
+      )}
+    >
+      {icon}
+      {label}
+    </span>
+  )
+}
+
+function WorkflowStep({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]">
+        {icon}
+      </span>
+      <span className="text-sm font-semibold text-foreground">{label}</span>
     </div>
   )
 }
