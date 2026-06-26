@@ -6,7 +6,9 @@ import path from 'node:path'
 import { inflateRawSync } from 'node:zlib'
 
 const repoRoot = process.cwd()
-const workbookPath = path.join(repoRoot, 'docs', 'teamwise-feature-user-story-tracker.xlsx')
+const workbookPath = process.env.TEAMWISE_TRACKER_WORKBOOK
+  ? path.resolve(repoRoot, process.env.TEAMWISE_TRACKER_WORKBOOK)
+  : path.join(repoRoot, 'docs', 'teamwise-feature-user-story-tracker.xlsx')
 
 if (!existsSync(workbookPath)) {
   fail([`Workbook not found: ${path.relative(repoRoot, workbookPath)}`])
@@ -14,6 +16,14 @@ if (!existsSync(workbookPath)) {
 
 const trackedFiles = gitTrackedFiles()
 const workbook = readWorkbook(workbookPath)
+
+const errors = []
+const warnings = []
+
+expectWorkbookShape(workbook, errors, warnings)
+if (errors.length > 0) {
+  fail(errors, warnings)
+}
 
 const routeRows = rowsByHeader(workbook, 'Route Inventory')
 const testRows = rowsByHeader(workbook, 'Test Mapping')
@@ -25,9 +35,6 @@ const trackedTestFiles = trackedFiles.filter(isTrackedTestFile)
 
 const routeInventoryFiles = uniqueValues(routeRows, 'Source File')
 const testMappingFiles = uniqueValues(testRows, 'Test File')
-
-const errors = []
-const warnings = []
 
 expectNoDuplicateValues({
   label: 'Route Inventory',
@@ -99,6 +106,135 @@ printWarnings(warnings)
 console.log(`Stories: ${storyRows.length}`)
 console.log(`Route/source entries: ${routeRows.length}`)
 console.log(`Automated test files indexed: ${testMappingFiles.length}`)
+
+function requiredWorkbookHeaders() {
+  return new Map([
+    [
+      'User Stories',
+      [
+        'Story ID',
+        'Epic',
+        'Feature',
+        'Persona',
+        'Route/API Surface',
+        'User Story',
+        'Expected Behavior',
+        'Source Evidence',
+        'Priority',
+        'Story Status',
+        'Verification Status',
+        'Manual Test Status',
+        'Automated Coverage',
+        'Defect IDs',
+        'Notes',
+      ],
+    ],
+    [
+      'Route Inventory',
+      ['Source File', 'Route/API Surface', 'File Kind', 'Mapped Story ID', 'Notes'],
+    ],
+    ['Test Mapping', ['Test File', 'Mapped Story ID', 'Coverage Type', 'Review Status']],
+    [
+      'Defects',
+      [
+        'Defect ID',
+        'Story ID',
+        'Severity',
+        'Status',
+        'Route/API Surface',
+        'Observed Behavior',
+        'Expected Behavior',
+        'Repro Steps',
+        'Evidence',
+        'Owner/Notes',
+        'Fix Commit',
+        'Retest Result',
+      ],
+    ],
+    [
+      'Test Runs',
+      [
+        'Run ID',
+        'Date',
+        'Scope',
+        'Command/Browser Path',
+        'Environment',
+        'Result',
+        'Stories Covered',
+        'Artifacts',
+        'Notes',
+      ],
+    ],
+    ['Summary', ['Field', 'Value']],
+  ])
+}
+
+function expectWorkbookShape(workbook, errors, warnings) {
+  const requiredSheets = requiredWorkbookHeaders()
+
+  for (const [sheetName, requiredHeaders] of requiredSheets) {
+    const rows = workbook.sheets.get(sheetName)
+    if (!rows) {
+      errors.push(`Missing workbook sheet: ${sheetName}`)
+      continue
+    }
+
+    const headers = readHeaderRow(rows)
+    expectHeaderShape({
+      sheetName,
+      headers,
+      requiredHeaders,
+      errors,
+      warnings,
+    })
+  }
+}
+
+function readHeaderRow(rows) {
+  const [headerRow] = rows
+  return (headerRow ?? []).map((value) => normalizeCell(value))
+}
+
+function expectHeaderShape({ sheetName, headers, requiredHeaders, errors, warnings }) {
+  const required = new Set(requiredHeaders)
+  const seen = new Set()
+  const duplicates = new Set()
+  const blanks = []
+
+  headers.forEach((header, index) => {
+    if (!header) {
+      blanks.push(index + 1)
+      return
+    }
+    if (seen.has(header)) duplicates.add(header)
+    seen.add(header)
+  })
+
+  if (headers.length === 0) {
+    errors.push(`${sheetName}: missing header row`)
+    return
+  }
+
+  if (blanks.length > 0) {
+    errors.push(`${sheetName}: blank header cells at positions ${blanks.join(', ')}`)
+  }
+
+  if (duplicates.size > 0) {
+    errors.push(`${sheetName}: duplicate headers:\n${formatList([...duplicates].sort())}`)
+  }
+
+  const missing = requiredHeaders.filter((header) => !seen.has(header))
+  if (missing.length > 0) {
+    errors.push(`${sheetName}: missing required headers:\n${formatList(missing)}`)
+  }
+
+  const unexpected = headers.filter((header) => header && !required.has(header))
+  if (unexpected.length > 0) {
+    warnings.push(
+      `${sheetName}: unexpected headers:\n${formatList([...new Set(unexpected)].sort())}`
+    )
+  }
+}
 
 function gitTrackedFiles() {
   return execFileSync('git', ['ls-files'], {

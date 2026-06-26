@@ -61,6 +61,7 @@ npm run validate:teamwise
 
 The validator compares the workbook against tracked source files. It fails when:
 
+- a required workbook sheet or required sheet header is missing
 - a current `src/app` route/layout/loading/error/not-found/action/API file is
   missing from `Route Inventory`
 - a current e2e or unit/spec test file is missing from `Test Mapping`
@@ -68,7 +69,11 @@ The validator compares the workbook against tracked source files. It fails when:
   stale
 
 It warns when a workbook inventory row points to a file that is no longer tracked
-by git. Treat warnings as cleanup prompts, not automatic blockers.
+by git, or when a sheet has an unexpected extra header. Treat warnings as cleanup
+prompts, not automatic blockers.
+
+For validator development, set `TEAMWISE_TRACKER_WORKBOOK` to point at a
+temporary workbook copy before running the command.
 
 For behavior changes, also run the focused tests or browser checks that prove the
 story. The tracker validation only proves that the workbook inventory did not

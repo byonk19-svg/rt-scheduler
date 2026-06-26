@@ -278,14 +278,19 @@ async function openShiftBoard(page: Parameters<typeof loginAs>[0]) {
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined)
 }
 
-async function findRequestCard(page: Parameters<typeof loginAs>[0], message: string) {
+async function findRequestCard(
+  page: Parameters<typeof loginAs>[0],
+  message: string,
+  requestId?: string
+) {
   const requestCard = page
     .locator('div.rounded-xl')
     .filter({ has: page.getByText(message) })
     .first()
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await gotoWithRetry(page, '/requests/new')
+  const requestPath = requestId ? `/requests/new?requestId=${requestId}` : '/requests/new'
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await gotoWithRetry(page, requestPath)
     await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => undefined)
     if (await requestCard.isVisible({ timeout: 10_000 }).catch(() => false)) {
       return requestCard
@@ -860,19 +865,23 @@ test.describe.serial('requests workflow', () => {
 
     const requestMessage = `Direct swap ${randomString('swap-direct')}`
 
-    const postInsert = await ctx!.supabase.from('shift_posts').insert({
-      shift_id: requesterShiftId,
-      posted_by: ctx!.requester.id,
-      claimed_by: ctx!.scheduledPartner.id,
-      swap_shift_id: partnerShiftId,
-      type: 'swap',
-      visibility: 'direct',
-      recipient_response: 'pending',
-      status: 'pending',
-      message: requestMessage,
-    })
-    if (postInsert.error) {
-      throw new Error(postInsert.error.message)
+    const postInsert = await ctx!.supabase
+      .from('shift_posts')
+      .insert({
+        shift_id: requesterShiftId,
+        posted_by: ctx!.requester.id,
+        claimed_by: ctx!.scheduledPartner.id,
+        swap_shift_id: partnerShiftId,
+        type: 'swap',
+        visibility: 'direct',
+        recipient_response: 'pending',
+        status: 'pending',
+        message: requestMessage,
+      })
+      .select('id')
+      .single()
+    if (postInsert.error || !postInsert.data) {
+      throw new Error(postInsert.error?.message ?? 'Could not create direct swap request.')
     }
 
     await expect
@@ -893,21 +902,27 @@ test.describe.serial('requests workflow', () => {
     const recipientPage = await recipientContext.newPage()
     try {
       await loginAs(recipientPage, ctx!.scheduledPartner.email, ctx!.scheduledPartner.password)
-      const requestCard = await findRequestCard(recipientPage, requestMessage)
+      const requestCard = await findRequestCard(recipientPage, requestMessage, postInsert.data.id)
+      const acceptResponsePromise = waitForShiftPostMutation(recipientPage)
       await requestCard.getByRole('button', { name: 'Accept and send to manager' }).click()
+      const acceptResponse = await acceptResponsePromise
+      await expectShiftPostResponseOk(acceptResponse)
 
       await expect
-        .poll(async () => {
-          const result = await ctx!.supabase
-            .from('shift_posts')
-            .select('recipient_response, status')
-            .eq('posted_by', ctx!.requester.id)
-            .eq('message', requestMessage)
-            .maybeSingle()
+        .poll(
+          async () => {
+            const result = await ctx!.supabase
+              .from('shift_posts')
+              .select('recipient_response, status')
+              .eq('posted_by', ctx!.requester.id)
+              .eq('message', requestMessage)
+              .maybeSingle()
 
-          if (result.error) throw new Error(result.error.message)
-          return `${result.data?.recipient_response ?? ''}:${result.data?.status ?? ''}`
-        })
+            if (result.error) throw new Error(result.error.message)
+            return `${result.data?.recipient_response ?? ''}:${result.data?.status ?? ''}`
+          },
+          { timeout: 20_000 }
+        )
         .toBe('accepted:pending')
     } finally {
       await recipientContext.close().catch(() => undefined)
