@@ -13,9 +13,9 @@
 - `git fetch origin` - passed
 - `git merge --ff-only origin/main` - passed; local branch was behind current `origin/main`
 - `npm install` - passed, 8 vulnerabilities reported
-- `npm run test:unit` - initial stale checkout failed; after sync, parallel unit tests passed and browser-backed subset passed on focused rerun
+- `npm run test:unit` - parallel unit tests passed; browser-backed subset initially timed out under parallel repo load and passed on focused rerun
 - `npm run lint` - passed after sync
-- `npm run build` - passed after deleting stale generated `.next` output
+- `npm run build` - initial run collided with an active Next build lock; passed on sequential rerun
 
 ## Files Changed
 
@@ -23,8 +23,7 @@
 
 ## What Was Fixed
 
-- Fast-forwarded the reset branch to current `origin/main`.
-- Removed stale generated `.next` output that referenced old `.next/dev/types` and caused a false build type error.
+- No code fixes were needed. The earlier failures were verification-environment issues: a browser-backed test timeout under parallel load and a concurrent Next build lock.
 
 ## Remaining Issues
 
