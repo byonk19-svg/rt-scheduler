@@ -15,7 +15,15 @@ Recent work improved the schedule mutation path without intentionally changing b
 - `ScheduleGrid` now prefers typed `error.code` handling before the legacy message-string fallback.
 - `DragAction` and `parseActionBody` were extracted to `src/lib/schedule-mutations/parse-action-body.ts`.
 - Manager authorization and manager site-scope loading were extracted to `src/lib/schedule-mutations/authorize-manager.ts`.
-- Focused tests were added or updated for typed error codes, parser behavior, manager authorization, and the drag-drop route.
+- Schedule Block loading, site-scope validation, and read-only validation were extracted to `src/lib/schedule-mutations/load-cycle.ts`.
+- Therapist assignment and lead-eligibility validation were extracted to `src/lib/schedule-mutations/validate-therapist.ts`.
+- Availability conflict validation was extracted to `src/lib/schedule-mutations/validate-availability.ts`.
+- Daily coverage and weekly limit validation were extracted to `src/lib/schedule-mutations/validate-limits.ts`.
+- The assign mutation branch was extracted to `src/lib/schedule-mutations/assign-shift.ts`.
+- The move mutation branch was extracted to `src/lib/schedule-mutations/move-shift.ts`.
+- The remove mutation branch was extracted to `src/lib/schedule-mutations/remove-shift.ts`.
+- The `set_lead` mutation branch was extracted to `src/lib/schedule-mutations/set-lead.ts`.
+- Focused tests were added or updated for typed error codes, parser behavior, manager authorization, Schedule Block loading, therapist validation, availability validation, limit validation, assign behavior, move behavior, remove behavior, set-lead behavior, and the drag-drop route.
 - Behavior was intentionally preserved during these changes.
 
 ## Current Route Responsibilities
@@ -28,17 +36,12 @@ Recent work improved the schedule mutation path without intentionally changing b
 - Request parsing.
 - Schedule Block cycle loading and site validation.
 - Cycle state and read-only validation.
-- Therapist profile validation.
-- Availability and work-pattern validation.
-- Coverage limit validation.
-- Weekly limit validation.
-- Assign branch.
-- Move branch.
-- Remove branch.
-- `set_lead` branch.
-- Shift-post cleanup.
-- Audit logging.
-- Preliminary and published schedule notifications.
+- Schedule mutation use-case helper dispatch.
+- Assign branch helper call.
+- Move branch helper call.
+- Remove branch helper call.
+- `set_lead` branch helper call.
+- Shared post-publish audit eligibility helper.
 
 ## Why The Route Remains High Risk
 
@@ -50,7 +53,7 @@ The app is still demo-stage unless production deployment, secrets, Supabase proj
 
 ## Recommended Next Extraction Sequence
 
-### A. Extract Cycle Loading And Cycle State Validation
+### A. Done: Extract Cycle Loading And Cycle State Validation
 
 Goal: Move Schedule Block lookup, manager site check, and read-only state checks behind a small helper.
 
@@ -77,7 +80,7 @@ What not to change:
 - Do not change preliminary snapshot loading.
 - Do not extract mutation branches in this step.
 
-### B. Extract Therapist Profile, Site, Active, FMLA, And Shift-Type Validation
+### B. Done: Extract Therapist Profile, Site, Active, FMLA, And Shift-Type Validation
 
 Goal: Move repeated therapist profile validation into a helper that can be reused by assign, move, and `set_lead` paths.
 
@@ -103,9 +106,11 @@ What not to change:
 - Do not change which roles can be designated lead.
 - Do not change existing profile query filters or site-scope behavior.
 
-### C. Extract Availability Conflict Validation
+### C. Done: Extract Availability Conflict Validation
 
 Goal: Move availability and work-pattern validation plus availability conflict response construction into a focused helper.
+
+Completed in `src/lib/schedule-mutations/validate-availability.ts`. The helper preserves current behavior: inactive/FMLA and PRN-not-offered states remain non-overridable `therapist_unassignable` failures, while ordinary availability conflicts remain overridable only when the manager confirms `availabilityOverride`.
 
 Likely files touched:
 
@@ -129,9 +134,11 @@ What not to change:
 - Do not change force-off, force-on, PRN, inactive, or FMLA semantics.
 - Do not remove availability override metadata handling from the mutation branches yet.
 
-### D. Extract Coverage And Weekly Limit Validation
+### D. Done: Extract Coverage And Weekly Limit Validation
 
 Goal: Move daily coverage and weekly limit checks into shared helpers for assign, move, and `set_lead`.
+
+Completed in `src/lib/schedule-mutations/validate-limits.ts`. The helper preserves current behavior: `overrideWeeklyRules` bypasses the checks, move validation excludes the moved shift from counts, non-working moved statuses still skip limit validation, active operational entries do not count toward daily coverage, and route-ready error messages/codes are unchanged.
 
 Likely files touched:
 
@@ -157,9 +164,11 @@ What not to change:
 - Do not change operational status handling in coverage counts.
 - Do not change override behavior.
 
-### E. Extract Assign Use Case
+### E. Done: Extract Assign Use Case
 
 Goal: Move the assign branch into a use-case function after its validation helpers are stable.
+
+Completed in `src/lib/schedule-mutations/assign-shift.ts`. The route now delegates assign requests to a focused use-case module while preserving insert payload shape, undo payload shape, duplicate-shift behavior, availability override metadata, shift-added audit logging, post-publish audit logging, and preliminary/published add notifications.
 
 Likely files touched:
 
@@ -185,9 +194,11 @@ What not to change:
 - Do not change audit action names.
 - Do not change notification targets or messages.
 
-### F. Extract Move Use Case
+### F. Done: Extract Move Use Case
 
 Goal: Move the move branch into a use-case function after shared validation helpers are stable.
+
+Completed in `src/lib/schedule-mutations/move-shift.ts`. The route now delegates move requests to a focused use-case module while preserving shift lookup/site checks, same-slot no-op behavior, assigned-therapist validation, availability and limit validation, update payload shape, duplicate-target handling, Shift Board cleanup, preliminary/published move notifications, post-publish audit behavior, and undo payload shape.
 
 Likely files touched:
 
@@ -214,9 +225,11 @@ What not to change:
 - Do not change audit conditions.
 - Do not change cleanup timing.
 
-### G. Extract Remove Use Case
+### G. Done: Extract Remove Use Case
 
 Goal: Move the remove branch into a use-case function.
+
+Completed in `src/lib/schedule-mutations/remove-shift.ts`. The route now delegates remove requests to a focused use-case module while preserving lookup-by-id and lookup-by-slot behavior, site checks, shift-post history preservation before deletion, blocking cleanup failure behavior, delete filters, shift-removed audit logging, preliminary/published remove notifications, post-publish audit behavior, and undo payload shape.
 
 Likely files touched:
 
@@ -243,9 +256,11 @@ What not to change:
 - Do not change shift-post cleanup reason text.
 - Do not change published or preliminary remove notifications.
 
-### H. Extract `set_lead` Use Case
+### H. Done: Extract `set_lead` Use Case
 
 Goal: Move the designated lead branch into a use-case function.
+
+Completed in `src/lib/schedule-mutations/set-lead.ts`. The route now delegates `set_lead` requests to a focused use-case module while preserving lead eligibility validation, availability and limit validation, existing-shift handling, `setDesignatedLeadMutation` semantics, multiple-lead prevention responses, availability override metadata updates, cleanup behavior, published add notifications for newly-created lead shifts, designated-lead and post-publish audit logging, and response shape.
 
 Likely files touched:
 
@@ -272,7 +287,7 @@ What not to change:
 - Do not change how a missing existing shift is handled.
 - Do not change designated lead audit target IDs.
 
-### I. Later Only: Transaction, RPC, Or Outbox Hardening
+### I. Next Later Only: Transaction, RPC, Or Outbox Hardening
 
 Goal: Consider stronger consistency guarantees only if production or real multi-manager editing creates a concrete need.
 
@@ -312,5 +327,5 @@ What not to change:
 ## Suggested Next Prompt
 
 ```text
-Extract cycle loading and cycle state validation from drag-drop/route.ts without changing behavior.
+Evaluate whether schedule mutations need transaction, RPC, or outbox hardening based on real concurrent-edit evidence.
 ```
