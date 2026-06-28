@@ -111,6 +111,22 @@ const dragDropRouteSource = readFileSync(
   resolve(process.cwd(), 'src/app/api/schedule/drag-drop/route.ts'),
   'utf8'
 )
+const assignShiftSource = readFileSync(
+  resolve(process.cwd(), 'src/lib/schedule-mutations/assign-shift.ts'),
+  'utf8'
+)
+const moveShiftSource = readFileSync(
+  resolve(process.cwd(), 'src/lib/schedule-mutations/move-shift.ts'),
+  'utf8'
+)
+const removeShiftSource = readFileSync(
+  resolve(process.cwd(), 'src/lib/schedule-mutations/remove-shift.ts'),
+  'utf8'
+)
+const setLeadSource = readFileSync(
+  resolve(process.cwd(), 'src/lib/schedule-mutations/set-lead.ts'),
+  'utf8'
+)
 const loadScheduleMutationCycleSource = readFileSync(
   resolve(process.cwd(), 'src/lib/schedule-mutations/load-cycle.ts'),
   'utf8'
@@ -224,8 +240,9 @@ describe('schedule lifecycle hardening', () => {
       ".select('id, site_id, start_date, end_date, published, status, archived_at')"
     )
     expect(loadScheduleMutationCycleSource).toContain('cycle.site_id !== managerSiteId')
-    expect(dragDropRouteSource).toContain('validateAssignableTherapist')
-    expect(dragDropRouteSource).toContain('validateLeadEligibleTherapist')
+    expect(assignShiftSource).toContain('validateAssignableTherapist')
+    expect(moveShiftSource).toContain('validateAssignableTherapist')
+    expect(setLeadSource).toContain('validateLeadEligibleTherapist')
     expect(validateTherapistSource).toContain(
       "select('site_id, shift_type, is_active, archived_at, on_fmla')"
     )
@@ -233,7 +250,10 @@ describe('schedule lifecycle hardening', () => {
     expect(validateTherapistSource).toContain('Boolean(therapist.archived_at)')
     expect(validateTherapistSource).toContain('therapist.on_fmla === true')
     expect(dragDropRouteSource).toContain(".eq('cycle_id', payload.cycleId)")
-    expect(dragDropRouteSource).toContain(".eq('site_id', managerSiteId)")
+    expect(assignShiftSource).toContain('site_id: managerSiteId')
+    expect(moveShiftSource).toContain(".eq('site_id', managerSiteId)")
+    expect(removeShiftSource).toContain(".eq('site_id', managerSiteId)")
+    expect(setLeadSource).toContain(".eq('site_id', managerSiteId)")
     expect(assignmentStatusRouteSource).toContain(
       ".select('id, site_id, user_id, schedule_cycles(published, status, archived_at)')"
     )
