@@ -103,7 +103,11 @@ function renderTable(dataset: GridDataset, interactionsDisabled = false) {
 }
 
 function getCellButton(html: string, userId: string, date: string) {
-  return html.match(new RegExp(`<button[^>]*data-testid="cell-${userId}-${date}"[^>]*>`))?.[0] ?? ''
+  return (
+    html.match(
+      new RegExp(`<button[^>]*data-testid="cell-${userId}-${date}"[^>]*>[\\s\\S]*?</button>`)
+    )?.[0] ?? ''
+  )
 }
 
 function makeDatasetWithAliceCell(
@@ -138,7 +142,7 @@ describe('ScheduleGridTable', () => {
     expect(html).toContain('data-testid="cell-u1-2026-05-04"')
     expect(html).toContain('bg-yellow-200')
     expect(html).toContain('border-yellow-300')
-    expect(html).toContain('>1</button>')
+    expect(html).toContain('>1</span></button>')
   })
 
   it('renders a needs-off asterisk', () => {
@@ -321,6 +325,36 @@ describe('ScheduleGridTable', () => {
     expect(staffCell).not.toContain('data-actionable')
     expect(staffCell).not.toContain('aria-haspopup')
     expect(staffCell).not.toContain('after:h-px')
+  })
+
+  it('uses larger touch targets while preserving compact visual cell marks', () => {
+    const managerHtml = renderTable(makeDataset())
+    const managerCell = getCellButton(managerHtml, 'u1', '2026-05-04')
+
+    expect(managerCell).toContain('[@media(pointer:coarse)]:min-h-11')
+    expect(managerCell).toContain('[@media(pointer:coarse)]:min-w-11')
+    expect(managerCell).not.toContain('-m-3.5')
+    expect(managerCell).toContain('touch-manipulation')
+    expect(managerCell).toContain('min-h-4')
+    expect(managerCell).toContain('min-w-4')
+
+    const staffHtml = renderTable(
+      makeDataset({
+        viewerUserId: 'u1',
+        viewerRole: 'therapist',
+        interactionMode: STAFF_VIEW_MODE,
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: false,
+        isPublished: true,
+      })
+    )
+    const staffCell = getCellButton(staffHtml, 'u1', '2026-05-04')
+
+    expect(staffCell).toContain('[@media(pointer:coarse)]:min-h-11')
+    expect(staffCell).toContain('[@media(pointer:coarse)]:min-w-11')
+    expect(staffCell).not.toContain('-m-3.5')
+    expect(staffCell).toContain('touch-manipulation')
+    expect(staffCell).toContain('disabled=""')
   })
 
   it('pins the viewer row for staff viewers', () => {

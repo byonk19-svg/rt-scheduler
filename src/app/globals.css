@@ -124,6 +124,8 @@ html {
   /* Marketing/auth deep-teal hero — distinct from --primary (button teal) so the hero gets the
      near-black-green #1b3836 from the design handoff while buttons stay at the lifted #276e66. */
   --marketing-hero-bg: hsl(174 35% 16%);
+  --marketing-hero-muted: hsl(174 12% 78%);
+  --marketing-hero-subtle: hsl(174 10% 70%);
 
   /* Auth right-side form-panel surface (slightly grayer than --background, matches design's --bg-form #f5f4f1) */
   --auth-form-bg: hsl(40 12% 95%);
@@ -208,6 +210,8 @@ html {
 
   --highlight: hsl(174 60% 50%);
   --attention: hsl(38 75% 52%);
+  --marketing-hero-muted: hsl(174 12% 78%);
+  --marketing-hero-subtle: hsl(174 10% 70%);
 
   --logo-mark-background: hsl(220 12% 92%);
   --logo-mark-primary: hsl(38 70% 45%);
@@ -290,6 +294,14 @@ html {
 
 .teamwise-public-grid-bg-lg {
   background-size: 40px 40px;
+}
+
+.text-hero-muted {
+  color: var(--marketing-hero-muted);
+}
+
+.text-hero-subtle {
+  color: var(--marketing-hero-subtle);
 }
 
 .teamwise-surface {

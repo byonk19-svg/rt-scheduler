@@ -492,7 +492,7 @@ export default function ShiftBoardClientPage({
         style={{ animationDelay: '0.1s' }}
       >
         {isStaffRole && (
-          <div className="flex gap-1">
+          <div className="flex gap-1" role="group" aria-label="Post scope">
             <FilterPill
               label="My Requests"
               active={scope === 'mine'}
@@ -788,7 +788,7 @@ function FilterSelect({
   )
 }
 
-function FilterButtonGroup({
+export function FilterButtonGroup({
   label,
   value,
   options,
@@ -800,11 +800,12 @@ function FilterButtonGroup({
   onChange: (value: string) => void
 }) {
   return (
-    <div className="flex items-center gap-1" aria-label={label}>
+    <div className="flex items-center gap-1" role="group" aria-label={label}>
       {options.map(([optionValue, optionLabel]) => (
         <button
           key={optionValue}
           type="button"
+          aria-pressed={value === optionValue}
           onClick={() => onChange(optionValue)}
           className={cn(
             'h-9 rounded-md border px-3 text-xs font-semibold transition-colors',
@@ -820,7 +821,7 @@ function FilterButtonGroup({
   )
 }
 
-function FilterPill({
+export function FilterPill({
   label,
   active,
   onClick,
@@ -832,6 +833,7 @@ function FilterPill({
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={cn(
         'h-9 rounded-md border px-3 text-xs font-semibold transition-colors',

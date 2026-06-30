@@ -126,13 +126,13 @@ export default function SignUpPage() {
           </div>
           <div>
             <p className="font-heading text-base font-bold text-white">Teamwise</p>
-            <p className="text-[0.7rem] text-white/45">Respiratory Therapy</p>
+            <p className="text-hero-subtle text-[0.7rem]">Respiratory Therapy</p>
           </div>
         </div>
         <div className="relative space-y-5">
           <div className="flex items-center gap-2.5">
             <div className="h-[2.5px] w-8 shrink-0 rounded-full bg-[var(--attention)]" />
-            <p className="text-[0.6rem] font-bold uppercase tracking-[0.18em] text-white/40">
+            <p className="text-hero-subtle text-[0.6rem] font-bold uppercase tracking-[0.18em]">
               Scheduling for RT teams
             </p>
           </div>
@@ -140,7 +140,7 @@ export default function SignUpPage() {
             <p className="font-display text-[2.625rem] font-normal leading-[1.08] tracking-[-0.02em] text-white">
               Scheduling that keeps care moving.
             </p>
-            <p className="text-sm leading-relaxed text-white/[0.42]">
+            <p className="text-hero-muted text-sm leading-relaxed">
               Coverage planning, availability, and shift management — built for RT departments.
             </p>
           </div>

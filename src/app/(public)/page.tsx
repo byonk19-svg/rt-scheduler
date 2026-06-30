@@ -38,7 +38,7 @@ export default function HomePage() {
           {/* eyebrow */}
           <div className="mb-8 flex items-center gap-3">
             <div className="h-[2.5px] w-8 shrink-0 rounded-full bg-[var(--attention)]" />
-            <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-white/45">
+            <p className="text-hero-subtle text-[0.65rem] font-bold uppercase tracking-[0.18em]">
               Scheduling for RT teams
             </p>
           </div>
@@ -49,7 +49,7 @@ export default function HomePage() {
           </h1>
 
           {/* subtext */}
-          <p className="mb-12 max-w-[34ch] text-[1.06rem] leading-[1.65] text-white/50">
+          <p className="text-hero-muted mb-12 max-w-[34ch] text-[1.06rem] leading-[1.65]">
             Coverage planning, availability, and shift management — built for RT departments that
             can&apos;t afford gaps.
           </p>
@@ -71,7 +71,7 @@ export default function HomePage() {
             >
               <Link href="/signup">Request access</Link>
             </Button>
-            <span className="text-sm text-white/30">Manager approval required.</span>
+            <span className="text-hero-subtle text-sm">Manager approval required.</span>
           </div>
         </div>
 

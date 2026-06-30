@@ -439,7 +439,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              className="min-h-[44px] min-w-[44px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               onClick={() => setMobileMenuOpen((open) => !open)}
               aria-expanded={mobileMenuOpen}
               aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
@@ -550,7 +550,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  className="min-h-[44px] min-w-[44px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   onClick={() => setMobileMenuOpen(false)}
                   aria-label="Close navigation menu"
                 >
@@ -577,7 +577,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                                 key={item.href}
                                 href={item.href}
                                 className={cn(
-                                  'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                                  'flex min-h-[44px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
                                   active
                                     ? APP_SHELL_ACTIVE_NAV_CLASS
                                     : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
@@ -600,7 +600,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                           key={section.key}
                           href={section.href}
                           className={cn(
-                            'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                            'flex min-h-[44px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
                             section.isActive(pathname)
                               ? APP_SHELL_ACTIVE_NAV_CLASS
                               : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
@@ -628,7 +628,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                         key={item.href}
                         href={item.href}
                         className={cn(
-                          'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                          'flex min-h-[44px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
                           item.current
                             ? APP_SHELL_ACTIVE_NAV_CLASS
                             : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
@@ -666,7 +666,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                 {canAccessManagerUi ? (
                   <Link
                     href="/therapist"
-                    className="flex min-h-[38px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
+                    className="flex min-h-[44px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -675,7 +675,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                 ) : null}
                 <Link
                   href="/settings"
-                  className="flex min-h-[38px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/45"
+                  className="flex min-h-[44px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/45"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Settings
@@ -683,7 +683,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                 <form action="/auth/signout" method="post">
                   <button
                     type="submit"
-                    className="flex min-h-[38px] w-full items-center rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+                    className="flex min-h-[44px] w-full items-center rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
                   >
                     Log out
                   </button>

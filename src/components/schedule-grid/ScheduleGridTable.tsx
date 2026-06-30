@@ -58,6 +58,12 @@ function totalToneClass(date: string): string {
     : 'border-border/70 bg-[var(--print-paper)] text-[var(--print-ink)]'
 }
 
+const gridCellHitTargetClass =
+  'group relative inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] text-[8px] font-black leading-none tabular-nums touch-manipulation [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11'
+
+const gridCellMarkClass =
+  'inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] px-0 text-[8px] font-black leading-none tabular-nums'
+
 function dailyTotalsForRows(rows: readonly TherapistGridRow[], cycleDates: readonly string[]) {
   const totals: Record<string, number> = {}
   for (const date of cycleDates) {
@@ -325,28 +331,37 @@ function TherapistRow({
               aria-haspopup={clickable ? 'dialog' : undefined}
               title={accessibleLabel}
               className={cn(
-                'inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] px-0 text-[8px] font-black leading-none tabular-nums',
-                isViewer && !display.isEmpty && 'ring-1 ring-primary/30',
-                display.isEmpty
-                  ? 'text-[var(--print-ink-muted)] hover:bg-muted/35'
-                  : display.colorClass,
+                gridCellHitTargetClass,
                 clickable
-                  ? 'relative cursor-pointer ring-offset-background transition after:absolute after:inset-x-1 after:bottom-0.5 after:h-px after:bg-[var(--print-ink-muted)] after:content-[""] hover:ring-2 hover:ring-ring/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                  ? 'cursor-pointer ring-offset-background transition hover:ring-2 hover:ring-ring/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                   : 'cursor-default',
                 cell.isIneligible && 'opacity-45'
               )}
               disabled={!clickable}
               onClick={(event) => onCellClick?.(row.userId, date, cell, event.currentTarget)}
             >
-              {display.code}
-              {display.asterisk ? (
-                <sup
-                  data-testid={`asterisk-${row.userId}-${date}`}
-                  className="ml-px text-[6px] font-black text-[var(--print-ink)]"
-                >
-                  *
-                </sup>
-              ) : null}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  gridCellMarkClass,
+                  isViewer && !display.isEmpty && 'ring-1 ring-primary/30',
+                  display.isEmpty
+                    ? 'text-[var(--print-ink-muted)] group-hover:bg-muted/35'
+                    : display.colorClass,
+                  clickable &&
+                    'relative after:absolute after:inset-x-1 after:bottom-0.5 after:h-px after:bg-[var(--print-ink-muted)] after:content-[""]'
+                )}
+              >
+                {display.code}
+                {display.asterisk ? (
+                  <sup
+                    data-testid={`asterisk-${row.userId}-${date}`}
+                    className="ml-px text-[6px] font-black text-[var(--print-ink)]"
+                  >
+                    *
+                  </sup>
+                ) : null}
+              </span>
             </button>
           </td>
         )

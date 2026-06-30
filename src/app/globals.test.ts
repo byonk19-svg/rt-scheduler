@@ -5,6 +5,64 @@ import { describe, expect, it } from 'vitest'
 
 const cssSource = fs.readFileSync(path.join(process.cwd(), 'src/app/globals.css'), 'utf8')
 
+function readHslToken(name: string): [number, number, number] {
+  const match = cssSource.match(new RegExp(`${name}:\\s*hsl\\((\\d+)\\s+(\\d+)%\\s+(\\d+)%\\)`))
+  expect(match).toBeTruthy()
+  return [Number(match?.[1]), Number(match?.[2]), Number(match?.[3])]
+}
+
+function hslToRgb([h, s, l]: [number, number, number]): [number, number, number] {
+  const saturation = s / 100
+  const lightness = l / 100
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation
+  const x = chroma * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = lightness - chroma / 2
+  let r = 0
+  let g = 0
+  let b = 0
+
+  if (h < 60) {
+    r = chroma
+    g = x
+  } else if (h < 120) {
+    r = x
+    g = chroma
+  } else if (h < 180) {
+    g = chroma
+    b = x
+  } else if (h < 240) {
+    g = x
+    b = chroma
+  } else if (h < 300) {
+    r = x
+    b = chroma
+  } else {
+    r = chroma
+    b = x
+  }
+
+  return [r + m, g + m, b + m].map((channel) => Math.round(channel * 255)) as [
+    number,
+    number,
+    number,
+  ]
+}
+
+function relativeLuminance(rgb: [number, number, number]): number {
+  return rgb
+    .map((channel) => {
+      const value = channel / 255
+      return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+    })
+    .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0)
+}
+
+function contrastRatio(foreground: [number, number, number], background: [number, number, number]) {
+  const lighter = Math.max(relativeLuminance(foreground), relativeLuminance(background))
+  const darker = Math.min(relativeLuminance(foreground), relativeLuminance(background))
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
 describe('global CSS tokens and theme overrides', () => {
   it('does not redefine the legacy luminous-homepage tokens or utilities', () => {
     expect(cssSource).not.toContain('--home-glow-warm')
@@ -43,6 +101,20 @@ describe('global CSS tokens and theme overrides', () => {
     // is a regression — it produced the wrong (lighter) hero in production.
     expect(cssSource).toMatch(/--marketing-hero-bg:\s*hsl\(174\s+\d+%?\s+1[0-9]%/)
     expect(cssSource).not.toMatch(/--marketing-hero-bg:\s*var\(--primary\)/)
+  })
+
+  it('declares AA-safe semantic text colors for the deep marketing hero', () => {
+    expect(cssSource).toContain('--marketing-hero-muted:')
+    expect(cssSource).toContain('--marketing-hero-subtle:')
+    expect(cssSource).toContain('.text-hero-muted')
+    expect(cssSource).toContain('.text-hero-subtle')
+
+    const heroBackground = hslToRgb(readHslToken('--marketing-hero-bg'))
+    const heroMuted = hslToRgb(readHslToken('--marketing-hero-muted'))
+    const heroSubtle = hslToRgb(readHslToken('--marketing-hero-subtle'))
+
+    expect(contrastRatio(heroMuted, heroBackground)).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio(heroSubtle, heroBackground)).toBeGreaterThanOrEqual(4.5)
   })
 
   it('defines dark theme token overrides and forces light color-scheme in print', () => {
