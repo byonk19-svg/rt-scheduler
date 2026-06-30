@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { readFileSync } from 'node:fs'
 
 import {
   EmptyState,
+  FilterButtonGroup,
+  FilterPill,
   getRequestActionModel,
   ManagerRequestCard,
   resolveShiftBoardTab,
@@ -95,6 +98,53 @@ describe('manager Shift Board action model', () => {
     expect(resolveShiftBoardTab('open-shifts')).toBe('open-shifts')
     expect(resolveShiftBoardTab('unknown')).toBe('needs-action')
     expect(resolveShiftBoardTab(null)).toBe('needs-action')
+  })
+
+  it('announces selected state for request filter button groups', () => {
+    const html = renderToStaticMarkup(
+      createElement(FilterButtonGroup, {
+        label: 'Request type',
+        value: 'pickup',
+        options: [
+          ['all', 'All Types'],
+          ['swap', 'Trade'],
+          ['pickup', 'Coverage'],
+        ],
+        onChange: () => undefined,
+      })
+    )
+
+    expect(html).toContain('role="group"')
+    expect(html).toContain('aria-label="Request type"')
+    expect(html).toMatch(/aria-pressed="false"[^>]*>All Types/)
+    expect(html).toMatch(/aria-pressed="false"[^>]*>Trade/)
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Coverage/)
+  })
+
+  it('announces selected state for scope filter pills', () => {
+    const activeHtml = renderToStaticMarkup(
+      createElement(FilterPill, {
+        label: 'My Requests',
+        active: true,
+        onClick: () => undefined,
+      })
+    )
+    const inactiveHtml = renderToStaticMarkup(
+      createElement(FilterPill, {
+        label: 'All Posts',
+        active: false,
+        onClick: () => undefined,
+      })
+    )
+
+    expect(activeHtml).toMatch(/aria-pressed="true"[^>]*>My Requests/)
+    expect(inactiveHtml).toMatch(/aria-pressed="false"[^>]*>All Posts/)
+  })
+
+  it('labels the staff scope filter pill group', () => {
+    const source = readFileSync('src/components/shift-board/ShiftBoardClientPage.tsx', 'utf8')
+
+    expect(source).toContain('role="group" aria-label="Post scope"')
   })
 
   it('does not approve a direct swap waiting on teammate response', () => {

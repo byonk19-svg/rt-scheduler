@@ -8,6 +8,12 @@ const publicHeaderSource = fs.readFileSync(
   path.join(process.cwd(), 'src/components/public/PublicHeader.tsx'),
   'utf8'
 )
+const publicAuthSources = [
+  pageSource,
+  fs.readFileSync(path.join(process.cwd(), 'src/app/(public)/login/page.tsx'), 'utf8'),
+  fs.readFileSync(path.join(process.cwd(), 'src/app/(public)/signup/page.tsx'), 'utf8'),
+  fs.readFileSync(path.join(process.cwd(), 'src/app/(public)/reset-password/page.tsx'), 'utf8'),
+]
 
 describe('public homepage redesign contract', () => {
   it('uses the scheduling-first hero copy', () => {
@@ -43,6 +49,15 @@ describe('public homepage redesign contract', () => {
     expect(pageSource).not.toMatch(/<section[^>]+bg-\[var\(--primary\)\]/)
     expect(pageSource).toContain('bg-[var(--attention)]')
     expect(pageSource).toContain('Scheduling for RT teams')
+  })
+
+  it('uses AA-safe semantic copy colors on deep public and auth hero panels', () => {
+    for (const source of publicAuthSources) {
+      expect(source).not.toMatch(/text-white\/(?:30|40|42|45|50|\[[\d.]+\])/)
+    }
+
+    expect(pageSource).toContain('text-hero-muted')
+    expect(pageSource).toContain('text-hero-subtle')
   })
 
   it('does not use the old luminous light-mode wrapper classes', () => {

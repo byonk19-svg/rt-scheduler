@@ -70,6 +70,16 @@ describe('AppShell mobile menu', () => {
     expect(appShellSource).toContain('overscroll-contain')
   })
 
+  it('keeps mobile drawer navigation and footer actions at least 44px tall', () => {
+    const mobileDrawerSource =
+      appShellSource.match(/<aside id="app-shell-mobile-nav"[\s\S]*?<\/aside>/)?.[0] ?? ''
+
+    expect(mobileDrawerSource).not.toContain('min-h-[42px]')
+    expect(mobileDrawerSource).not.toContain('min-h-[38px]')
+    expect(mobileDrawerSource.match(/min-h-\[44px\]/g)?.length ?? 0).toBeGreaterThanOrEqual(6)
+    expect(mobileDrawerSource).toContain('min-w-[44px]')
+  })
+
   it('renders the authenticated shell through shared header primitives', () => {
     expect(appShellSource).toContain('<AppHeader')
     expect(appShellSource).toContain('<LocalSectionNav')
