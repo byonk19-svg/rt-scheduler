@@ -46,6 +46,18 @@ function renderToolbar(interactionMode: ScheduleInteractionMode) {
 }
 
 describe('ScheduleGridToolbar template controls', () => {
+  it('keeps mobile schedule toolbar controls at touch-friendly target sizes', () => {
+    const html = renderToolbar(STAFF_VIEW_MODE)
+
+    expect(html).toContain('[@media(pointer:coarse)]:min-h-11')
+    expect(html).toContain('[@media(pointer:coarse)]:h-11')
+    expect(html).toContain('[@media(pointer:coarse)]:min-w-11')
+    expect(html).toContain('aria-label="Schedule Block"')
+    expect(html).toContain('aria-label="Day shift"')
+    expect(html).toContain('aria-label="Night shift"')
+    expect(html).toContain('Print')
+  })
+
   it('exposes template save and apply controls to managers', () => {
     const html = renderToolbar(MANAGER_EDIT_MODE)
 

@@ -158,14 +158,14 @@ export function ScheduleGridToolbar({
           <label className="sr-only" htmlFor="schedule-cycle">
             Schedule Block
           </label>
-          <div className="flex min-w-[14rem] items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1 shadow-tw-2xs">
+          <div className="flex min-h-8 min-w-[14rem] items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1 shadow-tw-2xs [@media(pointer:coarse)]:min-h-11">
             <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
             <select
               id="schedule-cycle"
               value={cycleId}
               disabled={isPending}
               onChange={(event) => onCycleChange(event.target.value)}
-              className="h-6 min-w-0 flex-1 bg-transparent text-xs font-bold text-foreground outline-none disabled:opacity-60"
+              className="h-6 min-w-0 flex-1 bg-transparent text-xs font-bold text-foreground outline-none disabled:opacity-60 [@media(pointer:coarse)]:h-11"
               aria-label="Schedule Block"
             >
               {availableCycles.length > 0 ? (
@@ -191,14 +191,14 @@ export function ScheduleGridToolbar({
           >
             {scheduleBlockStateLabel}
           </span>
-          <div className="flex h-7 gap-1 rounded-md border border-border bg-background p-0.5 shadow-tw-2xs">
+          <div className="flex min-h-7 gap-1 rounded-md border border-border bg-background p-0.5 shadow-tw-2xs [@media(pointer:coarse)]:min-h-11">
             {(['Day', 'Night'] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
                 aria-pressed={shiftTab === tab}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-black transition-colors',
+                  'inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-black transition-colors [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11',
                   shiftTab === tab
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted'
@@ -255,7 +255,12 @@ export function ScheduleGridToolbar({
               ) : null}
             </>
           ) : null}
-          <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={onPrint}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-muted-foreground [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:min-w-11"
+            onClick={onPrint}
+          >
             <Printer className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             Print
           </Button>
