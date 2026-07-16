@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   AlertCircle,
@@ -10,6 +11,7 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
+  Plus,
   Search,
   ShieldAlert,
   UsersRound,
@@ -388,22 +390,32 @@ export default function ShiftBoardClientPage({
               : 'Use Need coverage when someone should cover your shift, or Trade shift when you want to exchange assignments. Managers approve final schedule changes here.'}
           </p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[29rem]">
-          <ContextChip
-            label="Schedule Block"
-            value={scheduleBlockLabel}
-            icon={<CalendarDays className="h-3.5 w-3.5" />}
-          />
-          <ContextChip
-            label="Shift Visibility"
-            value={canReview ? 'All Shifts' : 'Your shift'}
-            icon={<ArrowRightLeft className="h-3.5 w-3.5" />}
-          />
-          <ContextChip
-            label="Access"
-            value={canReview ? 'Manager final approval' : 'Staff request view'}
-            icon={<ShieldAlert className="h-3.5 w-3.5" />}
-          />
+        <div className="flex flex-col gap-3 lg:min-w-[29rem] lg:items-end">
+          {!canReview ? (
+            <Button asChild size="sm" className="min-h-11 w-full px-4 font-bold sm:w-auto">
+              <Link href="/requests/new?new=1" aria-label="Start a trade or coverage request">
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                New request
+              </Link>
+            </Button>
+          ) : null}
+          <div className="grid w-full gap-2 sm:grid-cols-3">
+            <ContextChip
+              label="Schedule Block"
+              value={scheduleBlockLabel}
+              icon={<CalendarDays className="h-3.5 w-3.5" />}
+            />
+            <ContextChip
+              label="Shift Visibility"
+              value={canReview ? 'All Shifts' : 'Your shift'}
+              icon={<ArrowRightLeft className="h-3.5 w-3.5" />}
+            />
+            <ContextChip
+              label="Access"
+              value={canReview ? 'Manager final approval' : 'Staff request view'}
+              icon={<ShieldAlert className="h-3.5 w-3.5" />}
+            />
+          </div>
         </div>
       </div>
 

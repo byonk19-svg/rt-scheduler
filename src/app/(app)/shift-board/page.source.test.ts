@@ -77,6 +77,14 @@ describe('shift-board route source contract', () => {
     expect(clientSource).not.toContain('Published schedule changes only')
   })
 
+  it('lets staff start a trade or coverage request from the Shift Board surface', () => {
+    const { clientSource } = readShiftBoardSources()
+
+    expect(clientSource).toContain('href="/requests/new?new=1"')
+    expect(clientSource).toContain('Start a trade or coverage request')
+    expect(clientSource).toContain('New request')
+  })
+
   it('keeps unknown request errors user-safe instead of showing raw backend text', () => {
     const { clientSource, modelSource } = readShiftBoardSources()
 
