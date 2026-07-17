@@ -284,7 +284,7 @@ async function findRequestCard(
   requestId?: string
 ) {
   const requestCard = page
-    .locator('div.rounded-xl')
+    .getByTestId('request-card')
     .filter({ has: page.getByText(message) })
     .first()
 
@@ -629,7 +629,7 @@ test.describe.serial('requests workflow', () => {
     await expect(page.getByRole('heading', { name: 'Trade & Coverage Requests' })).toBeVisible()
 
     const directSwapCard = page
-      .locator('div.rounded-xl')
+      .getByTestId('request-card')
       .filter({ has: page.getByText(seededSwap.message) })
       .first()
     await expect
@@ -673,7 +673,7 @@ test.describe.serial('requests workflow', () => {
       await loginAs(managerPage, 'julie.d@teamwise.test', 'Teamwise123!')
       await openShiftBoard(managerPage)
       const managerCard = managerPage
-        .locator('div.rounded-xl')
+        .getByTestId('request-card')
         .filter({ has: managerPage.getByText(seededSwap.message) })
         .first()
       await expect(managerCard).toBeVisible({ timeout: 20_000 })
@@ -1060,7 +1060,7 @@ test.describe.serial('requests workflow', () => {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
       await openShiftBoard(managerPage)
       const requestCard = managerPage
-        .locator('div.rounded-xl')
+        .getByTestId('request-card')
         .filter({ has: managerPage.getByText(requestMessage) })
         .first()
       await expect(requestCard).toBeVisible({ timeout: 20_000 })
@@ -1168,7 +1168,7 @@ test.describe.serial('requests workflow', () => {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
       await gotoWithRetry(managerPage, '/shift-board?tab=history')
       const historyCard = managerPage
-        .locator('div.rounded-xl')
+        .getByTestId('request-card')
         .filter({ has: managerPage.getByText(fixture.requestMessage) })
         .first()
       await expect(historyCard).toBeVisible({ timeout: 20_000 })
@@ -1232,7 +1232,7 @@ test.describe.serial('requests workflow', () => {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
       await gotoWithRetry(managerPage, '/shift-board?tab=history')
       const historyCard = managerPage
-        .locator('div.rounded-xl')
+        .getByTestId('request-card')
         .filter({ has: managerPage.getByText(fixture.requestMessage) })
         .first()
       await expect(historyCard).toBeVisible({ timeout: 20_000 })
@@ -1349,7 +1349,7 @@ test.describe.serial('requests workflow', () => {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
       await openShiftBoard(managerPage)
       const requestCard = managerPage
-        .locator('div.rounded-xl')
+        .getByTestId('request-card')
         .filter({ has: managerPage.getByText(requestMessage) })
         .first()
       await expect(requestCard).toBeVisible({ timeout: 20_000 })
@@ -1515,7 +1515,7 @@ test.describe.serial('requests workflow', () => {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
       await openShiftBoard(managerPage)
       const requestCard = managerPage
-        .locator('div.rounded-xl')
+        .getByTestId('request-card')
         .filter({ has: managerPage.getByText(requestMessage) })
         .first()
       await expect(requestCard).toBeVisible({ timeout: 20_000 })

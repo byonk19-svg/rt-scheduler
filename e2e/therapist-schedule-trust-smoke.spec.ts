@@ -365,7 +365,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await expect(page.getByRole('heading', { name: nightTherapist.name })).toBeVisible({
       timeout: 20_000,
     })
-    await expect(page.getByRole('button', { name: 'Submitted with requests' })).toBeVisible()
+    await expect(page.locator('[data-roster-filter="submitted_with_exceptions"]')).toBeVisible()
     await expect(page.getByRole('button', { name: /Submitted with requests 1/ })).toBeVisible()
   })
 })

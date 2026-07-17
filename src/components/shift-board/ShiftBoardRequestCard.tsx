@@ -150,6 +150,7 @@ export function ManagerRequestCard({
 
   return (
     <div
+      data-testid="request-card"
       className={cn(
         'fade-up scroll-mt-24 overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md',
         requestTone === 'info'
