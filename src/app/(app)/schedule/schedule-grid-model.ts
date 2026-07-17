@@ -109,6 +109,10 @@ export function isCyclePublished(cycle: CycleRow): boolean {
   return cycle.published || cycle.status === 'final'
 }
 
+export function isCycleVisibleToStaff(cycle: CycleRow): boolean {
+  return isCyclePublished(cycle) || cycle.status === 'preliminary'
+}
+
 export function selectScheduleCycle({
   cycles,
   cycleIdFromUrl,
@@ -119,7 +123,7 @@ export function selectScheduleCycle({
   canManageCoverage: boolean
 }): { visibleCycles: CycleRow[]; selectedCycle: CycleRow | null } {
   const visibleCycles = cycles.filter((cycle) =>
-    canManageCoverage ? true : isCyclePublished(cycle)
+    canManageCoverage ? true : isCycleVisibleToStaff(cycle)
   )
   const selectedCycle =
     visibleCycles.find((candidate) => candidate.id === cycleIdFromUrl) ??

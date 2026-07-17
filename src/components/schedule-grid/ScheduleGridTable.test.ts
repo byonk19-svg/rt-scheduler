@@ -262,6 +262,83 @@ describe('ScheduleGridTable', () => {
     expect(getCellButton(html, 'fmla-1', '2026-05-04')).toContain('not eligible: FMLA')
   })
 
+  it('hides inactive and FMLA rationale from staff schedule views', () => {
+    const html = renderTable(
+      makeDataset({
+        viewerUserId: 'viewer-1',
+        viewerRole: 'therapist',
+        interactionMode: STAFF_VIEW_MODE,
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: false,
+        isPublished: true,
+        therapistRows: [
+          {
+            userId: 'viewer-1',
+            name: 'Alice Johnson',
+            isOnFmla: false,
+            isActive: true,
+            employmentType: 'full_time',
+            shiftType: 'day',
+            cells: {
+              '2026-05-04': {
+                shiftId: 'shift-viewer',
+                status: 'staff',
+                hasNeedsOff: false,
+                isIneligible: false,
+              },
+            },
+          },
+          {
+            userId: 'inactive-1',
+            name: 'Casey Nguyen',
+            isOnFmla: false,
+            isActive: false,
+            employmentType: 'full_time',
+            shiftType: 'day',
+            cells: {
+              '2026-05-04': {
+                shiftId: null,
+                status: 'off',
+                hasNeedsOff: false,
+                isIneligible: true,
+                ineligibleReason: 'inactive',
+              },
+            },
+          },
+          {
+            userId: 'fmla-1',
+            name: 'Blair Morgan',
+            isOnFmla: true,
+            isActive: true,
+            employmentType: 'full_time',
+            shiftType: 'day',
+            cells: {
+              '2026-05-04': {
+                shiftId: null,
+                status: 'off',
+                hasNeedsOff: false,
+                isIneligible: true,
+                ineligibleReason: 'fmla',
+              },
+            },
+          },
+        ],
+        dailyTotals: { '2026-05-03': 0, '2026-05-04': 1, '2026-05-05': 0 },
+      })
+    )
+
+    expect(html).not.toContain('FMLA')
+    expect(html).not.toContain('Inactive')
+    expect(getCellButton(html, 'inactive-1', '2026-05-04')).toContain(
+      'not scheduled, not eligible, read-only'
+    )
+    expect(getCellButton(html, 'fmla-1', '2026-05-04')).toContain(
+      'not scheduled, not eligible, read-only'
+    )
+    expect(getCellButton(html, 'inactive-1', '2026-05-04')).not.toContain('inactive team member')
+    expect(getCellButton(html, 'fmla-1', '2026-05-04')).not.toContain('not eligible: FMLA')
+  })
+
   it('labels non-actionable cells as read-only', () => {
     const html = renderTable(
       makeDataset({
@@ -335,8 +412,8 @@ describe('ScheduleGridTable', () => {
     expect(managerCell).toContain('[@media(pointer:coarse)]:min-w-11')
     expect(managerCell).not.toContain('-m-3.5')
     expect(managerCell).toContain('touch-manipulation')
-    expect(managerCell).toContain('min-h-4')
-    expect(managerCell).toContain('min-w-4')
+    expect(managerCell).toContain('min-h-6')
+    expect(managerCell).toContain('min-w-6')
 
     const staffHtml = renderTable(
       makeDataset({

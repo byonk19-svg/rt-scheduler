@@ -306,22 +306,22 @@ describe('staff nav items', () => {
     const items = getStaffNavItems()
     expect(items.map((item) => item.label)).toEqual([
       'Dashboard',
-      'Schedule',
+      'My Shifts',
       'Availability',
       'Shift Board',
       'History',
     ])
   })
 
-  it('"Schedule" routes to /schedule', () => {
+  it('"My Shifts" routes to /schedule', () => {
     const items = getStaffNavItems()
-    const schedule = items.find((item) => item.label === 'Schedule')
+    const schedule = items.find((item) => item.label === 'My Shifts')
     expect(schedule?.href).toBe('/schedule')
   })
 
-  it('"Schedule" is active for legacy personal and team schedule URLs', () => {
+  it('"My Shifts" is active for legacy personal and team schedule URLs', () => {
     const items = getStaffNavItems()
-    const schedule = items.find((item) => item.label === 'Schedule')
+    const schedule = items.find((item) => item.label === 'My Shifts')
     expect(schedule?.active('/staff/my-schedule')).toBe(true)
     expect(schedule?.active('/therapist/schedule')).toBe(true)
     expect(schedule?.active('/coverage')).toBe(true)
@@ -344,13 +344,13 @@ describe('staff nav items', () => {
     expect(context.localNav).toBeNull()
   })
 
-  it('"Schedule" item is active on /therapist/schedule', () => {
+  it('"My Shifts" item is active on /therapist/schedule', () => {
     const context = getShellContext({
       pathname: '/therapist/schedule',
       canAccessManagerUi: false,
       pendingCount: 0,
     })
-    const schedule = context.primaryItems.find((item) => item.label === 'Schedule')
+    const schedule = context.primaryItems.find((item) => item.label === 'My Shifts')
     expect(schedule?.active('/therapist/schedule')).toBe(true)
   })
 
@@ -359,7 +359,7 @@ describe('staff nav items', () => {
 
     expect(items.map((item) => item.label)).toEqual([
       'Dashboard',
-      'Schedule',
+      'My Shifts',
       'Availability',
       'Shift Board',
     ])
@@ -372,7 +372,7 @@ describe('staff nav items', () => {
       pendingCount: 0,
     })
 
-    expect(items.map((item) => item.label)).toEqual(['Dashboard', 'Schedule', 'Shift Board'])
+    expect(items.map((item) => item.label)).toEqual(['Dashboard', 'My Shifts', 'Shift Board'])
     expect(items.map((item) => item.href)).toEqual([
       '/dashboard/staff',
       '/schedule',

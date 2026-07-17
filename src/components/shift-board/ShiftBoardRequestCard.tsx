@@ -53,6 +53,7 @@ export function ManagerRequestCard({
   onSwapPartnerChange,
   selectedPickupInterestId,
   onSelectPickupInterest,
+  currentUserId = null,
   overrideReason,
   onOverrideReasonChange,
   onForceApprove,
@@ -74,6 +75,7 @@ export function ManagerRequestCard({
   onSwapPartnerChange: (id: string) => void
   selectedPickupInterestId: string | null
   onSelectPickupInterest: (id: string) => void
+  currentUserId?: string | null
   overrideReason: string
   onOverrideReasonChange: (reason: string) => void
   onForceApprove: () => void
@@ -125,6 +127,17 @@ export function ManagerRequestCard({
     isPending &&
     !awaitingDirectAcceptance &&
     Boolean(swapPartnerId)
+  const canSeeDeniedReason =
+    req.status === 'denied' &&
+    Boolean(req.overrideReason) &&
+    (canReview ||
+      Boolean(
+        currentUserId &&
+        (req.postedById === currentUserId ||
+          req.claimedById === currentUserId ||
+          req.swapWithId === currentUserId ||
+          req.interestCandidates.some((candidate) => candidate.therapistId === currentUserId))
+      ))
   const requestTone =
     req.type === 'swap' ? 'info' : stateLabel === 'No responders yet' ? 'muted' : 'success'
   const railClass =
@@ -252,7 +265,7 @@ export function ManagerRequestCard({
               </select>
             </div>
           ) : null}
-          {req.status === 'denied' && req.overrideReason ? (
+          {canSeeDeniedReason ? (
             <p className="mt-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-2.5 py-1.5 text-xs text-[var(--error-text)]">
               Reason: {req.overrideReason}
             </p>

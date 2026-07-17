@@ -616,6 +616,7 @@ export default function ShiftBoardClientPage({
                   [request.id]: interestId,
                 }))
               }
+              currentUserId={currentUserId}
               overrideReason={overrideReasons[request.id] ?? ''}
               onOverrideReasonChange={(reason) =>
                 setOverrideReasons((prev) => ({ ...prev, [request.id]: reason }))
