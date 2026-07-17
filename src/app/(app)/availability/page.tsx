@@ -19,6 +19,7 @@ import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { PrintMenuItem } from '@/components/print-menu-item'
 import { can } from '@/lib/auth/can'
 import { resolveAvailabilityWindowState } from '@/lib/availability-window'
+import { resolveAvailabilityRosterFilter } from '@/lib/availability-roster-filter'
 import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { parseRole } from '@/lib/auth/roles'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
@@ -611,6 +612,12 @@ export default async function AvailabilityPage({
 
   const submittedAvailabilityRows = availabilityStatusRows.filter((row) => row.submitted)
   const missingAvailabilityRows = availabilityStatusRows.filter((row) => !row.submitted)
+  const initialRosterFilter = resolveAvailabilityRosterFilter({
+    requestedFilter: initialRoster,
+    selectedTherapistId: selectedTherapistIdFromParams,
+    submittedRows: submittedAvailabilityRows,
+    missingRows: missingAvailabilityRows,
+  })
 
   const plannerTherapistNameForDefault =
     plannerTherapists.find((therapist) => therapist.id === selectedPlannerTherapistId)?.full_name ??
@@ -658,15 +665,7 @@ export default async function AvailabilityPage({
           initialTherapistId={selectedPlannerTherapistId}
           submittedRows={submittedAvailabilityRows}
           missingRows={missingAvailabilityRows}
-          initialRosterFilter={
-            initialRoster === 'submitted_with_exceptions' ||
-            initialRoster === 'submitted_no_exceptions' ||
-            initialRoster === 'submitted' ||
-            initialRoster === 'has_requests' ||
-            initialRoster === 'all'
-              ? initialRoster
-              : 'missing'
-          }
+          initialRosterFilter={initialRosterFilter}
           saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
           saveManagerAvailabilityRequestsAction={saveManagerAvailabilityRequestsAction}
           copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}

@@ -148,6 +148,7 @@ export function RequestsHistoryView({
           return (
             <div
               key={request.id}
+              data-testid="request-card"
               className={cn(
                 'fade-up overflow-hidden rounded-[1.15rem] border bg-card shadow-tw-panel-inner-soft transition-[border-color,box-shadow] hover:shadow-tw-panel',
                 isSelected
