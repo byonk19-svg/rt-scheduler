@@ -337,7 +337,7 @@ describe('lottery workflow routes', () => {
     expect(loadLotteryHistoryMock).not.toHaveBeenCalled()
   })
 
-  it('rejects lottery history reads for another therapist when the actor is a lead', async () => {
+  it('allows leads to read lottery history for another therapist', async () => {
     createClientMock.mockResolvedValue(createSupabaseMock('lead-1'))
     loadLotteryActorMock.mockResolvedValue({
       userId: 'lead-1',
@@ -351,8 +351,13 @@ describe('lottery workflow routes', () => {
       new Request('http://localhost/api/lottery/history?therapistId=therapist-2&shift=night')
     )
 
-    expect(response.status).toBe(403)
-    expect(loadLotteryHistoryMock).not.toHaveBeenCalled()
+    expect(response.status).toBe(200)
+    expect(loadLotteryHistoryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        therapistId: 'therapist-2',
+        shiftType: 'night',
+      })
+    )
   })
 
   it('loads history for the selected therapist and shift', async () => {

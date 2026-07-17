@@ -72,7 +72,15 @@ _Avoid_: implying shift visibility grants edit permission
 
 **Shift Default**:
 Team Schedule uses a Day, Night, Both toggle order and opens on Day by default for broad schedule views. Leads default to their regular Day or Night shift in lead-scoped views. Therapists default to their own shift in personal views.
+Therapists viewing Team Schedule should default to their own regular shift for readability, with Day/Night/Both available as an explicit switch for broader context.
+Leads should also default to their own regular shift, with cross-shift access available through the explicit shift switch.
+Managers should return to their last selected Team Schedule shift view when available; Day is the first-time fallback.
+Manager shift-view memory should be scoped per workflow, such as Team Schedule versus Coverage, so resuming one workflow does not unexpectedly change another.
 _Avoid_: defaulting broad schedule views to a dense Both view
+_Avoid_: dropping therapists into Both view when they primarily need their own shift context
+_Avoid_: making lead day-of views behave like generic manager planning views
+_Avoid_: forcing managers back to Day when they were actively working another shift view
+_Avoid_: using one global manager shift preference across workflows with different jobs
 
 **Regular Shift Change**:
 A therapist profile change that affects future planning defaults, not historical assignments. Old schedules keep the actual Day or Night assignment that was saved at the time.
@@ -140,24 +148,49 @@ _Avoid_: treating PTO as separate from Need Off
 
 **Availability Submission**:
 A therapist's confirmation that they reviewed a specific Schedule Block. A submission may contain Need Off or Need to Work exceptions, or no exceptions.
+Submitting no availability exceptions is valid and means the therapist reviewed the Schedule Block and has no changes or requests for it.
 Each therapist has one current Availability Submission per Schedule Block; edits during the open window update that current truth while optional history may be retained.
+Before the due date or availability lock, staff may edit submitted availability and update the current submission. After lock or Preliminary, later workflow rules apply instead of silently reshaping the schedule.
+Staff may save availability progress before submitting, but saved progress is not an Availability Submission and should still count as not submitted for readiness and dashboard purposes.
+Saved-but-not-submitted availability should appear as an incomplete attention state and may trigger reminders before the due date.
+The primary submit action should stay "Submit availability." Supporting copy can adapt, such as confirming "Submit with no availability exceptions" when the therapist has not marked any days.
 Therapists may submit availability for any future Schedule Block as soon as that Schedule Block exists; there is no separate availability opening date.
 Therapist availability screens should lead with the next future Schedule Block needing their response, while still allowing the therapist to switch to later visible future Schedule Blocks.
 Availability belongs to the target therapist, while entry provenance records who entered or updated it.
+Availability changes may be captured whenever, especially for future Schedule Blocks. Once Preliminary has already been sent for a Schedule Block, new availability input does not automatically apply to that Preliminary Schedule; staff schedule feedback for that block happens through Preliminary Cell Marks.
+If staff try to edit availability for a Schedule Block already in Preliminary review, the UI should explain that the preliminary schedule is already out and guide them to mark the Preliminary Schedule instead. Availability editing should remain straightforward for future Schedule Blocks.
+Future Schedule Block availability remains governed by that future block's own due date and lifecycle, not by whether another current block is in Preliminary or Final.
+Staff may copy their own availability from a previous Schedule Block as a convenience, including both Need Off and Need to Work exceptions, but they must review and submit it for the target block. Copied availability should shift by day-of-Schedule-Block position rather than exact calendar date. Manager copy-on-behalf remains separate with attribution.
 _Avoid_: assuming submitted availability always contains day-level entries
+_Avoid_: treating no-exception submissions as missing availability
+_Avoid_: treating saved progress as submitted availability
 _Avoid_: storing availability as an unscoped date range that is not tied to the Schedule Block lifecycle
 _Avoid_: creating competing active submissions for the same therapist and Schedule Block
 _Avoid_: confusing `therapist_id` with `entered_by` or `updated_by`
+_Avoid_: silently applying post-Preliminary availability changes to an already-sent Preliminary Schedule
+_Avoid_: letting staff think late availability edits will automatically reshape a Preliminary Schedule
+_Avoid_: closing future availability just because a different Schedule Block is in Preliminary or Final
+_Avoid_: treating copied staff availability as submitted before the therapist reviews it
 
 **Manager-entered Availability**:
 Availability exceptions entered by a manager on behalf of a therapist from email, verbal, or paper availability. It counts as supplied availability for scheduling eligibility while automatically preserving manager attribution and optional source context.
 It counts as received availability for manager readiness counts, while remaining distinct from a therapist-submitted in-app Availability Submission.
+Staff should be able to see when availability was manager-entered on their behalf and who entered it, using simple attribution such as "Entered by Manager Sarah." Simple source context such as "from email" or "from paper form" may be shown when available, but raw intake content should stay out of staff UI.
+Staff should receive light notification or dashboard attention when manager-entered availability affects a visible/current availability block they can review. Manager-only internal planning does not need staff notification.
 When manager-entered availability is Need to Work, it follows the same hard assignment rule as therapist-entered Need to Work.
 While the availability window is open, the therapist may review and update manager-entered availability for their own Schedule Block, with history/attribution retained.
+This lets staff correct transcription mistakes while preserving provenance that the original entry was manager-entered. While the window is open, correction may include deleting a manager-entered exception that was wrong, with history retained.
 After Availability Locked, therapist changes to manager-entered availability become late manager-reviewed changes rather than direct edits.
+Managers may enter late availability for staff after lock as manager-managed availability, with attribution and schedule impact surfaced, but it should not silently reshape existing draft, preliminary, or final schedules.
+After Final Publish, manager-entered late availability that requires schedule correction belongs in direct manager schedule edit or operational workflows, not a new Shift Board request.
 _Avoid_: treating manager-entered therapist-provided availability as a force-on override
 _Avoid_: making manager-entered availability look like the therapist personally entered it in the app
+_Avoid_: hiding manager-entered attribution from the therapist whose availability was entered
+_Avoid_: exposing raw intake emails, attachments, or notes in staff availability UI
 _Avoid_: requiring a typed reason or source note for every transcribed availability entry
+_Avoid_: turning manager intake into a staff upload workflow when structured availability UI is available
+_Avoid_: silently applying manager-entered late availability to existing schedule assignments
+_Avoid_: forcing manager-owned post-Final corrections through Shift Board when manager approval is already inherent
 
 **Manager Force-on PRN**:
 A manager decision to schedule a Flexible PRN for a date where no therapist-provided availability exists in the app. It is distinct from Manager-entered Availability and should require a short manager reason before Final Publish.
@@ -167,20 +200,34 @@ _Avoid_: using force-on when the therapist explicitly told the manager they can 
 
 **Availability Edit Window**:
 The period before availability closes or schedule building starts when a therapist may edit a submitted Availability Submission. Future Schedule Blocks do not need an availability opening date; the manager only sets the due date for when submissions should be complete. After the window closes, changes become manager-managed or move to later workflows.
+The due date creates overdue and attention state but does not automatically hard-lock availability by itself. Manager lock or schedule-building is the real lock.
 _Avoid_: adding a separate availability-open milestone when the Schedule Block already exists for future submission
 _Avoid_: silently changing availability after managers have started schedule planning
+_Avoid_: surprising staff with an automatic midnight lock solely because the due date passed
 
 **Availability Locked**:
 The state after a manager manually closes availability collection or starts creating a draft schedule for the Schedule Block. Therapists can no longer silently edit submitted availability.
+Managers may start schedule building while availability submissions are missing, but the app should warn, identify missing submissions, and confirm that availability will lock.
+Staff-facing locked copy should use plain language such as "Managers have started building this schedule. Availability changes for this block now need manager review."
 Late therapist changes after lock become manager-reviewed requests or manager-managed availability changes instead of replacing the current submission automatically.
-Approving a late availability change before Final Publish should not automatically mutate draft or preliminary assignments; it should surface schedule impact for manager action.
+Before Preliminary is sent, late availability input after lock should create a manager review item when supported. After Preliminary is sent, staff should use Preliminary Cell Marks. If the app cannot support review for the current state, it should tell staff to contact the manager rather than silently accepting input.
+Approving a late availability change before Final Publish should not automatically mutate draft or preliminary assignments; it should surface schedule impact for deliberate manager action.
+Staff should be able to see when a late availability change was approved for manager review but has not yet changed the draft or preliminary schedule, using plain pending-impact language.
 _Avoid_: exposing backend draft or cycle terminology to explain the lock
+_Avoid_: blocking schedule building solely because availability submissions are missing
+_Avoid_: locking availability for schedule building without telling the manager what is missing
 _Avoid_: completely losing late therapist input when it should be reviewed by a manager
+_Avoid_: silently accepting late availability input that no manager will review
 _Avoid_: silently reshuffling assignments when a late availability change is approved
+_Avoid_: making staff think late availability approval already changed the schedule when it has not
 
 **Reopen Availability**:
 An intentional manager action that reopens a locked Availability Edit Window without deleting existing draft schedule or manager planning data.
+Reopening availability after schedule building starts should preserve draft or preliminary work and warn managers that existing assignments may need review.
+Reopening availability should notify staff only when staff are expected to act on the reopened window. Manager-only cleanup does not need staff notification.
 _Avoid_: reopening availability silently or clearing draft planning as a side effect
+_Avoid_: implying reopened availability automatically reshapes existing schedule work
+_Avoid_: notifying staff about reopened availability they cannot or do not need to act on
 
 **Manager Availability Plan**:
 Manager-entered scheduling intent for a therapist within a Schedule Block. It is a separate layer from therapist-submitted availability exceptions and should not erase who submitted what.
@@ -203,11 +250,60 @@ _Avoid_: labeling an intake item as applied before the availability write succee
 
 **My Shifts**:
 The therapist-facing view of the full Schedule Block, with the therapist's scheduled days highlighted and non-working days still visible for orientation.
+My Shifts is the primary staff-facing label for personal schedule. My Schedule may remain as a compatibility phrase or route alias, but primary staff navigation should use My Shifts.
+My Shifts may show when the therapist is the Designated Lead because lead assignment is operational context.
+Preliminary and Final schedules should use the same My Shifts entry point, with clear state labels and banners rather than separate staff schedule destinations.
 _Avoid_: reducing My Shifts to only a list of worked days
+_Avoid_: using My Schedule as the primary label when Team Schedule also exists
+_Avoid_: making staff learn a separate location just to review Preliminary Schedule
 
 **Team Schedule**:
 The canonical live published schedule for all roles, showing who is working across a Schedule Block and current operational statuses such as Scheduled, On Call, Cancelled, Call In, and Left Early.
+Therapists may use Team Schedule as read-only shared context. Leads may adjust permitted operational statuses such as Call In, On Call, Cancelled, and Left Early from Team Schedule, while manager-owned assignment and final Shift Board approval authority remains separate.
+Once Preliminary Schedule is sent, Team Schedule may show the preliminary version to staff with obvious Preliminary labeling so staff can understand team context and coverage gaps before Final Publish.
+Staff may print the full six-week Team Schedule so they can see who is working when. Printing does not grant edit permission.
+Normal staff Team Schedule print should show schedule truth and operational statuses, not unresolved "Name down" volunteer intents.
+Staff should not have full schedule data export/download by default; manager export remains the admin-oriented path.
+Manager print/export does not need unresolved "Name down" volunteer intents by default; live workflow views remain the source for reduction decisions.
+Staff Team Schedule visibility should show names and shift assignments by default, not teammate contact details. Contact information belongs behind directory or profile visibility rules.
+Staff may see operational statuses for other staff on Team Schedule, including On Call, Cancelled, Call In, and Left Early.
+Staff see only the operational status label for other staff, not reason text.
+A therapist may see reason text for their own operational status when a manager or lead entered one.
+A therapist may see who made an operational status change on their own affected shift, such as the manager or lead who updated it. Other staff status attribution stays hidden by default.
+Staff Team Schedule visibility should not expose HR or scheduling rationale such as FMLA, inactive status, PRN mode, or why someone was not scheduled; those are manager planning details.
+Staff may see PRN staff who are scheduled on the same Team Schedule like other scheduled coworkers, but do not need PRN-specific rationale or manager planning details.
+Staff-facing PRN labeling should be contextual: show PRN where it helps explain reduction or Lottery expectations, such as selected-day context, rather than stamping every schedule row by default.
+Normal staff schedule print does not need PRN labels by default; print focuses on who is working and current operational status labels.
+Team Schedule should show Designated Lead assignment because staff need to know the operational lead for a shift.
+Staff Team Schedule should show the current Designated Lead, not historical from/to lead reassignment details for everyone.
+Team Schedule may show restrained staffing counts such as "3 working / minimum 3" as operational context for staff, especially around coverage and trade decisions, without exposing manager-only rule detail.
+Staff-visible staffing counts should count active working staff only; visible Call In, On Call, and Cancelled assignments remain status context and do not count toward working coverage. Cancelled and On Call should reflect that the department is working with fewer active people, but neither creates a problem warning by itself. Left Early remains informational and does not need to change coverage counts by default.
+When a reduction volunteer is placed On Call, staff should still see that therapist in shift context with an On Call label; the therapist remains connected to the shift but does not count as active working coverage.
+Staff may see plain below-minimum staffing warnings because they can help staff decide to pick up an open shift. The warning should be operational and neutral, not manager-triage detail. Showing the actual minimum is acceptable when space allows, such as "2 working / minimum 3." Staff-facing counts should focus on active/minimum, not target staffing.
+Staff may also see below-minimum staffing signals during Preliminary Schedule review so people know where coverage is still needed and can offer to pick up shifts. Draft schedule staffing gaps remain manager planning context until Preliminary is sent.
+Staff-facing warnings are based on Minimum Staffing. Below target but at or above minimum may be neutral context, not a warning.
 _Avoid_: splitting Team Schedule and Live Schedule into separate primary workflow concepts
+_Avoid_: hiding Preliminary team context from staff after Preliminary has been sent
+_Avoid_: treating therapist Team Schedule visibility as edit permission
+_Avoid_: blocking leads from day-of operational status work they are expected to manage
+_Avoid_: treating staff print visibility as permission to export schedule data
+_Avoid_: turning the schedule grid into an unrestricted contact directory
+_Avoid_: exposing another staff member's operational status reason text
+_Avoid_: hiding the therapist's own status reason when it explains a change to their shift obligation
+_Avoid_: exposing operational status attribution for unrelated staff shifts by default
+_Avoid_: exposing sensitive absence or employment context in staff schedule views
+_Avoid_: showing lead reassignment history to all staff when current lead context is enough
+_Avoid_: hiding basic staffing context that staff need for responsible coverage and trade decisions
+_Avoid_: counting visible Call In, On Call, or Cancelled rows as active staff in staff-facing coverage counts
+_Avoid_: treating Cancelled as an automatic coverage problem
+_Avoid_: treating On Call as an automatic coverage problem when it is an intentional status
+_Avoid_: over-modeling partial-shift staffing from Left Early unless the product deliberately adds that rule
+_Avoid_: hiding below-minimum staffing signals from staff when visibility could help fill coverage
+_Avoid_: making staff-facing staffing warnings alarmist or manager-only in tone
+_Avoid_: turning below-target-but-safe staffing into a staff-facing warning
+_Avoid_: showing target staffing to staff in a way that makes safe staffing look like a problem
+_Avoid_: hiding Preliminary below-minimum signals when staff could help fill coverage
+_Avoid_: exposing draft-only manager planning gaps to staff before Preliminary review
 
 **Daily Assignment Uniqueness**:
 A therapist may have at most one scheduled assignment on a calendar date within the same Schedule Block, regardless of Day or Night shift.
@@ -232,7 +328,7 @@ _Avoid_: hiding FMLA therapists from the roster when managers still need employe
 The one assigned lead-capable therapist responsible as lead for a specific Schedule Block date and shift, even when multiple lead-capable therapists are scheduled in that same slot. The Designated Lead must be one of the therapists assigned to that same date/shift. It is represented by the scheduled assignment row, such as `role = 'lead'`, not by a separate `lead_user_id` pointer.
 Designated Lead uniqueness is per Schedule Block, date, and shift. Each date/shift can have at most one Designated Lead in every lifecycle state. Final Publish requires exactly one Designated Lead for every date and shift; Draft and Preliminary schedules may have zero while managers build or review the schedule.
 The same lead-capable therapist may be Designated Lead on one date/shift and regular staff on another date/shift in the same Schedule Block.
-Post-Final manager-owned Designated Lead reassignment should notify affected leads only, not the whole department.
+Post-Final manager-owned Designated Lead reassignment should notify affected leads only, not the whole department. Notify both the newly designated lead and the previously designated lead when responsibility is removed.
 Draft and Preliminary Designated Lead reassignment is quiet working-schedule editing and does not notify staff.
 Auto-draft may create incomplete lead coverage, but missing Designated Lead slots should be surfaced clearly for manager resolution before Final Publish.
 Auto-draft should designate an eligible lead-capable assigned therapist as lead where possible using deterministic priority.
@@ -280,6 +376,8 @@ _Avoid_: keeping legacy shift-row status fields as an independent write/read aut
 
 **Operational Status Notification**:
 Role-appropriate notification created by an Operational Status Change. Call In alerts managers and leads because it can create a coverage issue; Cancelled and On Call notify the affected therapist; Left Early does not create broad notifications by default unless follow-up action is required.
+When a lead records Call In, managers should be notified immediately in-app at minimum because replacement assignment remains manager-owned. Additional channels follow configured notification delivery.
+Left Early is visible in status/history but does not notify the affected therapist by default because the therapist already knows they left early; notify only when a later follow-up action requires it.
 _Avoid_: sending broad notifications for every operational status edit
 _Avoid_: hiding direct affected-therapist notifications when a schedule status changes their work obligation
 
@@ -290,12 +388,18 @@ _Avoid_: adding time-based coverage logic to Left Early without a separate featu
 
 **On Call**:
 An operational status meaning the therapist remains connected to the shift as backup but is not active bedside coverage. It should not automatically create a coverage gap when the manager intentionally moved them on call due to staffing needs.
+On Call should be visually and textually distinct from Cancelled in My Shifts and Team Schedule detail because the therapist may still have backup responsibility.
+Applying On Call requires manager or lead phone-contact confirmation because it changes the therapist's work obligation while keeping them tied to the shift.
+On Call therapists remain visible in schedule context, including when On Call is applied through reduction volunteering.
+On Call does not need backup ordering by default. The status alone is enough unless a later department rule adds explicit backup sequencing.
 _Avoid_: counting On Call as actively working coverage
 _Avoid_: using On Call as a normal initial draft assignment state before publish
 _Avoid_: hiding On Call therapists entirely from the shift just because they do not count as active bedside coverage
+_Avoid_: inventing On Call backup order without an explicit workflow need
 
 **Cancelled**:
 An operational status meaning a manager cancelled the scheduled shift because the staff member was not needed, usually because of overstaffing. Cancelled does not create a coverage gap.
+Cancelled should be visually and textually distinct from On Call in My Shifts and Team Schedule detail because the therapist is released from the scheduled shift obligation.
 _Avoid_: using Cancelled for call-ins or unresolved staffing gaps
 _Avoid_: using Cancelled as a normal initial draft assignment state before publish
 _Avoid_: counting Cancelled as active bedside coverage
@@ -303,30 +407,152 @@ _Avoid_: hiding Cancelled therapists entirely from the shift history or status v
 
 **Call In**:
 An operational status meaning a scheduled therapist cannot work the shift. Call In is the only operational status that automatically creates possible coverage impact and should route managers or leads to urgent resolution when staffing falls below minimum.
+Staff do not enter Call In through Teamwise. A therapist who cannot make a shift contacts the manager by phone, and the manager or permitted lead records the official Call In status in the app.
 If a replacement or pickup is approved, the original assignment remains marked Call In and the replacement is added as a separate assignment.
+Staff-facing Team Schedule should show both the original Call In assignment and the replacement in a restrained way so the schedule reflects current coverage without hiding why staffing changed.
+Call In should trigger coverage-impact evaluation, but it should not remain a problem warning after replacement coverage keeps active staffing at or above minimum and lead coverage is resolved.
+Leads may record Call In when permitted, but replacement assignment remains manager-owned unless lead schedule-edit authority is deliberately expanded.
 If a Call In removes the active Designated Lead but another lead-capable therapist is assigned to the same shift, the system should auto-designate that eligible therapist as lead and show the remaining active staffing count.
 If no other lead-capable therapist is assigned, the Call In still saves and the app surfaces urgent unresolved lead coverage for manager/lead action.
 _Avoid_: using Call In for overstaffing cancellations
 _Avoid_: overwriting the original call-in assignment with the replacement therapist
 _Avoid_: counting Call In as active bedside coverage
+_Avoid_: adding a staff-facing in-app Call In path
+_Avoid_: hiding the original Call In assignment from staff once a replacement is added
+_Avoid_: treating resolved Call In history as an unresolved coverage problem
 
 **Lottery Decision**:
 A staff reduction decision that can apply **Cancelled** or **On Call** operational statuses to Team Schedule and My Shifts while preserving decision history and reason.
+Applying Lottery requires an explicit manager or lead choice between On Call and Cancelled because they mean different work obligations.
+After a staff member is lotteried/called off, they move to the bottom of the relevant home-shift Lottery order. Cross-shift fill-in work does not create a separate cancellation pool or move the therapist in the fill-in shift's order.
+If no PRN staff are scheduled and a reduction volunteer is selected for On Call or Cancelled status, that reduction counts as their Lottery day and moves them to the bottom of the relevant Lottery order. If a PRN is scheduled and must work while another staff member volunteered for reduction, reducing that volunteer does not count as a Lottery day and does not move them to the bottom.
+Staff may put their name down for possible On Call or Cancelled status by volunteering for reduction on their own scheduled shift. Volunteers are considered before PRN staff and before using the Lottery order, but staff do not choose the final status.
+PRN staff are not in the Lottery pool. If one or more regular staff have put their name down for reduction, a volunteer may be placed On Call or Cancelled based on staffing needs; when a PRN must work and a regular volunteer is cancelled, that volunteer cancellation does not count as a Lottery day. If no one has put their name down for reduction, PRN staff are considered for cancellation before using the Lottery order. When multiple PRN staff are scheduled, show PRN candidates first and let the manager or lead choose unless a separate PRN ordering rule is deliberately added. PRN cancellation still requires phone-contact confirmation before applying the status.
+Managers/leads may apply On Call to a PRN staff member when operationally needed, with phone-contact confirmation, but PRN On Call does not affect Lottery order because PRNs are not in the Lottery pool.
+PRN Cancelled status is operational status history only, not Lottery history or Lottery order movement.
+Manager/lead reduction resolution should surface PRN context clearly when PRN staff are scheduled or otherwise relevant, so the user understands whether selecting a regular volunteer will count as a Lottery day.
+Leads may apply day-of Lottery decisions when they have lead tools, with attribution and history. Managers retain oversight.
+Lead-applied Lottery decisions should be visible to managers in activity/history and may notify managers when operational urgency requires it.
+Staff affected by a Lottery Decision are contacted by phone; the app records the resulting On Call or Cancelled status but does not need to notify the affected staff member by default.
+Applying a Lottery Decision should require the manager or lead to confirm they contacted the affected therapist by phone, whether the result is On Call or Cancelled. The confirmation should record who confirmed phone contact and when.
+Phone-confirmation metadata is manager/lead audit context; staff see the resulting status, not the confirmation record by default.
+Staff may see Lottery-applied On Call or Cancelled status labels for other people on Team Schedule, but not the reason or phone-confirmation metadata.
+Lottery Decisions are reversible by permitted managers or leads through operational status changes, with attribution and history retained.
+Reversing a Lottery Decision requires phone-contact confirmation when it changes the affected staff member's work obligation again.
 _Avoid_: treating Lottery output as separate from the live schedule
+_Avoid_: automatically guessing On Call versus Cancelled when applying Lottery
+_Avoid_: using Lottery to apply Call In; Call In is a separate operational status for a therapist who cannot work
+_Avoid_: including PRN staff in the Lottery order
+_Avoid_: silently auto-picking among multiple PRN staff without an explicit PRN ordering rule
+
+**Reduction Volunteer**:
+A staff self-service intent saying they are willing to be placed On Call or Cancelled for one of their own scheduled shifts. Volunteering does not change Team Schedule by itself; manager or lead chooses the final status based on staffing needs and applies On Call or Cancelled after phone-contact confirmation.
+Reduction Volunteer is a published/live schedule reduction workflow, not a Draft or Preliminary Schedule review action. Staff-facing copy may use plain language such as "put my name down" instead of making staff choose On Call versus Cancelled.
+The staff-facing action label should be "Put my name down" with supporting copy explaining that manager/lead may place them On Call or Cancelled depending on staffing needs.
+The active staff-facing state label should be "Name down" in compact schedule UI and "You put your name down" in detail or dashboard contexts. Avoid exposing "Reduction volunteer" as staff-facing jargon.
+Staff may volunteer for reduction on same-day or future published shifts. The final On Call or Cancelled status still requires manager/lead phone-contact confirmation when the decision is applied.
+After Final Publish, staff may put their name down for any future published scheduled shift in the Schedule Block, not only near-term dates.
+Staff may start reduction volunteering from My Shifts, or from Team Schedule when the selected row is their own active scheduled shift.
+Cross-shift fill-in staff may put their own name down for reduction on the fill-in shift they are actually scheduled for when otherwise eligible. If selected and the reduction counts as a Lottery day, movement still applies to their usual/home-shift Lottery order.
+Reduction volunteering is available only for an active Scheduled assignment that does not already have On Call, Cancelled, Call In, or Left Early as its current operational status.
+PRN staff do not use reduction volunteering. PRN reductions are handled by the PRN-first operational rule when no regular staff have put their name down, and PRN staff are not in the Lottery pool.
+Reduction volunteering remains available even when the shift is already at or below minimum staffing, as long as the therapist shift is otherwise eligible. The UI should explain that management may not reduce anyone when staffing is tight.
+Reduction volunteering is blocked when the same therapist shift already has an unresolved Shift Board Need coverage or Trade shift request. Staff should withdraw or resolve the existing request before putting their name down for reduction.
+Need coverage and Trade shift requests are also blocked when the same therapist shift already has an unresolved reduction volunteer entry; staff should withdraw the reduction volunteer entry first.
+Open Need coverage or Trade shift requests from other therapists on the same date/shift do not block a staff member from putting their own name down; selected-day context may show both.
+Picking up an open shift is blocked when it conflicts with a therapist's unresolved reduction volunteer entry for the same shift or creates a schedule conflict. For a different non-conflicting date, the reduction volunteer entry does not block pickup interest.
+Staff may volunteer for reduction on multiple different scheduled shifts in the same Schedule Block. Each date/shift is handled independently, while the one-active-intent rule still applies per therapist shift.
+If the volunteering staff member is the Designated Lead, applying Cancelled status is allowed only when another lead-capable/lead staff member is working that same shift so lead responsibility can be covered.
+When a Designated Lead volunteer is cancelled, the app should designate another working lead-capable staff member for that shift. If multiple eligible replacements exist, manager or lead selects the replacement Designated Lead.
+App notification is enough for the newly designated lead when lead responsibility changes through this flow.
+The cancelled Designated Lead still requires phone-contact confirmation because their work obligation changes.
+Staff may withdraw a reduction volunteer entry until manager or lead applies the final status. After On Call or Cancelled is applied, reversal is manager/lead-owned and requires phone-contact confirmation when it changes work obligation again.
+When staff withdraw a reduction volunteer entry, the "Name down" marker should disappear from active schedule context immediately while history is retained.
+Withdrawing a reduction volunteer entry does not need broad manager/lead notification by default; the active list updates immediately and history remains available.
+Putting your own name down does not need a separate in-app confirmation notification; the active "Name down" state in the UI is the confirmation.
+Once manager or lead phone contact is completed for a reduction decision, the volunteer entry is locked into that operational decision; staff withdrawal after that point is no longer self-service.
+Contact-in-progress state for a reduction decision does not need to be staff-facing.
+Unresolved reduction volunteer entries leave the active volunteer list automatically when the shift starts or passes, while remaining visible in history.
+Expiration of an unresolved reduction volunteer entry does not need an app notification; it quietly leaves active context and remains in history.
+Staff dashboard may surface unresolved reduction volunteer entries as a light active status with withdraw available until the shift starts/passes or manager/lead resolves the entry. It should not read as an urgent task.
+After a manager or lead resolves a reduction decision for a date/shift, new reduction volunteer entries for that same date/shift should be blocked with a clear message that the reduction decision has already been handled.
+Reversing a resolved reduction decision back to Scheduled does not automatically reopen staff self-service reduction entries for that date/shift.
+Managers/leads do not need a dedicated reopen action for names-down self-service by default. After a date/shift reduction is handled, later changes stay in manager/lead operational status workflows.
+Staff may see who volunteered for reduction for the relevant shift/day because it helps them understand whether Lottery is likely to reach them. Reduction volunteering does not need a reason or note field.
+Coworker visibility may show a small "Name down" marker in schedule context when space allows, plus a selected-day list of people with names down. On cramped mobile, the selected-day list is enough. Staff do not need to see exact submission timestamps.
+PRN staff with Team Schedule visibility may see regular staff names-down entries because it explains why a regular volunteer may be reduced while PRN works.
+Staff filling in cross-shift may see names-down and PRN context for the date/shift they are working, even though any Lottery movement remains tied to their usual/home-shift order.
+Managers or leads choose among reduction volunteers, with submission time visible as context. Volunteer order does not automatically select who is placed On Call or Cancelled, including when a PRN is scheduled and a volunteer may be cancelled so the PRN works.
+When a PRN is scheduled or otherwise relevant to the shift, manager/lead resolution should clearly show how PRN context affects the Lottery-counting rule before applying On Call or Cancelled to a regular volunteer.
+If PRN context is ambiguous or missing during day-of reduction resolution, the app should allow manager/lead override with explicit confirmation and record the uncertainty instead of blocking the operational decision.
+PRN ambiguity or override context is manager/lead history. Staff see the resulting Lottery order and operational status, not ambiguity metadata.
+Manager/lead history should distinguish a regular volunteer reduction where PRN worked from a regular volunteer reduction with no PRN because that distinction determines whether the volunteer moves in Lottery order.
+Manager/lead resolution should warn when selecting a cross-shift fill-in volunteer because any counted Lottery movement applies to that therapist's usual/home-shift order, not the shift they are filling into.
+Managers and leads should see relevant reduction volunteers from Team Schedule day detail because day-of reduction decisions happen there. A dedicated Lottery or reduction workflow can still provide the fuller list and history.
+Leads may resolve reduction volunteers for the current day when they have lead operational tools. Future scheduled-day reduction decisions remain manager-owned unless a broader permission is deliberately granted.
+Lead current-day reduction resolution follows Lead Operational Status Permission: if the lead has cross-shift operational tools, they may resolve Day or Night reduction decisions for the current day.
+Current-day manager/lead operational views should show current-day reduction volunteers only. Far-future names-down entries belong in the fuller reduction/Lottery view or the relevant future date's Team Schedule detail.
+Managers do not need aggregate future names-down summary counts by default.
+When no PRN staff are scheduled, selecting a reduction volunteer for On Call or Cancelled status counts as that staff member's Lottery day and moves them to the bottom of their relevant home-shift Lottery order. When a PRN is scheduled and must work, selecting a reduction volunteer for On Call or Cancelled status does not count as a Lottery day.
+If active reduction volunteers exist, reducing a non-volunteer should require an explicit manager/lead override reason. Volunteers are the normal first path, but operational exceptions are allowed with attribution.
+Volunteer-bypass override rationale is manager/lead history by default. Staff see the resulting On Call or Cancelled status, not the reason volunteers were bypassed, unless it is their own affected shift.
+_Avoid_: treating a reduction volunteer as already On Call or Cancelled
+_Avoid_: using reduction volunteering before Final Publish; staff use Preliminary Cell Marks during Preliminary review
+_Avoid_: letting staff volunteer another person for cancellation
+_Avoid_: allowing reduction volunteering from an assignment that is already On Call, Cancelled, Call In, or Left Early
+_Avoid_: allowing PRN staff to put their name down for reduction
+_Avoid_: allowing multiple unresolved self-service intents for the same therapist shift
+_Avoid_: allowing Designated Lead reduction volunteer cancellation when no other lead-capable staff member is working that shift
+_Avoid_: preventing staff from withdrawing unresolved reduction volunteer intent
+_Avoid_: hiding reduction volunteer names when they materially affect staff expectations about working
+_Avoid_: exposing reduction volunteer reasons by default
+_Avoid_: presenting reduction volunteer order as an automatic entitlement to be placed On Call or Cancelled
+_Avoid_: moving a reduction volunteer to the bottom of the Lottery order when PRN-staffing rules mean the cancellation should not count as a Lottery day
+_Avoid_: asking staff to choose between On Call and Cancelled when volunteering; staffing needs determine the final status
+_Avoid_: reducing a non-volunteer while active volunteers exist without explicit override context
+_Avoid_: exposing volunteer-bypass rationale to unrelated staff
+_Avoid_: showing staff a contact-in-progress state before the operational decision is resolved
+_Avoid_: relying on app notification as the primary communication for Lottery call-off decisions
+_Avoid_: applying Lottery call-off status without phone-contact confirmation
+_Avoid_: exposing phone-confirmation audit metadata in staff Lottery/status UI by default
 
 **Lottery Visibility**:
 Role-based access to Lottery information. Managers and leads can view and apply decisions across shifts, and therapists can view their shift's lottery order and their own position without apply controls.
+Lottery order is scoped to the relevant site/unit or Schedule Block context and the therapist's usual/home shift. A therapist should not move in a Lottery order for a location or shift context they are only filling into.
+Therapists should have an easy contextual way to see their Lottery position and shift order, such as from Dashboard or My Shifts, using neutral language. This does not make Lottery a full therapist primary workflow.
+Staff Lottery visibility may show the logged-in therapist a light note about their own last movement, such as "Moved after reduction on July 22." Staff should not see full rationale or movement history for everyone.
+Staff infer coworker Lottery movement from the current order; the app does not need to show movement events for other staff.
+Manager/lead Lottery history should be filterable by Day/Night and by staff member so operational history is explainable without scanning a giant log.
+Managers may manually adjust Lottery order when needed, but the action requires an explicit reason and is saved in manager history. Lead manual reorder requires a separate deliberate permission if ever added.
+Staff see the current Lottery order after manual adjustment, not the manager reason. If the logged-in staff member's position changed because of a manual adjustment, a light self-facing note such as "Order updated by manager" is enough.
+Manual Lottery order adjustment does not notify affected staff by default because it changes order context, not a current work obligation.
+Therapist Lottery context should show the therapist's own position prominently and may show the full Day and Night order for operational visibility. Staff visibility does not include applying Lottery decisions or calling staff off in the app; manager/lead owns the action.
+Day and Night Lottery orders should be presented as clearly separate home-shift lists or tabs, never one combined list. Cross-shift fill-in assignments do not require a separate staff cancellation pool.
+Therapists see current Lottery order and position, not Lottery history or manager rationale by default.
 _Avoid_: hiding lottery order from therapists when transparency is expected
 _Avoid_: judgmental labels such as at risk or penalty
+_Avoid_: exposing manager apply controls or manager rationale in therapist Lottery context
+_Avoid_: turning therapist Lottery context into a manager history/audit view
+_Avoid_: treating staff Lottery visibility as permission to apply call-off decisions
+_Avoid_: combining Day and Night Lottery order into one ambiguous staff-facing list
 
 **Pickup Resolution**:
 The approved result of a pickup workflow that adds or assigns a therapist to the live Team Schedule while preserving the original operational status, such as Call In, on the original assignment.
 _Avoid_: treating Shift Board approval as separate from Team Schedule truth
 _Avoid_: clearing the original Call In just because a replacement was added
 
+**Open Shifts**:
+The unified Shift Board opportunity list where staff can respond to team-visible coverage requests and open trade requests. Open Shifts should make the item type unmistakable while keeping "where can I help?" in one staff destination.
+_Avoid_: splitting coverage opportunities and open trade opportunities into separate primary staff destinations
+_Avoid_: making staff infer whether an open item is coverage or trade from hidden lifecycle state
+
 **Open Shifts Responder Queue**:
-The ordered list of therapists who respond to an Open Shifts post. The first responder is primary, later responders are backups, and the manager selects or approves the final resolution.
+The ordered list of therapists who respond to an Open Shifts post. The first responder is primary, later responders are backups, and the manager selects or approves the final resolution. Staff who responded should see neutral position language such as "You're first in line" or "Backup responder #2."
+Staff may withdraw their offer while the Open Shifts item is still pending manager approval. After manager approval finalizes them, backing out is a manager-handled schedule change rather than responder self-withdrawal.
 _Avoid_: hiding responder order from therapists or managers
+_Avoid_: winner/loser language for responder position
+_Avoid_: locking staff into an unresolved offer they can no longer cover
+_Avoid_: letting staff undo an approved schedule change without manager involvement
 
 **Approved Swap**:
 A manager-approved swap whose final assignments are reflected on Team Schedule and My Shifts while Shift Board preserves the request lifecycle and history.
@@ -334,35 +560,70 @@ _Avoid_: showing approved swaps only as request history without updating the liv
 
 **Shift Board**:
 The shared workflow for therapists, leads, and managers to handle swaps, pickups, and direct shift requests after a schedule exists.
+Shift Board requests are for post-publish live schedule changes. Preliminary Schedule feedback uses Preliminary Cell Marks instead of Need coverage or Trade shift requests.
 _Avoid_: using Requests, Pickups, or Shift Swaps as separate primary navigation concepts
 _Avoid_: treating route/API action names as the lifecycle model; Shift Board state transitions should be explicit domain commands
+_Avoid_: using Shift Board for Preliminary Schedule feedback before Final Publish
 
 **Shift Board Section**:
 A shared section name used across roles: Needs Action, Open Shifts, My Requests, and History. Section contents and available actions vary by role and permission.
+Staff should land on My Requests when they have an active request or a direct request waiting on them; otherwise they should land on Open Shifts. Managers can keep Needs Action as the primary review default.
 _Avoid_: giving each role a different board structure for the same workflow
+_Avoid_: defaulting staff to an empty manager-shaped Needs Action view
 
 **New Shift Board Request**:
-The therapist entry point for creating a new trade or give-up request. Picking up a shift is not created here; therapists pick up shifts by opening an existing Open Shifts item and responding to it.
+The therapist entry point for creating a new trade request or coverage request. The entry point should be neutral, then the first composer screen should make the therapist choose Trade shift or Need coverage before sending anything. Picking up a shift is not created here; therapists pick up shifts by opening an existing Open Shifts item and responding to it.
+Submitted request terms are not edited in place. If a therapist chose the wrong shift, teammate, path, or message, they withdraw the pending request and create a corrected one.
+Each therapist may have at most one unresolved Shift Board request for the same scheduled shift. Creating a different path for that shift requires withdrawing the existing unresolved request first.
 _Avoid_: "Pick up a shift" as a new-request option
+_Avoid_: defaulting New request into one request type before the therapist chooses intent
+_Avoid_: mutating pending request terms after teammates or managers may have seen them
+_Avoid_: allowing parallel unresolved trade and coverage requests for the same therapist shift
 
-**Give Up Shift Request**:
-A therapist request to give up a scheduled shift by either asking a specific teammate or posting it to Open Shifts. Manager approval still finalizes the schedule change.
-_Avoid_: forcing every give-up request through a specific teammate first
+**Coverage Request**:
+A therapist request for someone to cover one of their scheduled shifts by either posting it to Open Shifts or asking a specific teammate. The staff-facing action is Need coverage. Open Shifts is the default coverage path because more than one qualified teammate may be able to help; direct teammate ask remains available when the requester already has someone in mind. Manager approval still finalizes the schedule change.
+Coverage Request is for planned post-publish coverage changes, not same-day urgent call-ins. A therapist who cannot make today's shift should contact the manager by phone; staff should not have an in-app call-in path.
+Same-calendar-day Need coverage should be blocked or redirected with plain guidance to call the manager by phone.
+Staff-facing coverage request screens should briefly explain that the original therapist remains responsible until manager approval updates the schedule.
+_Avoid_: Give Up Shift Request as staff-facing language
+_Avoid_: forcing every coverage request through a specific teammate first
+_Avoid_: hiding urgent Call In inside the normal Need coverage request composer
+_Avoid_: adding a staff-facing Call In report path
+_Avoid_: letting same-day urgent coverage needs look like routine Shift Board requests
 
 **Calendar-started Shift Request**:
-A shift board request started from a selected scheduled day in My Shifts, prefilled with the selected shift. Therapists should not have to leave the calendar and re-select the same shift to start a give-up or trade request.
+A shift board request started from a selected scheduled day in My Shifts, prefilled with the selected shift. Selected My Shifts day or cell detail should offer Need coverage and Trade this shift so therapists do not have to leave the calendar and re-select the same shift.
+Same-calendar-day staff shift changes should not enter normal Shift Board request creation. The UI should guide the therapist to call the manager by phone for any same-day Need coverage or Trade shift situation.
+Same-calendar-day is evaluated in the hospital or site local date, not the therapist device timezone.
+Past shifts and shifts that have already started are read-only for staff request creation. Corrections to those shifts are manager-owned schedule or audit cleanup, not therapist-created Shift Board requests.
 _Avoid_: forcing request creation to start only from Shift Board
+_Avoid_: letting same-day urgent shift changes look like routine async requests
+_Avoid_: using browser timezone as the authority for same-day urgency
+_Avoid_: creating staff Shift Board requests for historical or already-started shifts
+
+**Shift-context Request Action**:
+A staff-facing Need coverage or Trade this shift action tied to a concrete scheduled shift, such as a selected My Shifts day or a next-shift dashboard card. Shift-context actions should prefill the request composer so therapists do not have to reselect the same shift.
+_Avoid_: generic dashboard request buttons that send therapists to a chooser without shift context
 
 **Schedule Impact Preview**:
-A visual before/after preview of how a swap, give-up, or pickup would affect the involved days, shifts, people, coverage counts, and downstream schedule truth. Therapists see it before sending a request; managers see it before approval.
+A visual before/after preview of how a swap, coverage request, or pickup would affect the involved days, shifts, people, coverage counts, and downstream schedule truth. Therapists see it before sending a request; managers see it before approval.
+Therapists should see a plain Manager-review warning when a request may create coverage risk, while managers see the detailed operational consequence needed for approval.
+Manager-review warnings should not block therapist submission. Block only structurally invalid requests, such as same-day phone-only shift changes, past or already-started shifts, missing shift selection, or duplicate unresolved requests for the same therapist shift.
+Staff-facing previews should include the responsibility handoff: the current assignment remains theirs until manager approval changes Team Schedule.
 _Avoid_: hiding coverage impact until after request submission or approval
+_Avoid_: forcing staff to interpret manager staffing-rule detail before they submit
+_Avoid_: hiding exact operational impact from manager approval
+_Avoid_: treating every coverage risk warning as a staff-side hard stop
 
 **Post-publish Change Marker**:
 A subtle Team Schedule or My Shifts indicator that a visible assignment or status changed after the original publish. The current schedule truth remains primary, with change details available in selected-day detail.
 Therapists do not need a visible post-publish change-history view; affected-change notifications and the current live schedule are enough for staff-facing use.
-Post-Final Designated Lead reassignment should create subtle post-publish change context because shift responsibility changed, even if staffing did not.
+Direct manager schedule edits after Final Publish should create staff-visible changed-after-publish context for affected staff through subtle markers, recent-change summaries, or selected-day detail.
+Post-publish changes should notify staff when their own assignment or work obligation changes. Changes only to coworker context or staffing counts can rely on visible schedule context without direct notification.
+Post-Final Designated Lead reassignment should create subtle post-publish change context and notify the newly designated lead and the previously designated lead because shift responsibility changed, even if staffing did not.
 _Avoid_: cluttering schedule cells with full history
 _Avoid_: making original-publish history compete with the current live schedule
+_Avoid_: notifying staff for every coworker-context-only schedule change
 
 **Direct Grid Schedule Edit**:
 A manager-facing post-publish edit made directly on the schedule grid, similar to normal schedule building. It is allowed, but the system must still save attribution, history, affected therapist visibility, and any required notification or change marker behind the scenes.
@@ -389,15 +650,22 @@ _Avoid_: storing display abbreviations as business-state values
 
 **Mobile Priority**:
 Mobile design prioritizes therapist quick use first, lead day-of operations second, and manager triage third. Dense manager schedule building can remain desktop-first.
+Therapist mobile navigation should prioritize My Shifts over Team Schedule because staff usually check their own work first on mobile. Team Schedule remains available as shared context, but can live behind More if primary mobile space is tight.
+Availability should stay in therapist primary mobile navigation only while an open or upcoming availability action needs staff attention. When there is no actionable availability work, Availability can move behind More so My Shifts and Shift Board stay easier to reach.
 _Avoid_: compressing every manager workbench into the primary mobile experience
+_Avoid_: making therapists dig for their own schedule on mobile
+_Avoid_: keeping inactive availability collection in prime mobile navigation at the expense of day-to-day shift workflows
 
 **Workflow History**:
 History shown inside the workflow it belongs to, such as Shift Board History, Lottery History, Team Schedule post-publish details, or My Shifts past blocks.
+Staff-facing Shift Board history should emphasize active and recent requests, with older request history available but secondary. Full audit-style request history is manager or admin context.
 _Avoid_: History as a vague standalone primary navigation item
+_Avoid_: making therapist request history feel like an audit log
 
 **Primary Workflow Navigation**:
 The small role-based set of main workflows. Therapists use Dashboard, My Shifts, Team Schedule, Availability, and Shift Board. Leads use Dashboard, Team Schedule, Shift Board, Lottery, and limited Availability visibility if needed. Managers use Dashboard, Coverage, Team Schedule, Availability, Shift Board, and Lottery.
 _Avoid_: promoting Roster, Publish, History, Print, Export, or Requests into separate primary workflow concepts
+_Avoid_: using My Schedule as a primary therapist navigation label
 
 **Attention Surface**:
 The combination of Dashboard summary, inline workflow context, and notification history used to show user-relevant changes without duplicating noise.
@@ -405,7 +673,14 @@ _Avoid_: relying only on global notifications or repeating the same alert everyw
 
 **Role-specific Dashboard**:
 A dashboard whose information hierarchy matches the user's role: therapist personal next action, lead day-of regular-shift operations, or manager both-shift operational triage.
+Therapist dashboards should include a compact recent schedule changes summary that links into My Shifts or Shift Board instead of becoming a full history surface.
+Therapist dashboard and My Shifts surfaces must make Preliminary Schedule and Final Schedule visibly distinct with plain labels such as "Preliminary - review open" and "Final schedule published."
+Therapist dashboards should make the next availability block needing action primary, with later future blocks summarized secondarily rather than shown as equal competing cards.
 _Avoid_: one generic dashboard trying to serve all roles equally
+_Avoid_: making staff rely only on notification history to notice recent schedule changes
+_Avoid_: turning the dashboard into a detailed audit or history page
+_Avoid_: letting staff confuse a Preliminary Schedule with the official Final Schedule
+_Avoid_: overwhelming staff with multiple equal future availability cards when one next action is most important
 
 **Lead Dashboard**:
 The lead-facing dashboard for today or next-shift operations on the lead's regular shift, including Team Schedule status, Call In impact, operational status attention, Lottery decision context, and Shift Board visibility without manager final approval.
@@ -489,6 +764,7 @@ _Avoid_: allowing bypass with only a confirmation click and no audit reason
 
 **Final Publish Notification**:
 The block-wide notification sent when a Schedule Block becomes the official active final schedule, including normal Final Publish and republish from offline. It goes to all therapists in the Schedule Block, not only therapists whose assignments changed during preliminary review.
+Staff receive Final Publish Notification even when their schedule did not change from Preliminary because Final Publish is the official release moment.
 _Avoid_: treating Final Publish as a delta-only notification
 _Avoid_: skipping unchanged therapists when the official final schedule is released
 
@@ -496,32 +772,67 @@ _Avoid_: skipping unchanged therapists when the official final schedule is relea
 The staff-entered review layer on top of a Preliminary Schedule, represented as cell marks rather than formal Shift Board requests. The pencil layer does not directly rewrite the manager's original draft; it waits for manager review before becoming part of the final published schedule.
 Manager edits to the Preliminary Schedule should preserve staff pencil marks where possible and surface conflicts when the underlying assignment/date context changes.
 Staff may create or edit pencil marks only while the Schedule Block is in Preliminary review.
+Managers may explicitly close Preliminary review to stop new staff input while they finalize the schedule. Final Publish also closes Preliminary review automatically.
+After Preliminary review is closed but before Final Publish, staff may view the current preliminary schedule and their resolved mark state, but cannot create or edit marks.
+Closing Preliminary review does not need a separate staff notification; Final Publish is the main staff communication point.
+When a manager sets a Preliminary review deadline, staff-facing preliminary surfaces should show it plainly, such as "Review by Friday." If no deadline is set, say only that Preliminary review is open.
+Managers are not required to set a Preliminary review deadline when sending Preliminary, but the workflow should make it easy to add one.
 _Avoid_: letting staff preliminary edits silently mutate the manager's draft shifts
 _Avoid_: showing every staff member's unresolved pencil marks to all staff; staff see their own marks, while managers see all marks
 _Avoid_: bending request-style preliminary tables into the source of truth for paper-style cell marks; use a cell-mark model that matches the grid interaction
 _Avoid_: silently dropping staff pencil marks because a manager edited the preliminary grid
 _Avoid_: accepting new preliminary pencil marks in Draft, Final, Offline, or Archived states
 _Avoid_: reopening preliminary marks after Final Publish; use post-Final workflows instead
+_Avoid_: silently closing staff preliminary input just because manager review work has started
+_Avoid_: leaving managers without a clear way to stop new preliminary input before finalizing
+_Avoid_: sending noisy staff notifications just because Preliminary review closed
+_Avoid_: inventing a staff preliminary deadline when the manager did not set one
+_Avoid_: blocking Send Preliminary solely because no review deadline was entered
 
 **Preliminary Cell Mark**:
 A staff pencil mark on one date cell of the Preliminary Schedule. Marking out a scheduled `1` means the staff member is asking not to work that assigned day; writing a `1` into an empty eligible day means the staff member is asking to work that day. The mark is visible to the manager as staff-entered pencil until manager final review.
 The mark belongs to a target therapist row, while provenance records who created or updated it.
 Managers may create or correct Preliminary Cell Marks on behalf of staff with provenance retained.
 While Preliminary review is open, staff may edit manager-created marks that belong to their own row.
+Staff may continue creating or editing unresolved Preliminary Cell Marks while managers are resolving other marks, until the manager explicitly closes review or publishes. Newly submitted marks must stay visible to managers and keep Final Publish blocked until resolved.
+Staff should see their own Preliminary Cell Marks, not coworker-specific preliminary marks. Aggregate staffing signals can remain visible without exposing who requested a preliminary change.
+Staff may see aggregate preliminary interest such as how many people offered to help on an understaffed day, but not the coworker-specific marks behind that count.
+Staff may create Preliminary Cell Marks from Team Schedule context only on their own row or eligible own-shift cells when the UI makes ownership clear.
 Each therapist/date/shift cell has at most one current Preliminary Cell Mark state; history may exist behind it.
 A Flexible PRN add-work mark during Preliminary review is explicit work intent for manager review, even without prior date-level availability.
+Staff may use a Preliminary Cell Mark to offer to pick up an understaffed preliminary shift. This is preliminary add-work intent, not a post-publish Shift Board pickup.
+Below-minimum preliminary days should be highlighted as useful places to help, but staff may still add-work mark any eligible day they want to work.
 Preliminary add-work marks are manager-review requests, not automatic hard assignments like pre-schedule Need to Work.
+Staff-facing preliminary add-work UI should not warn about overstaffing. Staff offer availability; managers decide whether to accept over-coverage.
+During Preliminary review, staff feedback belongs in Preliminary Cell Marks only; Need coverage and Trade shift request creation belongs to post-publish Shift Board workflows.
 Preliminary mark-outs are also manager-review requests; the assignment is removed only if the manager approves the mark-out.
 Staff may withdraw their own unresolved Preliminary Cell Marks while Preliminary review is open.
+This includes preliminary add-work offers: staff may withdraw before manager resolution, but after approval the assignment is schedule truth and changes are manager-handled.
 After a manager approves, denies, or dismisses a Preliminary Cell Mark, staff cannot edit or withdraw that resolved mark.
 After a same-cell Preliminary Cell Mark is denied or dismissed, staff cannot create a new mark on that same cell unless a manager reopens it.
+If staff try to add the same day again after denial or dismissal, the UI should show a clear error message explaining that the manager already resolved that preliminary mark and that they should contact the manager if something changed.
 Managers may reopen denied or dismissed Preliminary Cell Marks while Preliminary review remains open, with history retained.
 Preliminary Cell Marks cannot be reopened after Final Publish.
+Final Publish is blocked until each unresolved Preliminary Cell Mark is approved, denied, dismissed, or otherwise explicitly resolved by a manager so staff feedback does not disappear ambiguously.
 _Avoid_: forcing simple paper-style preliminary edits into a heavy swap or request workflow
+_Avoid_: routing preliminary pickup offers through normal post-publish Shift Board requests
+_Avoid_: making staff evaluate overstaffing before offering to work a preliminary day
+_Avoid_: creating post-publish Shift Board requests against a Preliminary Schedule
+_Avoid_: publishing final schedules while staff preliminary marks are unresolved
+_Avoid_: silently ignoring a repeat preliminary mark after manager denial
 _Avoid_: letting staff mark someone else's row; staff preliminary marks are limited to the signed-in staff member's own row, while managers review all rows
+_Avoid_: making Team Schedule context imply staff can mark coworker rows
+_Avoid_: exposing coworker-specific preliminary requests to staff before manager review
+_Avoid_: exposing aggregate preliminary interest in a way that reveals who made the marks
 _Avoid_: confusing the target therapist with `created_by` when a manager enters or corrects a mark on behalf of staff
-_Avoid_: cross-shift staff marking by default; Day staff mark Day schedule cells and Night staff mark Night schedule cells unless a manager edits across shifts
+Cross-shift preliminary marks may be allowed when necessary because staff sometimes work across shifts, but they should not be the common/default path.
+Cross-shift preliminary marks should require a short staff note so managers understand why the exception is reasonable.
+Cross-shift preliminary add-work must prevent unsafe adjacent shift combinations: do not allow a Night shift mark when the therapist is already working the next Day shift, and do not allow a Day shift mark when the therapist is already working the previous Night shift.
+_Avoid_: making cross-shift staff marking feel routine when it should be an exception
+_Avoid_: accepting cross-shift preliminary marks without context for manager review
+_Avoid_: letting cross-shift preliminary marks create night-before/day-after work conflicts
 _Avoid_: locking a staff member's preliminary marks immediately after entry; staff can revise their own pencil marks until the manager closes review or publishes
+_Avoid_: letting staff undo a manager-approved preliminary assignment without manager involvement
 _Avoid_: requiring a note for every preliminary mark; notes are optional context, not the primary interaction
 _Avoid_: requiring every mark-out and add-work mark to be paired, even though pairing should be easy when a staff member is proposing a direct replacement day
 _Avoid_: blocking a standalone mark-out just because the staff member did not propose a replacement day
@@ -531,8 +842,27 @@ _Avoid_: blocking staff from marking out a scheduled day just because they were 
 
 **Preliminary Mark Approval**:
 The manager's inline review action for a Preliminary Cell Mark. In the review grid, a staff mark-out should appear as a noticeable hash mark over the original scheduled `1`, and a staff add-work mark should appear as a colored `1`; approving the change removes the old normal `1`/hash mark and turns the new approved `1` into a normal schedule assignment.
+After approval, the schedule should update accordingly and the preliminary annotation should disappear from the staff-facing current schedule. Approved marks become ordinary schedule truth; unresolved marks remain visible as review annotations.
+Manager approval of cross-shift preliminary add-work should check the same night-before/day-after conflict rule. Managers may override an adjacent shift conflict only with an explicit reason.
+Approving an adjacent-shift conflict override should notify the affected therapist when approved, not wait only for Final Publish.
+When approving one of several preliminary add-work offers resolves the staffing need and the manager does not want additional staff, other competing offers for that same need should close with a neutral state such as "Not needed after schedule update." If the manager may still approve extra staff, remaining offers should stay pending or be closed intentionally.
+Managers should have an explicit bulk action such as Close remaining offers as not needed after enough coverage is approved.
+Those neutral competing-offer closures should lightly notify the affected staff members so they know their offer is no longer pending.
+Managers may approve more staff than the minimum when appropriate. Minimum Staffing is not a hard cap; over-coverage is a manager warning/context, not an automatic denial.
+Preliminary add-work offers should be ordered for manager review by useful fit signals such as lead qualification and staffing need, with submission time as a tiebreaker. Ordering supports manager choice; it does not auto-select the winner.
+Staff should not see their rank among preliminary add-work offers; they only need pending or resolved state.
+Denied or materially changed Preliminary Cell Marks should lightly notify only the affected staff member before Final Publish. Routine approvals can usually wait for Final Publish to communicate the settled schedule.
+If the manager provides a staff-facing comment on a denied Preliminary Cell Mark, the affected staff member should be able to see it.
+Manager comments on Preliminary Cell Mark denial are optional by default unless department policy later requires them.
 _Avoid_: hiding manager review in a separate approvals queue when the mark can be approved directly from the preliminary grid
 _Avoid_: leaving approved staff-entered `1`s visually colored after they become normal schedule truth
+_Avoid_: leaving resolved preliminary comments or annotations in the way after the schedule has been updated
+_Avoid_: approving night-before/day-after cross-shift conflicts without an explicit manager override reason
+_Avoid_: hiding an approved adjacent-shift override until Final Publish
+_Avoid_: leaving competing preliminary offers pending after the schedule need is already resolved
+_Avoid_: forcing managers to close no-longer-needed preliminary offers one by one
+_Avoid_: presenting preliminary offer order as an automatic entitlement to the shift
+_Avoid_: showing staff comparative ranking for preliminary offers
 _Avoid_: auto-filling coverage when a standalone mark-out is approved; approval removes that assignment and surfaces the resulting coverage count for manager action
 _Avoid_: blocking Preliminary mark-out approval solely because it removes the current Designated Lead; auto-promote another assigned lead-capable therapist when available, otherwise surface missing lead coverage for manager resolution before Final Publish
 _Avoid_: blocking manager approval of an add-work mark solely because the slot is already at or above target coverage; warn about over-coverage and let the manager decide
@@ -540,10 +870,13 @@ _Avoid_: publishing a final Schedule Block while preliminary marks are unresolve
 _Avoid_: keeping denied or dismissed pencil marks as long-term staff-facing schedule clutter; retain manager/audit history only as needed for traceability
 _Avoid_: making resolved preliminary history obvious or in the way after manager review; the current grid should prioritize unresolved marks and final schedule truth
 _Avoid_: sending noisy notifications for every approved preliminary mark; notify lightly and only the affected staff member when a mark is denied or changed materially, and let final publish communicate the settled schedule
+_Avoid_: hiding a staff-facing denial comment from the affected staff member
 
 **Linked Preliminary Change**:
 A pair of Preliminary Cell Marks from the same staff member where marking out one scheduled `1` and writing a new colored `1` elsewhere represents one intended move. Managers can approve the linked change as one action, while standalone mark-outs and standalone add-work marks remain valid.
+Linked Preliminary Change is not a coworker trade request. Specific teammate trading belongs to post-publish Shift Board after Final Publish.
 _Avoid_: forcing every preliminary mark into a linked move
+_Avoid_: modeling preliminary linked moves as direct swaps with another staff member
 _Avoid_: making managers approve the removal and replacement separately when staff clearly proposed them together
 _Avoid_: denying only half of a linked change; deny clears both pencil marks and leaves the original schedule unchanged
 _Avoid_: approving a linked change that silently violates hard structural rules such as Daily Assignment Uniqueness or Final lead coverage requirements
@@ -587,33 +920,48 @@ _Avoid_: asking therapists to choose Day/Night for routine availability when the
 Manager availability tools may explicitly set Day or Night scope for cross-shift exceptions when needed.
 
 **Direct Swap Request**:
-A swap request sent to one specific teammate before manager approval.
+A trade request sent to one specific teammate before manager approval. This is the default Trade shift path because the app can evaluate the two concrete assignments and show whether the proposed trade is coverage-safe.
 _Avoid_: private swap, specific-person swap, direct teammate ask
 
 **Direct Request Response**:
-The specific teammate's accept or decline response to a Direct Swap Request or direct give-up request. Acceptance moves the request to manager approval; it does not change Team Schedule by itself.
+The specific teammate's accept or decline response to a Direct Swap Request or direct Coverage Request. Acceptance moves the request to manager approval; it does not change Team Schedule by itself.
 _Avoid_: treating teammate acceptance as final schedule approval
 
 **Request Waiting State**:
 A therapist-visible lifecycle label that states who the request is waiting on, such as Waiting on teammate, Waiting on manager, Approved, Declined, Denied by manager, or Withdrawn.
 _Avoid_: using Accepted alone when manager approval is still required
 
+**Request Withdrawal**:
+A therapist action that stops their own unresolved Shift Board request before final manager approval. Withdrawal should notify only engaged participants: the direct teammate who was asked, or responders who expressed interest on an Open Shifts post. It should not notify everyone who could have seen the board.
+_Avoid_: silently leaving an asked teammate thinking they still need to respond
+_Avoid_: broadcasting open-request withdrawals to the whole team
+
 **On-behalf Shift Board Post**:
 A Shift Board post created by a manager, or by a lead if permitted, for a therapist after an operational or verbal request. It must show who created it and who it is for.
 _Avoid_: making manager-entered requests look therapist-submitted
 
 **Manager Final Approval**:
-The required manager approval step before a Shift Board request can change Team Schedule or My Shifts. Leads may have visibility or operational support permissions, but final swap, give-up, or pickup approval is manager-only.
+The required manager approval step before a Shift Board request can change Team Schedule or My Shifts. Leads may have visibility or operational support permissions, but final swap, coverage request, or pickup approval is manager-only.
+If a manager denies a request and provides a reason, the reason should be visible to the requester and directly involved teammate or responders. A denial reason is useful but not required by default unless department policy changes.
+Manager approval is the final schedule-changing action and should immediately update Team Schedule and affected My Shifts views without requiring another staff confirmation.
+Affected staff should be notified after approval. In-app notification is required; email follows the existing notification preference and channel configuration.
 _Avoid_: letting lead actions finalize schedule-changing Shift Board requests
+_Avoid_: hiding a manager denial reason from directly involved staff when one exists
+_Avoid_: requiring staff to reconfirm after manager final approval
+_Avoid_: making email the only record of an approved schedule-changing request
 
 **Lead Operational Status Permission**:
 Permission for leads to toggle all live operational statuses on Team Schedule across shifts, including On Call, Cancelled, Call In, and Left Early. It does not include final approval of Shift Board schedule changes.
+Lead operational permission is cross-shift; the UI may default to the lead's regular shift for convenience, but permitted lead status work is not limited to that shift.
+Lead operational status permission does not include assigning replacement therapists after a Call In; it should surface the coverage gap for manager action.
+Leads may apply On Call and Cancelled without manager approval when they have operational status permission; attribution, status history, and affected-therapist notification still apply.
 _Avoid_: treating lead status updates as manager final approval
 _Avoid_: restricting leads to Call In or Left Early when they normally handle Cancelled and On Call day-of operations
 _Avoid_: giving leads designated-lead reassignment authority; changing the Designated Lead is a manager-owned assignment/role edit
+_Avoid_: quietly turning lead status tools into live schedule assignment tools
 
 **Open Swap Request**:
-A swap request posted for manager review without committing to one teammate up front.
+A trade request posted for manager review without committing to one teammate up front. This is the fallback Trade shift path for therapists who are flexible or do not already know who might trade.
 _Avoid_: generic swap, board swap, open ask
 
 **Suggested Swap Partner**:
@@ -652,7 +1000,7 @@ _Avoid_: embedded form, generic request page, mini composer
 - A **Direct Request Response** gates manager review but does not update Team Schedule until manager approval
 - **Request Waiting State** labels should make it clear when a teammate accepted but the request is still waiting on manager approval
 - **On-behalf Shift Board Post** entries must show manager/lead attribution and the therapist the post is for
-- **Manager Final Approval** is required before Shift Board swaps, give-up requests, or pickups change Team Schedule or My Shifts
+- **Manager Final Approval** is required before Shift Board swaps, coverage requests, or pickups change Team Schedule or My Shifts
 - **Lead Operational Status Permission** allows lead status toggles across Day and Night shifts, but Shift Board final approval remains manager-only
 - **Lead Operational Status Permission** does not include changing the **Designated Lead** assignment; designated-lead reassignment is manager-owned
 - A manager can set a **Manager-assigned partner** while resolving an **Open Swap Request**
@@ -753,6 +1101,7 @@ _Avoid_: embedded form, generic request page, mini composer
 - When an **Operational Status Change** creates a coverage issue, the live status should still be saved; the app should surface the coverage impact and route managers to Coverage or Shift Board rather than auto-filling another therapist
 - **Cancelled** means the staff member was not needed and should not create a coverage gap
 - **On Call** and **Cancelled** apply to existing assignments through post-publish operations or Lottery outcomes, not as normal initial draft assignment states
+- **On Call** and **Cancelled** must remain visually and textually distinct in staff-facing schedule views because they carry different work obligations
 - **Left Early** should show on Team Schedule but should not affect the staffing ratio for that day
 - **On Call** remains visible on Team Schedule but should be grouped separately from actively working staff, should not count as active bedside coverage, and should not automatically create a coverage gap when intentionally assigned
 - **Call In** is the only operational status that automatically creates possible coverage impact and should route managers or leads to urgent resolution when staffing falls below minimum
@@ -764,7 +1113,7 @@ _Avoid_: embedded form, generic request page, mini composer
 - Automatic **Designated Lead** promotion also applies when a Preliminary mark-out approval removes the current lead and another assigned lead-capable therapist is available
 - Preliminary automatic **Designated Lead** promotion is visible in the current Preliminary Schedule but does not notify the newly promoted lead until Final Publish
 - Lottery is driven by Team Schedule: live schedule changes update the Lottery view, and a **Lottery Decision** applies **Cancelled** or **On Call** back to Team Schedule and My Shifts
-- A **Lottery Decision** is shift-specific: managers apply it to Day or Night, not Both
+- A **Lottery Decision** applies within the therapist's relevant home-shift Lottery order; cross-shift fill-in work does not create a separate cancellation pool
 - **Lottery Visibility** lets managers and leads apply decisions across shifts, and lets therapists view their shift order and own position without apply controls
 - Therapists may see the full lottery order for their shift using neutral language, with manager-only rationale and apply controls hidden
 - Lottery remains a primary workflow for managers and leads, with contextual links from Team Schedule selected-day detail; lead-applied decisions require attribution/history, and therapists see lottery position/order context without needing a primary Lottery nav item
@@ -856,12 +1205,12 @@ _Avoid_: embedded form, generic request page, mini composer
 - **Shift Board Section** names stay consistent across roles, while actions and contents are permission-specific
 - Shift Board defaults to **Needs Action** for all roles; if empty, show a clear empty state and counts that point to Open Shifts, My Requests, and History
 - **Open Shifts** contains pickup opportunities and open swap requests together, with clear item type labels and optional filters rather than separate primary sections
-- **New Shift Board Request** creates trade or give-up requests only; pickup responses start from existing Open Shifts posts
-- A **Give Up Shift Request** can target a specific teammate or be posted to Open Shifts; manager approval remains required before Team Schedule changes
-- Posting a **Give Up Shift Request** to Open Shifts does not remove the original therapist from Team Schedule; the original therapist remains scheduled until manager approval finalizes a replacement or other resolution
+- **New Shift Board Request** creates trade requests or coverage requests only; pickup responses start from existing Open Shifts posts
+- A **Coverage Request** can target a specific teammate or be posted to Open Shifts; manager approval remains required before Team Schedule changes
+- Posting a **Coverage Request** to Open Shifts does not remove the original therapist from Team Schedule; the original therapist remains scheduled until manager approval finalizes a replacement or other resolution
 - **Open Shifts Responder Queue** should show primary and backup responders, including "you are first in line" or backup position for the current therapist when applicable
-- A **Calendar-started Shift Request** should prefill the selected My Shifts assignment and offer Give up this shift or Trade this shift from selected-day detail
-- A **Schedule Impact Preview** should show the overall schedule effect before a therapist sends a request and before a manager approves swaps, give-up requests, or pickup resolutions
+- A **Calendar-started Shift Request** should prefill the selected My Shifts assignment and offer Need coverage or Trade this shift from selected-day detail
+- A **Schedule Impact Preview** should show the overall schedule effect before a therapist sends a request and before a manager approves swaps, coverage requests, or pickup resolutions
 - A therapist request with a coverage concern should show a **Manager-review warning** in the **Schedule Impact Preview** but remain sendable unless it is structurally invalid
 
 ## Example dialogue

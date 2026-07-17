@@ -159,8 +159,7 @@ describe('AppShell navigation structure', () => {
 
   it('includes the unified schedule route in the flat staff nav', () => {
     expect(shellConfigSource).toContain("href: '/schedule'")
-    expect(shellConfigSource).toContain("label: 'Schedule'")
-    expect(shellConfigSource).not.toContain("label: 'My Shifts'")
+    expect(shellConfigSource).toContain("label: 'My Shifts'")
   })
 
   it('routes manager Dashboard section to the manager dashboard', () => {

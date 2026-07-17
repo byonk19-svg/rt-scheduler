@@ -59,7 +59,7 @@ function totalToneClass(date: string): string {
 }
 
 const gridCellHitTargetClass =
-  'group relative inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] text-[8px] font-black leading-none tabular-nums touch-manipulation [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11'
+  'group relative inline-flex min-h-6 min-w-6 items-center justify-center rounded-[2px] text-[8px] font-black leading-none tabular-nums touch-manipulation [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11'
 
 const gridCellMarkClass =
   'inline-flex min-h-4 min-w-4 items-center justify-center rounded-[2px] px-0 text-[8px] font-black leading-none tabular-nums'
@@ -152,6 +152,7 @@ export function ScheduleGridTable({
               shiftType={dataset.shiftType}
               cycleDates={cycleDates}
               isViewer={isStaffViewer && row.userId === viewerUserId}
+              hideEligibilityReason={isStaffViewer}
               interactionMode={interactionMode}
               interactionsDisabled={interactionsDisabled}
               onCellClick={onCellClick}
@@ -172,6 +173,7 @@ export function ScheduleGridTable({
                   shiftType={dataset.shiftType}
                   cycleDates={cycleDates}
                   isViewer={false}
+                  hideEligibilityReason={false}
                   interactionMode={interactionMode}
                   interactionsDisabled={interactionsDisabled}
                   onCellClick={onCellClick}
@@ -244,6 +246,7 @@ function TherapistRow({
   shiftType,
   cycleDates,
   isViewer,
+  hideEligibilityReason,
   interactionMode,
   interactionsDisabled,
   onCellClick,
@@ -252,6 +255,7 @@ function TherapistRow({
   shiftType: GridDataset['shiftType']
   cycleDates: readonly string[]
   isViewer: boolean
+  hideEligibilityReason: boolean
   interactionMode: ScheduleInteractionMode
   interactionsDisabled: boolean
   onCellClick?: CellClickHandler
@@ -276,10 +280,10 @@ function TherapistRow({
             Your row
           </span>
         ) : null}
-        {row.isOnFmla ? (
+        {!hideEligibilityReason && row.isOnFmla ? (
           <span className="text-[7px] font-black uppercase text-muted-foreground">FMLA</span>
         ) : null}
-        {!row.isActive ? (
+        {!hideEligibilityReason && !row.isActive ? (
           <span className="ml-1 text-[7px] font-black uppercase text-muted-foreground">
             Inactive
           </span>
@@ -305,11 +309,15 @@ function TherapistRow({
           !cell.isIneligible &&
           (canAssign || canEditAssigned)
         )
+        const labelCell =
+          hideEligibilityReason && cell.ineligibleReason !== 'weekly_limit'
+            ? { ...cell, ineligibleReason: undefined }
+            : cell
         const accessibleLabel = buildScheduleCellAccessibleLabel({
           therapistName: row.name,
           date,
           shiftType,
-          cell,
+          cell: labelCell,
           canOpenActions: clickable,
         })
 

@@ -128,6 +128,17 @@ const draftCycle: Cycle = {
   site_id: 'site-a',
 }
 
+const preliminaryCycle: Cycle = {
+  id: 'preliminary-cycle',
+  label: 'Preliminary cycle',
+  start_date: '2026-04-27',
+  end_date: '2026-04-28',
+  published: false,
+  status: 'preliminary',
+  archived_at: null,
+  site_id: 'site-a',
+}
+
 const publishedCycle: Cycle = {
   id: 'published-cycle',
   label: 'Published cycle',
@@ -1217,15 +1228,28 @@ describe('schedule grid model helpers', () => {
     ])
   })
 
-  it('limits therapist cycle options to published cycles and ignores requested drafts', () => {
+  it('limits therapist cycle options to staff-visible cycles and ignores requested drafts', () => {
     const result = selectScheduleCycle({
-      cycles: [draftCycle, publishedCycle],
+      cycles: [draftCycle, preliminaryCycle, publishedCycle],
       cycleIdFromUrl: 'draft-cycle',
       canManageCoverage: false,
     })
 
-    expect(result.selectedCycle?.id).toBe('published-cycle')
-    expect(result.visibleCycles.map((cycle) => cycle.id)).toEqual(['published-cycle'])
+    expect(result.selectedCycle?.id).toBe('preliminary-cycle')
+    expect(result.visibleCycles.map((cycle) => cycle.id)).toEqual([
+      'preliminary-cycle',
+      'published-cycle',
+    ])
+  })
+
+  it('honors requested preliminary cycles for therapist schedule views', () => {
+    const result = selectScheduleCycle({
+      cycles: [draftCycle, publishedCycle, preliminaryCycle],
+      cycleIdFromUrl: 'preliminary-cycle',
+      canManageCoverage: false,
+    })
+
+    expect(result.selectedCycle?.id).toBe('preliminary-cycle')
   })
 
   it('prefers draft cycles before published cycles when no cycle is requested for managers', () => {

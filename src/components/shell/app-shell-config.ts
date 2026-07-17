@@ -183,7 +183,7 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
     },
     {
       href: '/schedule',
-      label: 'Schedule',
+      label: 'My Shifts',
       active: (pathname) =>
         pathname === '/schedule' ||
         pathname === '/therapist/schedule' ||
@@ -298,7 +298,7 @@ export function getMobilePrimaryItems(args: {
       },
       {
         href: '/schedule',
-        label: 'Schedule',
+        label: 'My Shifts',
         active: (pathname) =>
           pathname === '/schedule' ||
           pathname === '/therapist/schedule' ||
@@ -327,7 +327,7 @@ export function getMobilePrimaryItems(args: {
     },
     {
       href: '/schedule',
-      label: 'Schedule',
+      label: 'My Shifts',
       active: (pathname) =>
         pathname === '/schedule' ||
         pathname === '/therapist/schedule' ||

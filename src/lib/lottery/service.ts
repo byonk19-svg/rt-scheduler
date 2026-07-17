@@ -267,11 +267,11 @@ function canManageList(role: UiRole): boolean {
 }
 
 function canApplyLottery(role: UiRole): boolean {
-  return role === 'manager'
+  return role === 'manager' || role === 'lead'
 }
 
 function canReadLotteryHistory(actor: LotteryActor, therapistId: string): boolean {
-  return actor.userId === therapistId || actor.role === 'manager'
+  return actor.userId === therapistId || actor.role === 'manager' || actor.role === 'lead'
 }
 
 function lotteryServiceError(
@@ -1961,7 +1961,7 @@ export async function applyLotteryDecision(
   const deleteDecision = deps?.deleteLotteryDecision ?? deleteLotteryDecision
 
   if (!canApplyLottery(args.actor.role)) {
-    return { ok: false, error: 'Only managers can apply Lottery results.' }
+    return { ok: false, error: 'Only managers or leads can apply Lottery results.' }
   }
 
   const snapshot = await loadSnapshot({

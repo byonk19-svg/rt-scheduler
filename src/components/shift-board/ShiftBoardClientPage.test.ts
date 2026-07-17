@@ -52,13 +52,16 @@ function request(overrides: Partial<ShiftBoardRequest>): ShiftBoardRequest {
   }
 }
 
-function renderManagerCard(overrides: Partial<ShiftBoardRequest>): string {
+function renderManagerCard(
+  overrides: Partial<ShiftBoardRequest>,
+  options: { canReview?: boolean; currentUserId?: string | null } = {}
+): string {
   const req = request(overrides)
 
   return renderToStaticMarkup(
     createElement(ManagerRequestCard, {
       req,
-      canReview: true,
+      canReview: options.canReview ?? true,
       onPickupInterest: () => undefined,
       saving: false,
       interactiveEnabled: true,
@@ -83,6 +86,7 @@ function renderManagerCard(overrides: Partial<ShiftBoardRequest>): string {
       onSwapPartnerChange: () => undefined,
       selectedPickupInterestId: null,
       onSelectPickupInterest: () => undefined,
+      currentUserId: options.currentUserId ?? null,
       overrideReason: '',
       onOverrideReasonChange: () => undefined,
       onForceApprove: () => undefined,
@@ -293,6 +297,36 @@ describe('manager Shift Board action model', () => {
     )
     expect(html).toContain('Approve coverage request')
     expect(html).not.toContain('View coverage request')
+  })
+
+  it('shows denial reasons to managers and directly involved staff only', () => {
+    const deniedRequest: Partial<ShiftBoardRequest> = {
+      status: 'denied',
+      overrideReason: 'Coverage changed after review.',
+      postedById: 'julie',
+      claimedById: 'off-day-partner',
+      swapWithId: 'off-day-partner',
+      interestCandidates: [
+        {
+          id: 'interest-1',
+          therapistId: 'audbriana',
+          therapistName: 'Audbriana',
+          createdAt: '2026-05-10T13:00:00.000Z',
+          status: 'pending',
+        },
+      ],
+    }
+
+    expect(renderManagerCard(deniedRequest)).toContain('Reason: Coverage changed after review.')
+    expect(
+      renderManagerCard(deniedRequest, { canReview: false, currentUserId: 'julie' })
+    ).toContain('Reason: Coverage changed after review.')
+    expect(
+      renderManagerCard(deniedRequest, { canReview: false, currentUserId: 'audbriana' })
+    ).toContain('Reason: Coverage changed after review.')
+    expect(
+      renderManagerCard(deniedRequest, { canReview: false, currentUserId: 'unrelated' })
+    ).not.toContain('Reason: Coverage changed after review.')
   })
 
   it('keeps long responder and requester names readable inside the card', () => {
