@@ -12,7 +12,7 @@ const protectedRoutes = [
 
 for (const route of protectedRoutes) {
   test(`redirects unauthenticated request from ${route} to /login`, async ({ page }) => {
-    await page.goto(route)
+    await page.goto(route, { waitUntil: 'domcontentloaded' })
     await expect(page).toHaveURL(/\/login/)
   })
 }

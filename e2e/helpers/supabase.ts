@@ -23,10 +23,10 @@ type E2EUserPayload = {
 export function createServiceRoleClientOrNull(): SupabaseClient | null {
   const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL')
   const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY')
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || supabaseUrl.includes('example.supabase.co') || !serviceRoleKey) {
     if (!warnedAboutMissingSeededEnv) {
       console.warn(
-        'Seeded E2E coverage is reduced: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing.'
+        'Seeded E2E coverage is reduced: NEXT_PUBLIC_SUPABASE_URL is a placeholder or SUPABASE_SERVICE_ROLE_KEY is missing.'
       )
       warnedAboutMissingSeededEnv = true
     }

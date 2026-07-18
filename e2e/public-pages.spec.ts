@@ -21,11 +21,14 @@ test('landing page exposes public navigation', async ({ page }) => {
   ).toBeVisible()
 
   const main = page.locator('#main-content')
-  await main.getByRole('link', { name: 'Sign in' }).click()
+  await main.getByRole('link', { name: 'Sign in' }).click({ noWaitAfter: true })
   await expect(page).toHaveURL(/\/login(?:[/?].*)?$/)
 
   await page.goto('/', { waitUntil: 'domcontentloaded' })
-  await page.locator('#main-content').getByRole('link', { name: 'Request access' }).click()
+  await page
+    .locator('#main-content')
+    .getByRole('link', { name: 'Request access' })
+    .click({ noWaitAfter: true })
   await expect(page).toHaveURL(/\/signup(?:[/?].*)?$/)
   await expect(page.getByRole('heading', { name: 'Request access' })).toBeVisible()
 })
@@ -57,10 +60,10 @@ test('password reset submits a generic reset-link request', async ({ page }) => 
   })
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' })
-  await page.getByRole('link', { name: 'Forgot password?' }).click()
+  await page.getByRole('link', { name: 'Forgot password?' }).click({ noWaitAfter: true })
   await expect(page).toHaveURL(/\/reset-password(?:[/?].*)?$/)
+  await page.goto('/reset-password', { waitUntil: 'networkidle' })
   await expect(page.getByRole('heading', { name: 'Forgot your password?' })).toBeVisible()
-  await page.waitForLoadState('networkidle')
 
   await page.getByLabel('Email address').fill('casey@example.test')
   await page.getByRole('button', { name: 'Send reset link' }).click()
@@ -69,7 +72,10 @@ test('password reset submits a generic reset-link request', async ({ page }) => 
   await expect.poll(() => recoverRequests.length).toBe(1)
   expect(recoverRequests[0]).toContain('casey@example.test')
 
-  await page.locator('#main-content').getByRole('link', { name: 'Back to sign in' }).click()
+  await page
+    .locator('#main-content')
+    .getByRole('link', { name: 'Back to sign in' })
+    .click({ noWaitAfter: true })
   await expect(page).toHaveURL(/\/login(?:[/?].*)?$/)
 })
 
