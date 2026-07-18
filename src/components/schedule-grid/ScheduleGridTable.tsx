@@ -115,8 +115,8 @@ export function ScheduleGridTable({
   }
 
   return (
-    <div className="max-h-[min(72vh,46rem)] overflow-auto bg-[var(--print-paper)]">
-      <table className="w-full min-w-max border-collapse text-[8px]">
+    <div className="schedule-grid-print-table-wrapper max-h-[min(72vh,46rem)] overflow-auto bg-[var(--print-paper)]">
+      <table className="schedule-grid-print-table w-full min-w-max border-collapse text-[8px]">
         <thead>
           <tr className="border-b border-border/70 bg-[var(--print-paper)]">
             <th className="sticky left-0 top-0 z-40 min-w-[118px] bg-[var(--print-paper)] px-2 py-1.5 text-left font-black uppercase tracking-[0.04em] text-[var(--print-ink)] shadow-[1px_0_0_var(--border)]">

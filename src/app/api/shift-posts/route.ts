@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
-import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { fetchActiveOperationalCodeMap, isWorkingScheduledShift } from '@/lib/operational-codes'
 import { writeAuditLog } from '@/lib/audit-log'
 import { isRequestExpired, type PersistedRequestStatus } from '@/lib/request-workflow'
 import {
@@ -11,6 +11,7 @@ import {
   shiftPostCommandRequiresManager,
 } from '@/lib/shift-post-transition-model'
 import { buildShiftPostReviewRpcCall } from '@/lib/shift-board/review-classifier'
+import { dateKeyFromDate } from '@/lib/schedule-helpers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -82,6 +83,13 @@ type ShiftSelectionRow = {
   shift_type: 'day' | 'night' | null
 }
 
+type CreateRequestShiftPreflightRow = ShiftSelectionRow & {
+  id: string
+  user_id: string | null
+  status: string | null
+  schedule_cycles: { published: boolean | null } | Array<{ published: boolean | null }> | null
+}
+
 type ShiftPostReviewRow = {
   id: string
   status: string
@@ -143,6 +151,7 @@ function toErrorResponse(message: string): NextResponse {
     lowered.includes('requests can only') ||
     lowered.includes('recipient is not available') ||
     lowered.includes('same shift type') ||
+    lowered.includes('call your manager') ||
     lowered.includes('no longer pending') ||
     lowered.includes('no longer available') ||
     lowered.includes('cannot be created')
@@ -343,7 +352,7 @@ async function resolveSameCycleSwapShiftId(params: {
   shiftId: string
 }): Promise<string | null> {
   const { admin, actorId, partnerId, shiftId } = params
-  const todayKey = new Date().toISOString().slice(0, 10)
+  const todayKey = dateKeyFromDate(new Date())
   const { data: requesterShift, error: requesterShiftError } = await admin
     .from('shifts')
     .select('cycle_id, date, shift_type')
@@ -365,7 +374,7 @@ async function resolveSameCycleSwapShiftId(params: {
     .select('id, schedule_cycles!inner(published)')
     .eq('cycle_id', shift.cycle_id)
     .eq('user_id', partnerId)
-    .gte('date', todayKey)
+    .gt('date', todayKey)
     .neq('date', shift.date)
     .eq('shift_type', shift.shift_type)
     .eq('status', 'scheduled')
@@ -387,6 +396,47 @@ async function resolveSameCycleSwapShiftId(params: {
   )
 
   return partnerRows.find((row) => !activeOperationalCodes.has(row.id))?.id ?? null
+}
+
+async function validateCreateRequestShiftBeforeRpc(params: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase query builders are structurally large; this preflight uses a narrow fluent subset.
+  admin: any
+  actorId: string
+  shiftId: string
+}): Promise<string | null> {
+  const { data: shiftData, error } = await params.admin
+    .from('shifts')
+    .select('id, cycle_id, date, shift_type, user_id, status, schedule_cycles(published)')
+    .eq('id', params.shiftId)
+    .maybeSingle()
+
+  if (error) return error.message ?? 'Could not load shift before creating request.'
+  if (!shiftData) return `Shift ${params.shiftId} was not found.`
+
+  const shift = shiftData as CreateRequestShiftPreflightRow
+  const cycle = Array.isArray(shift.schedule_cycles)
+    ? shift.schedule_cycles[0]
+    : shift.schedule_cycles
+  if (shift.user_id !== params.actorId) return 'You can only create requests from your own shift.'
+  if (cycle?.published !== true) return 'Requests can only be created from a published schedule.'
+  const activeOperationalCodes = await fetchActiveOperationalCodeMap(params.admin, [shift.id])
+  if (
+    !isWorkingScheduledShift({
+      status: shift.status,
+      activeOperationalCode: activeOperationalCodes.get(shift.id),
+    })
+  ) {
+    return 'Requests can only be created from a working scheduled shift.'
+  }
+  const todayKey = dateKeyFromDate(new Date())
+  if (shift.date && shift.date < todayKey) {
+    return 'Past shifts cannot be used to create Shift Board requests.'
+  }
+  if (shift.date === todayKey) {
+    return 'For same-day shift changes, call your manager by phone instead of creating a Shift Board request.'
+  }
+
+  return null
 }
 
 async function writeShiftPostApprovalPostPublishAuditLogs(params: {
@@ -447,6 +497,15 @@ export async function POST(request: Request) {
 
       if (!shiftId || (requestType !== 'swap' && requestType !== 'pickup')) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+      }
+
+      const shiftPreflightError = await validateCreateRequestShiftBeforeRpc({
+        admin,
+        actorId: user.id,
+        shiftId,
+      })
+      if (shiftPreflightError) {
+        return toErrorResponse(shiftPreflightError)
       }
 
       const swapShiftId =

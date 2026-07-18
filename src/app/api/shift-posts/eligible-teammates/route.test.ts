@@ -96,6 +96,11 @@ function createAdminClient(state: TestState) {
             ? cell >= filter.value
             : false
         }
+        if (filter.op === 'gt') {
+          return typeof cell === 'string' && typeof filter.value === 'string'
+            ? cell > filter.value
+            : false
+        }
         if (filter.op === 'is') {
           return (cell ?? null) === filter.value
         }
@@ -126,6 +131,10 @@ function createAdminClient(state: TestState) {
       },
       gte(key: string, value: unknown) {
         filters.push({ op: 'gte', key, value })
+        return builder
+      },
+      gt(key: string, value: unknown) {
+        filters.push({ op: 'gt', key, value })
         return builder
       },
       is(key: string, value: unknown) {

@@ -125,6 +125,13 @@ describe('global CSS tokens and theme overrides', () => {
     expect(cssSource).toContain('color-scheme: light;')
   })
 
+  it('lets the full schedule grid print instead of clipping to the scroll viewport', () => {
+    expect(cssSource).toContain('.schedule-grid-print-table')
+    expect(cssSource).toContain('.schedule-grid-print-table-wrapper')
+    expect(cssSource).toContain('max-height: none !important;')
+    expect(cssSource).toContain('overflow: visible !important;')
+  })
+
   it('reserves scroll offset for the fixed authenticated header', () => {
     expect(cssSource).toContain('scroll-padding-top: 5rem;')
   })

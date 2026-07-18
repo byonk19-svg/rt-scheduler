@@ -129,7 +129,7 @@ export function PreliminaryShiftCard({
             </>
           )}
           <label htmlFor={`shift-note-${card.shiftId}`} className="sr-only">
-            Optional note
+            {card.directActionRequiresNote ? 'Required note' : 'Optional note'}
           </label>
           {card.directAction !== 'express_interest' ? (
             <>
@@ -149,15 +149,18 @@ export function PreliminaryShiftCard({
                 id={`shift-note-${card.shiftId}`}
                 name="note"
                 rows={2}
+                required={card.directActionRequiresNote}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
                 placeholder={
-                  card.directAction === 'remove_me'
-                    ? 'Optional note for marking this day out'
-                    : card.directAction === 'add_here'
-                      ? 'Optional note for wanting this day'
-                      : card.canClaim
-                        ? 'Optional note for the manager'
-                        : 'Optional reason for the change request'
+                  card.directActionRequiresNote
+                    ? 'Required note for cross-shift manager review'
+                    : card.directAction === 'remove_me'
+                      ? 'Optional note for marking this day out'
+                      : card.directAction === 'add_here'
+                        ? 'Optional note for wanting this day'
+                        : card.canClaim
+                          ? 'Optional note for the manager'
+                          : 'Optional reason for the change request'
                 }
               />
             </>

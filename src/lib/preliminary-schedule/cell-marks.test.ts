@@ -10,13 +10,21 @@ import {
   reviewPreliminaryCellMark,
 } from './cell-marks'
 
-const migrationSource = readFileSync(
+const baseMigrationSource = readFileSync(
   resolve(
     process.cwd(),
     'supabase/migrations/20260511001059_finish_preliminary_workflow_hardening.sql'
   ),
   'utf8'
 )
+const resolvedRulesMigrationSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260717190333_harden_preliminary_cell_mark_requests.sql'
+  ),
+  'utf8'
+)
+const migrationSource = `${baseMigrationSource}\n${resolvedRulesMigrationSource}`
 
 describe('preliminary cell marks', () => {
   it('wraps the server-side RPCs used by the preliminary pencil workflow', async () => {
@@ -83,5 +91,36 @@ describe('preliminary cell marks', () => {
     expect(migrationSource).toContain('app_review_preliminary_cell_mark')
     expect(migrationSource).toContain("order by case when reviewed_mark.mark_type = 'mark_off'")
     expect(migrationSource).toContain('shifts_designated_lead_assigned_check')
+  })
+
+  it('blocks repeat marks after manager denial or dismissal until reopened', () => {
+    expect(migrationSource).toContain('from public.preliminary_cell_marks resolved_mark')
+    expect(migrationSource).toContain("resolved_mark.status in ('denied', 'dismissed')")
+    expect(migrationSource).toContain('manager already resolved this preliminary mark')
+  })
+
+  it('prevents unsafe adjacent night/day cross-shift add-work marks', () => {
+    expect(resolvedRulesMigrationSource).toContain('app_preliminary_add_work_has_adjacent_conflict')
+    expect(resolvedRulesMigrationSource).toContain("p_mark_type = 'add_work'")
+    expect(resolvedRulesMigrationSource).toContain("sibling_mark.status in ('pending', 'approved')")
+    expect(resolvedRulesMigrationSource).toContain(
+      'Cross-shift preliminary add-work requires a note'
+    )
+    expect(resolvedRulesMigrationSource).toContain("p_shift_type = 'night'")
+    expect(resolvedRulesMigrationSource).toContain('p_mark_date + interval')
+    expect(resolvedRulesMigrationSource).toContain("p_shift_type = 'day'")
+    expect(resolvedRulesMigrationSource).toContain('p_mark_date - interval')
+    expect(resolvedRulesMigrationSource).toContain(
+      'would create unsafe adjacent day and night shifts'
+    )
+  })
+
+  it('rechecks unsafe adjacent add-work marks when managers approve them', () => {
+    expect(resolvedRulesMigrationSource).toContain('app_preliminary_cell_mark_approval_guard')
+    expect(resolvedRulesMigrationSource).toContain(
+      'before update of status on public.preliminary_cell_marks'
+    )
+    expect(resolvedRulesMigrationSource).toContain("new.status <> 'approved'")
+    expect(resolvedRulesMigrationSource).toContain('p_excluded_mark_id')
   })
 })

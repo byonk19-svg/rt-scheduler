@@ -81,6 +81,14 @@ async function redirectWithResult(success?: string, error?: string) {
   redirect(query ? `/preliminary?${query}` : '/preliminary')
 }
 
+function preliminaryMarkErrorCode(message: string | null | undefined): string {
+  const lowered = (message ?? '').toLowerCase()
+  if (lowered.includes('manager already resolved this preliminary mark')) {
+    return 'preliminary_mark_already_resolved'
+  }
+  return 'preliminary_mark_failed'
+}
+
 export async function claimPreliminaryShiftAction(formData: FormData) {
   const { userId } = await getCurrentActiveUser()
   const admin = createAdminClient()
@@ -186,7 +194,7 @@ export async function createPreliminaryCellMarkAction(formData: FormData) {
 
     if (group.error || !group.data) {
       console.error('Failed to create preliminary mark group:', group.error)
-      await redirectWithResult(undefined, 'preliminary_mark_failed')
+      await redirectWithResult(undefined, preliminaryMarkErrorCode(group.error?.message))
       return
     }
 
@@ -204,7 +212,7 @@ export async function createPreliminaryCellMarkAction(formData: FormData) {
 
     if (markOff.error || !markOff.data) {
       console.error('Failed to create preliminary mark-off:', markOff.error)
-      await redirectWithResult(undefined, 'preliminary_mark_failed')
+      await redirectWithResult(undefined, preliminaryMarkErrorCode(markOff.error?.message))
       return
     }
 
@@ -226,7 +234,7 @@ export async function createPreliminaryCellMarkAction(formData: FormData) {
         actorId: userId,
         markId: markOffId,
       })
-      await redirectWithResult(undefined, 'preliminary_mark_failed')
+      await redirectWithResult(undefined, preliminaryMarkErrorCode(addWork.error.message))
       return
     }
 
@@ -249,7 +257,7 @@ export async function createPreliminaryCellMarkAction(formData: FormData) {
 
   if (result.error) {
     console.error('Failed to create preliminary cell mark:', result.error)
-    await redirectWithResult(undefined, 'preliminary_mark_failed')
+    await redirectWithResult(undefined, preliminaryMarkErrorCode(result.error.message))
   }
 
   await notifyManagersOfPreliminaryRequest(admin as never, userId, 'pencil_mark')

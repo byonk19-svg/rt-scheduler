@@ -90,6 +90,7 @@ function makeAdminQuery(result: { data: unknown; error: unknown }) {
     eq: vi.fn(() => query),
     in: vi.fn(() => query),
     gte: vi.fn(() => query),
+    gt: vi.fn(() => query),
     neq: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
@@ -213,7 +214,20 @@ describe('shift-post mutation API', () => {
     }))
     const shiftQueries = [
       makeAdminQuery({
-        data: { cycle_id: 'cycle-1', date: '2026-05-04', shift_type: 'day' },
+        data: {
+          id: 'shift-1',
+          cycle_id: 'cycle-1',
+          date: '2099-05-04',
+          shift_type: 'day',
+          user_id: 'therapist-1',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          schedule_cycles: { published: true },
+        },
+        error: null,
+      }),
+      makeAdminQuery({
+        data: { cycle_id: 'cycle-1', date: '2099-05-04', shift_type: 'day' },
         error: null,
       }),
       makeAdminQuery({
@@ -263,6 +277,108 @@ describe('shift-post mutation API', () => {
       p_claimed_by: 'therapist-2',
       p_message: 'Please swap with me',
     })
+  })
+
+  it('blocks same-day staff requests before they reach the shift-post RPC', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-04T15:00:00.000Z'))
+    const rpcMock = vi.fn()
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'shift_operational_entries') {
+        return makeAdminQuery({ data: [], error: null })
+      }
+      if (table !== 'shifts') {
+        throw new Error(`Unexpected admin table ${table}`)
+      }
+      return makeAdminQuery({
+        data: {
+          id: 'shift-1',
+          cycle_id: 'cycle-1',
+          date: '2026-05-04',
+          shift_type: 'day',
+          user_id: 'therapist-1',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          schedule_cycles: { published: true },
+        },
+        error: null,
+      })
+    })
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'therapist-1', role: 'therapist' })
+    )
+    createAdminClientMock.mockReturnValue({
+      from: fromMock,
+      rpc: rpcMock,
+    })
+
+    try {
+      const response = await POST(
+        makeRequest({
+          action: 'create_request',
+          shiftId: 'shift-1',
+          requestType: 'pickup',
+          visibility: 'team',
+          message: 'Need help today',
+        })
+      )
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body.error).toContain('call your manager')
+      expect(rpcMock).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('blocks requests for shifts with active operational entries before the RPC', async () => {
+    const rpcMock = vi.fn()
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'shift_operational_entries') {
+        return makeAdminQuery({ data: [{ shift_id: 'shift-1', code: 'cancelled' }], error: null })
+      }
+      if (table !== 'shifts') {
+        throw new Error(`Unexpected admin table ${table}`)
+      }
+      return makeAdminQuery({
+        data: {
+          id: 'shift-1',
+          cycle_id: 'cycle-1',
+          date: '2099-05-04',
+          shift_type: 'day',
+          user_id: 'therapist-1',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          schedule_cycles: { published: true },
+        },
+        error: null,
+      })
+    })
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'therapist-1', role: 'therapist' })
+    )
+    createAdminClientMock.mockReturnValue({
+      from: fromMock,
+      rpc: rpcMock,
+    })
+
+    const response = await POST(
+      makeRequest({
+        action: 'create_request',
+        shiftId: 'shift-1',
+        requestType: 'pickup',
+        visibility: 'team',
+        message: 'Need help later',
+      })
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain('working scheduled shift')
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('creates pickup interests through the hardened database function', async () => {

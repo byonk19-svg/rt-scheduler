@@ -64,7 +64,7 @@ function createSupabaseMock(overrides?: {
     eq(column: string) {
       if (column === 'user_id') {
         return {
-          gte() {
+          gt() {
             return {
               eq() {
                 return {
