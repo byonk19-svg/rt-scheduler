@@ -434,6 +434,13 @@ describe('ScheduleGridTable', () => {
     expect(staffCell).toContain('disabled=""')
   })
 
+  it('marks the grid wrapper and table for full-page print overrides', () => {
+    const managerHtml = renderTable(makeDataset())
+
+    expect(managerHtml).toContain('schedule-grid-print-table-wrapper')
+    expect(managerHtml).toContain('schedule-grid-print-table')
+  })
+
   it('pins the viewer row for staff viewers', () => {
     const html = renderTable(
       makeDataset({

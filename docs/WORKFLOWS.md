@@ -154,6 +154,7 @@ Current operational guidance:
 ## 5) Shift Board Requests
 
 1. Staff create shift requests from `/requests/new`.
+   Same-day changes are not self-service requests; staff contact the manager by phone.
 2. Requests can be team-visible or direct:
    team requests are visible on `/shift-board`; direct requests stay between the requester, the selected teammate, and managers.
 3. Team swap requests can optionally name a suggested swap partner up front; managers can keep or change that partner during review.

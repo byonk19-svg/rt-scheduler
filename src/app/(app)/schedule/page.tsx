@@ -16,7 +16,7 @@ import { loadScheduleGridData } from './schedule-grid-data'
 import { SetupCompleteBanner } from './SetupCompleteBanner'
 
 export const metadata: Metadata = {
-  title: 'Team Schedule',
+  title: 'Schedule',
   description: 'Review staffing, coverage, and publish readiness from the unified schedule grid.',
 }
 
@@ -55,6 +55,16 @@ function getScheduleSubtitle(dataset: GridDataset) {
     return 'Review the team schedule and update published shift status in one 42-day grid.'
   }
   return 'Review your row and the live team schedule in one 42-day grid.'
+}
+
+function getSchedulePageTitle(dataset: GridDataset) {
+  if (
+    dataset.interactionMode.kind === 'manager_edit' ||
+    dataset.interactionMode.kind === 'lead_status'
+  ) {
+    return 'Team Schedule'
+  }
+  return 'My Shifts'
 }
 
 function getScheduleStateLabel(dataset: GridDataset) {
@@ -235,12 +245,13 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   }
 
   const feedback = getScheduleFeedback(params)
+  const pageTitle = getSchedulePageTitle(result.dataset)
 
   return (
     <div className="mx-auto max-w-[96rem] scroll-mt-24 space-y-4 px-4 pb-6 pt-2 md:px-6 md:pt-3">
       {showSetupCompleteBanner ? <SetupCompleteBanner /> : null}
       <ManagerWorkspaceHeader
-        title="Team Schedule"
+        title={pageTitle}
         subtitle={getScheduleSubtitle(result.dataset)}
         summary={
           <>

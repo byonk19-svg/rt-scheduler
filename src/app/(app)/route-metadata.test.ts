@@ -19,7 +19,7 @@ const routes = [
   ['src/app/(app)/team/page.tsx', "title: 'Team'"],
   ['src/app/(app)/lottery/page.tsx', "title: 'Lottery'"],
   ['src/app/(app)/coverage/page.tsx', "title: 'Schedule'"],
-  ['src/app/(app)/schedule/page.tsx', "title: 'Team Schedule'"],
+  ['src/app/(app)/schedule/page.tsx', "title: 'Schedule'"],
   ['src/app/(app)/approvals/page.tsx', "title: 'Approvals'"],
   ['src/app/(app)/analytics/page.tsx', "title: 'Analytics'"],
   ['src/app/(app)/profile/page.tsx', "title: 'Profile'"],
@@ -43,9 +43,11 @@ describe('app route metadata sweep', () => {
 })
 
 describe('route title consistency', () => {
-  it('/schedule uses the canonical Team Schedule title', () => {
+  it('/schedule uses neutral metadata and role-aware page titles', () => {
     const source = read('src/app/(app)/schedule/page.tsx')
-    expect(source).toContain("title: 'Team Schedule'")
+    expect(source).toContain("title: 'Schedule'")
+    expect(source).toContain('function getSchedulePageTitle')
+    expect(source).toContain("return 'My Shifts'")
     expect(source).not.toContain('>Schedule roster<')
     expect(source).not.toContain('>Roster view<')
   })
@@ -76,7 +78,8 @@ describe('route title consistency', () => {
     const coverage = read('src/app/(app)/coverage/page.tsx')
     const schedule = read('src/app/(app)/schedule/page.tsx')
     expect(coverage).toContain("title: 'Schedule'")
-    expect(schedule).toContain("title: 'Team Schedule'")
+    expect(schedule).toContain("title: 'Schedule'")
+    expect(schedule).toContain("return 'Team Schedule'")
     expect(coverage).toContain('buildScheduleRedirectPath(params, { preserveAll: true })')
     expect(schedule).not.toContain("title: 'Coverage'")
   })

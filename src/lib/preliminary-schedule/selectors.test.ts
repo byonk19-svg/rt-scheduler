@@ -120,7 +120,7 @@ describe('toPreliminaryShiftCard', () => {
     expect(result.canClaim).toBe(false)
   })
 
-  it('offers express interest on open opposite-shift slots', () => {
+  it('offers a note-required add-work pencil mark on open opposite-shift slots', () => {
     const result = toPreliminaryShiftCard({
       shift: makeShift({ id: 'shift-night', shift_type: 'night', user_id: null, full_name: null }),
       shiftState: makeShiftState({
@@ -131,8 +131,9 @@ describe('toPreliminaryShiftCard', () => {
       currentUserShiftType: 'day',
     })
 
-    expect(result.directAction).toBe('express_interest')
-    expect(result.directActionLabel).toBe('Express interest')
+    expect(result.directAction).toBe('add_here')
+    expect(result.directActionLabel).toBe('Request cross-shift')
+    expect(result.directActionRequiresNote).toBe(true)
   })
 })
 

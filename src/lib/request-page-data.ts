@@ -55,7 +55,7 @@ export async function loadRequestPageSnapshot(
       .from('shifts')
       .select('id, date, shift_type, role, status, schedule_cycles!inner(published)')
       .eq('user_id', user.id)
-      .gte('date', todayKey)
+      .gt('date', todayKey)
       .eq('status', 'scheduled')
       .eq('schedule_cycles.published', true)
       .order('date', { ascending: true }),

@@ -26,6 +26,7 @@ function makeCard(overrides: Partial<PreliminaryShiftCard> = {}): PreliminaryShi
     canRequestChange: false,
     directAction: null,
     directActionLabel: null,
+    directActionRequiresNote: false,
     ...overrides,
   }
 }
@@ -122,6 +123,17 @@ describe('PreliminaryScheduleView', () => {
             state: 'open',
             canClaim: true,
           }),
+          makeCard({
+            shiftId: 'cross-shift',
+            shiftDate: '2026-03-31',
+            shiftType: 'night',
+            assignedUserId: null,
+            assignedName: null,
+            state: 'open',
+            directAction: 'add_here',
+            directActionLabel: 'Request cross-shift',
+            directActionRequiresNote: true,
+          }),
         ],
         historyItems: [
           makeHistory(),
@@ -168,6 +180,9 @@ describe('PreliminaryScheduleView', () => {
     expect(html).toContain('Preliminary Schedule')
     expect(html).toContain('Request change')
     expect(html).toContain('Claim shift')
+    expect(html).toContain('Request cross-shift')
+    expect(html).toContain('Required note for cross-shift manager review')
+    expect(html).toContain('required=""')
     expect(html).toContain('Pending claim')
     expect(html).toContain('Week of Mar 22')
     expect(html).toContain('Week of Mar 29')

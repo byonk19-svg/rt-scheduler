@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { fetchActiveOperationalCodeMap, isWorkingScheduledShift } from '@/lib/operational-codes'
+import { dateKeyFromDate } from '@/lib/schedule-helpers'
 
 type RequestType = 'swap' | 'pickup'
 
@@ -105,7 +106,7 @@ export async function GET(request: Request) {
   }
 
   const admin = createAdminClient()
-  const todayKey = new Date().toISOString().slice(0, 10)
+  const todayKey = dateKeyFromDate(new Date())
 
   const [{ data: shift, error: shiftError }, { data: requesterProfile }] = await Promise.all([
     admin
@@ -207,7 +208,7 @@ export async function GET(request: Request) {
       .eq('cycle_id', requestShift.cycle_id)
       .eq('site_id', actorSiteId)
       .eq('shift_type', requestShift.shift_type)
-      .gte('date', todayKey)
+      .gt('date', todayKey)
       .eq('status', 'scheduled')
       .eq('schedule_cycles.published', true)
       .neq('date', requestShift.date)

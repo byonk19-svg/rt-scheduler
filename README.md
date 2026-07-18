@@ -32,7 +32,8 @@ Controlled demo script: [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
 
 - [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is the live schedule grid for all roles. It uses [`schedule-grid-data.ts`](<./src/app/(app)/schedule/schedule-grid-data.ts>) to load cycles, shifts, force-off markers, operational status, pre-flight data, and role permissions.
 
-- **Schedule** (nav label; route [`/schedule`](<./src/app/(app)/schedule/page.tsx>), rendered via [`ScheduleGrid`](./src/components/schedule-grid/ScheduleGrid.tsx)) - create and staff 6-week blocks, auto-draft, pre-flight, inline assign/unassign, designate lead, update published assignment status, print, and publish. Same cycle-selection rule everywhere: URL cycle if valid, else draft, else published, else none (empty state, not a fake grid).
+- **Team Schedule** (manager nav label; route [`/schedule`](<./src/app/(app)/schedule/page.tsx>), rendered via [`ScheduleGrid`](./src/components/schedule-grid/ScheduleGrid.tsx)) - create and staff 6-week blocks, auto-draft, pre-flight, inline assign/unassign, designate lead, update published assignment status, print, and publish. Same cycle-selection rule everywhere: URL cycle if valid, else draft, else published, else none (empty state, not a fake grid).
+- **My Shifts** (staff nav label; route [`/schedule`](<./src/app/(app)/schedule/page.tsx>)) - read-only staff entry point for the same Schedule Block context, with the therapist row highlighted and preliminary/final state labels kept visible.
 - Auto-draft now opens a pre-flight report first, summarizing likely unfilled slots, missing leads, and forced must-work misses using the real current shift set for that cycle.
 - Managers edit staffing by clicking grid cells. Leads can update published assignment status (`OC`, `LE`, `CX`, `CI`) from staffed cells.
 - `/coverage` is now a compatibility redirect to `/schedule`; the old block-board and roster-layout toggle have been removed.
@@ -71,6 +72,7 @@ Local tooling noise (Playwright MCP dumps, generated `artifacts/`) is gitignored
 - `shifts` stores planned assignments for cycle/date/role.
 - Real-time operational status (for example `on_call`, `call_in`, `cancelled`, `left_early`) is stored in `shift_operational_entries`.
 - Schedule/headcount metrics use "working scheduled" semantics: planned assignments minus active operational entries.
+- Staff Shift Board requests are future-only; same-day shift changes are handled by contacting the manager by phone.
 - Assignment status updates are written through `update_assignment_status` RPC and audited.
 - Lead-only schedule behavior is role-driven in product logic: `role = 'lead'` is the source of truth across Team, Schedule, print/export, and swap-partner filtering.
 

@@ -43,6 +43,7 @@ export function toPreliminaryShiftCard(params: {
   const isPreferredShift = currentUserShiftType != null && shift.shift_type === currentUserShiftType
   let directAction: PreliminaryDirectEditAction | null = null
   let directActionLabel: string | null = null
+  let directActionRequiresNote = false
 
   if (isCurrentUser && shiftState.state === 'tentative_assignment') {
     directAction = 'remove_me'
@@ -60,8 +61,9 @@ export function toPreliminaryShiftCard(params: {
     shift.shift_type !== currentUserShiftType &&
     shiftState.state === 'open'
   ) {
-    directAction = 'express_interest'
-    directActionLabel = 'Express interest'
+    directAction = 'add_here'
+    directActionLabel = 'Request cross-shift'
+    directActionRequiresNote = true
   }
 
   return {
@@ -80,6 +82,7 @@ export function toPreliminaryShiftCard(params: {
     canRequestChange,
     directAction,
     directActionLabel,
+    directActionRequiresNote,
   }
 }
 

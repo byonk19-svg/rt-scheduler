@@ -119,6 +119,34 @@ describe('schedule route', () => {
     expect(html).toContain('Template action wired')
   })
 
+  it('renders the staff-facing schedule label for read-only staff viewers', async () => {
+    loadScheduleGridDataMock.mockResolvedValue({
+      status: 'ok',
+      dataset: {
+        ...okDataset(),
+        interactionMode: {
+          kind: 'staff_view',
+          canUseManagerToolbar: false,
+          canAssignShifts: false,
+          canUnassignShifts: false,
+          canDesignateLead: false,
+          canUpdateAssignmentStatus: false,
+        },
+        viewerRole: 'therapist',
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: false,
+      },
+      initialShiftTab: 'Day',
+      preFlightSummary: null,
+    })
+
+    const html = renderToStaticMarkup(await SchedulePage({ searchParams: Promise.resolve({}) }))
+
+    expect(html).toContain('My Shifts')
+    expect(html).toContain('Review your row and the live team schedule in one 42-day grid.')
+    expect(html).not.toContain('Draft staffing, coverage review, and live schedule visibility.')
+  })
+
   it('renders publish validation failures as visible manager feedback', async () => {
     loadScheduleGridDataMock.mockResolvedValue({
       status: 'ok',
@@ -281,7 +309,9 @@ describe('schedule route', () => {
   it('sets unified schedule metadata', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/schedule/page.tsx'), 'utf8')
 
-    expect(source).toContain("title: 'Team Schedule'")
+    expect(source).toContain("title: 'Schedule'")
+    expect(source).toContain('function getSchedulePageTitle')
+    expect(source).toContain("return 'My Shifts'")
     expect(source).toContain('unified schedule grid')
   })
 

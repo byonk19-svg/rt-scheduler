@@ -77,6 +77,7 @@ export type PreliminaryShiftCard = {
   canRequestChange: boolean
   directAction: PreliminaryDirectEditAction | null
   directActionLabel: string | null
+  directActionRequiresNote: boolean
 }
 
 export type PreliminaryTeamScheduleShift = {

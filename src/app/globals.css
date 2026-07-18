@@ -766,6 +766,16 @@ html {
   .coverage-calendar-desktop-grid {
     min-width: 0 !important;
   }
+
+  .schedule-grid-print-table-wrapper {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .schedule-grid-print-table {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
 }
 
 /* ─── Print: availability page (sidebar hidden in AppShell) ───────────────── */

@@ -114,6 +114,9 @@ function toErrorMessage(value: string | undefined) {
   if (value === 'request_not_pending') {
     return 'That request is no longer pending.'
   }
+  if (value === 'preliminary_mark_already_resolved') {
+    return 'A manager already resolved that preliminary pencil mark. Contact the manager if something changed.'
+  }
   if (value === 'preliminary_mark_failed') {
     return 'Could not update the preliminary pencil mark. Please try again.'
   }
