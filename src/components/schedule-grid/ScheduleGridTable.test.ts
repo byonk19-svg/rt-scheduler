@@ -138,10 +138,11 @@ describe('ScheduleGridTable', () => {
 
   it('renders lead cells with yellow styling', () => {
     const html = renderTable(makeDataset())
+    const cell = getCellButton(html, 'u1', '2026-05-04')
 
     expect(html).toContain('data-testid="cell-u1-2026-05-04"')
-    expect(html).toContain('bg-yellow-200')
-    expect(html).toContain('border-yellow-300')
+    expect(cell).toContain('bg-yellow-200')
+    expect(cell).toContain('border-yellow-300')
     expect(html).toContain('>1</span></button>')
   })
 

@@ -343,6 +343,7 @@ function TherapistRow({
                 clickable
                   ? 'cursor-pointer ring-offset-background transition hover:ring-2 hover:ring-ring/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                   : 'cursor-default',
+                cell.status === 'lead' && display.colorClass,
                 cell.isIneligible && 'opacity-45'
               )}
               disabled={!clickable}
