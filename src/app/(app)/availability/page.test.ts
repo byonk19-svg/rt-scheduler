@@ -63,9 +63,9 @@ describe('availability page role-specific actions', () => {
     expect(source).not.toContain('AvailabilityOverviewHeader')
     expect(source).toContain('Email intake')
     expect(source).toContain('toolbarUtilities=')
-    expect(source).toContain("initialRoster === 'submitted_with_exceptions'")
-    expect(source).toContain("initialRoster === 'submitted_no_exceptions'")
-    expect(source).toContain("initialRoster === 'all'")
+    expect(source).toContain('resolveAvailabilityRosterFilter')
+    expect(source).toContain('requestedFilter: initialRoster')
+    expect(source).toContain('initialRosterFilter={initialRosterFilter}')
   })
 
   it('gates therapist scheduled-shift conflict warnings off for managers', () => {
