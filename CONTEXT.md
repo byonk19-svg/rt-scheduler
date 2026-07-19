@@ -67,17 +67,18 @@ _Avoid_: treating Schedule Block Planning as the place where preliminary or fina
 _Avoid_: exposing Schedule Block Planning as a therapist workflow
 
 **Shift Visibility**:
-Therapists default to their own shift; Team Schedule may show both Day shift and Night shift as read-only visibility, while My Shifts stays personally scoped. Leads and managers may toggle Day/Night wherever their role has schedule access.
+Therapists default to their own shift; Team Schedule may let them switch between separate Day shift and Night shift read-only views, while My Shifts stays personally scoped. Leads and managers may toggle Day/Night wherever their role has schedule access.
 _Avoid_: implying shift visibility grants edit permission
 
 **Shift Default**:
-Team Schedule uses a Day, Night, Both toggle order and opens on Day by default for broad schedule views. Leads default to their regular Day or Night shift in lead-scoped views. Therapists default to their own shift in personal views.
-Therapists viewing Team Schedule should default to their own regular shift for readability, with Day/Night/Both available as an explicit switch for broader context.
-Leads should also default to their own regular shift, with cross-shift access available through the explicit shift switch.
+Manager broad Team Schedule views may use Day, Night, Both toggle order and open on Day by default. Staff-facing Team Schedule uses separate Day/Night views. Leads default to their regular Day or Night shift in lead-scoped views, while therapists default to their own shift in personal views.
+Therapists viewing Team Schedule should default to their own regular shift for readability, with a simple Day/Night switch available for the other separate shift view.
+Leads should also default to their own regular shift, with cross-shift operational status access available through the explicit Day/Night shift switch.
 Managers should return to their last selected Team Schedule shift view when available; Day is the first-time fallback.
 Manager shift-view memory should be scoped per workflow, such as Team Schedule versus Coverage, so resuming one workflow does not unexpectedly change another.
 _Avoid_: defaulting broad schedule views to a dense Both view
 _Avoid_: dropping therapists into Both view when they primarily need their own shift context
+_Avoid_: making ordinary staff use a dense combined Both view to inspect the other shift
 _Avoid_: making lead day-of views behave like generic manager planning views
 _Avoid_: forcing managers back to Day when they were actively working another shift view
 _Avoid_: using one global manager shift preference across workflows with different jobs
@@ -251,18 +252,42 @@ _Avoid_: labeling an intake item as applied before the availability write succee
 **My Shifts**:
 The therapist-facing view of the full Schedule Block, with the therapist's scheduled days highlighted and non-working days still visible for orientation.
 My Shifts is the primary staff-facing label for personal schedule. My Schedule may remain as a compatibility phrase or route alias, but primary staff navigation should use My Shifts.
+My Shifts should show the full six-week Schedule Block context with the therapist's own working days highlighted, so staff can understand where they fit in the broader schedule rather than only seeing an isolated assignment list.
+My Shifts should make weekend scanning easy with subtle grouping or labeling because weekend spacing matters in respiratory therapy scheduling.
+My Shifts scheduled days should show compact same-shift coworker context and the Designated Lead when the therapist is not the lead, while full cross-shift roster context belongs in Team Schedule.
+My Shifts may show coworker names directly when space allows, while mobile or dense layouts may collapse coworkers to a count and show names in day detail.
+My Shifts should avoid showing coworker context on ordinary unscheduled days unless the day has an open need or pickup opportunity.
+My Shifts coworker context should show names and lead context by default, not teammate contact information.
+My Shifts scheduled days should show operational status labels such as On Call, Cancelled, Call In, and Left Early directly on the day, with day detail used for supporting explanation.
+When a My Shifts day is On Call or Cancelled, the obligation status is primary while original same-shift coworker and lead context may remain visible as secondary context.
+Ordinary staff-facing My Shifts and Team Schedule views show operational status labels by default, not internal reasons or manager notes for those statuses.
+My Shifts should show restrained post-publish change markers such as Updated on affected days, while keeping the current schedule/status as the primary truth.
+My Shifts should surface plain coverage-needed prompts on relevant preliminary days, such as "Coverage still needed" or "1 more RT needed," while Team Schedule can show the fuller staffing context.
+My Shifts may show compact pickup opportunity prompts on unscheduled preliminary days when staffing is below threshold, with Shift Board or the request flow owning the action and lifecycle.
+After Final Publish, My Shifts may show a compact Open Shifts or pickup needs strip for discoverability, while Shift Board owns the actual pickup lifecycle.
 My Shifts may show when the therapist is the Designated Lead because lead assignment is operational context.
-Preliminary and Final schedules should use the same My Shifts entry point, with clear state labels and banners rather than separate staff schedule destinations.
+Preliminary and Final schedules should use the same My Shifts entry point, with a large visual difference between review-mode Preliminary and settled Final state rather than separate staff schedule destinations.
+Preliminary My Shifts should feel like review mode through obvious banners, pencil/review styling, review deadline context when present, and preliminary-specific actions. Final My Shifts should feel settled through normal schedule styling, Final schedule published labeling, and post-publish Shift Board actions.
+My Shifts is not the full-team print surface; staff print the full six-week schedule from Team Schedule.
+My Shifts and dashboard may link staff into the relevant Availability workflow when they notice a future issue, but Availability owns the edit and lifecycle rules. If the selected Schedule Block is already in Preliminary review, staff should be guided to Preliminary Cell Marks for that block while normal availability remains available for future blocks.
+For today's scheduled shift, My Shifts should show plain same-day issue guidance such as "Same-day issue? Call manager" without creating a staff self-service Call In path. If a manager or unit phone number is configured, the guidance should support one-tap calling; otherwise it should show the instruction only.
+My Shifts empty or waiting states should explain the schedule lifecycle plainly, such as no visible Schedule Block, waiting for Preliminary, Preliminary review open, or Final schedule not published yet, and should route staff to the next useful action when one exists.
+Mobile My Shifts should preserve the same hierarchy as desktop: the six-week block remains primary, coworker context collapses before schedule context does, and actions remain tied to the selected day.
 _Avoid_: reducing My Shifts to only a list of worked days
 _Avoid_: using My Schedule as the primary label when Team Schedule also exists
 _Avoid_: making staff learn a separate location just to review Preliminary Schedule
+_Avoid_: hiding weekend spacing in a plain chronological list
+_Avoid_: letting mobile collapse the six-week context into only upcoming shifts
 
 **Team Schedule**:
 The canonical live published schedule for all roles, showing who is working across a Schedule Block and current operational statuses such as Scheduled, On Call, Cancelled, Call In, and Left Early.
 Therapists may use Team Schedule as read-only shared context. Leads may adjust permitted operational statuses such as Call In, On Call, Cancelled, and Left Early from Team Schedule, while manager-owned assignment and final Shift Board approval authority remains separate.
 Once Preliminary Schedule is sent, Team Schedule may show the preliminary version to staff with obvious Preliminary labeling so staff can understand team context and coverage gaps before Final Publish.
 Staff may print the full six-week Team Schedule so they can see who is working when. Printing does not grant edit permission.
+Dashboard and My Shifts may link to Print team schedule, but the actual full-team print/export view belongs to Team Schedule as the source of truth.
 Normal staff Team Schedule print should show schedule truth and operational statuses, not unresolved "Name down" volunteer intents.
+Staff Team Schedule should be the place for full roster inspection across the selected Day or Night shift, including coworkers, Designated Lead, visible operational statuses, restrained staffing counts, and print/export actions.
+Staff Team Schedule should preserve separate Day and Night views for readability, with switching available for visibility rather than permission.
 Staff should not have full schedule data export/download by default; manager export remains the admin-oriented path.
 Manager print/export does not need unresolved "Name down" volunteer intents by default; live workflow views remain the source for reduction decisions.
 Staff Team Schedule visibility should show names and shift assignments by default, not teammate contact details. Contact information belongs behind directory or profile visibility rules.
@@ -299,6 +324,7 @@ _Avoid_: treating Cancelled as an automatic coverage problem
 _Avoid_: treating On Call as an automatic coverage problem when it is an intentional status
 _Avoid_: over-modeling partial-shift staffing from Left Early unless the product deliberately adds that rule
 _Avoid_: hiding below-minimum staffing signals from staff when visibility could help fill coverage
+_Avoid_: using Team Schedule as the first place ordinary staff must go to understand their own schedule
 _Avoid_: making staff-facing staffing warnings alarmist or manager-only in tone
 _Avoid_: turning below-target-but-safe staffing into a staff-facing warning
 _Avoid_: showing target staffing to staff in a way that makes safe staffing look like a problem
@@ -449,10 +475,11 @@ _Avoid_: silently auto-picking among multiple PRN staff without an explicit PRN 
 A staff self-service intent saying they are willing to be placed On Call or Cancelled for one of their own scheduled shifts. Volunteering does not change Team Schedule by itself; manager or lead chooses the final status based on staffing needs and applies On Call or Cancelled after phone-contact confirmation.
 Reduction Volunteer is a published/live schedule reduction workflow, not a Draft or Preliminary Schedule review action. Staff-facing copy may use plain language such as "put my name down" instead of making staff choose On Call versus Cancelled.
 The staff-facing action label should be "Put my name down" with supporting copy explaining that manager/lead may place them On Call or Cancelled depending on staffing needs.
-The active staff-facing state label should be "Name down" in compact schedule UI and "You put your name down" in detail or dashboard contexts. Avoid exposing "Reduction volunteer" as staff-facing jargon.
+The active staff-facing state label should be "Name down" in compact schedule UI and "You put your name down" in detail or dashboard contexts. My Shifts should show this active state directly on the relevant scheduled day. Avoid exposing "Reduction volunteer" as staff-facing jargon.
 Staff may volunteer for reduction on same-day or future published shifts. The final On Call or Cancelled status still requires manager/lead phone-contact confirmation when the decision is applied.
 After Final Publish, staff may put their name down for any future published scheduled shift in the Schedule Block, not only near-term dates.
-Staff may start reduction volunteering from My Shifts, or from Team Schedule when the selected row is their own active scheduled shift.
+Staff may start reduction volunteering from My Shifts on their own Final scheduled shift, or from Team Schedule when the selected row is their own active scheduled shift.
+The staff-facing action may say Put my name down and should explain that the final result may be On Call or Cancelled depending on staffing needs.
 Cross-shift fill-in staff may put their own name down for reduction on the fill-in shift they are actually scheduled for when otherwise eligible. If selected and the reduction counts as a Lottery day, movement still applies to their usual/home-shift Lottery order.
 Reduction volunteering is available only for an active Scheduled assignment that does not already have On Call, Cancelled, Call In, or Left Early as its current operational status.
 PRN staff do not use reduction volunteering. PRN reductions are handled by the PRN-first operational rule when no regular staff have put their name down, and PRN staff are not in the Lottery pool.
@@ -466,7 +493,7 @@ If the volunteering staff member is the Designated Lead, applying Cancelled stat
 When a Designated Lead volunteer is cancelled, the app should designate another working lead-capable staff member for that shift. If multiple eligible replacements exist, manager or lead selects the replacement Designated Lead.
 App notification is enough for the newly designated lead when lead responsibility changes through this flow.
 The cancelled Designated Lead still requires phone-contact confirmation because their work obligation changes.
-Staff may withdraw a reduction volunteer entry until manager or lead applies the final status. After On Call or Cancelled is applied, reversal is manager/lead-owned and requires phone-contact confirmation when it changes work obligation again.
+Staff may withdraw a reduction volunteer entry from My Shifts or relevant schedule context until manager or lead applies the final status. After On Call or Cancelled is applied, reversal is manager/lead-owned and requires phone-contact confirmation when it changes work obligation again.
 When staff withdraw a reduction volunteer entry, the "Name down" marker should disappear from active schedule context immediately while history is retained.
 Withdrawing a reduction volunteer entry does not need broad manager/lead notification by default; the active list updates immediately and history remains available.
 Putting your own name down does not need a separate in-app confirmation notification; the active "Name down" state in the UI is the confirmation.
@@ -519,7 +546,7 @@ _Avoid_: exposing phone-confirmation audit metadata in staff Lottery/status UI b
 **Lottery Visibility**:
 Role-based access to Lottery information. Managers and leads can view and apply decisions across shifts, and therapists can view their shift's lottery order and their own position without apply controls.
 Lottery order is scoped to the relevant site/unit or Schedule Block context and the therapist's usual/home shift. A therapist should not move in a Lottery order for a location or shift context they are only filling into.
-Therapists should have an easy contextual way to see their Lottery position and shift order, such as from Dashboard or My Shifts, using neutral language. This does not make Lottery a full therapist primary workflow.
+Therapists should have an easy contextual way to see their Lottery position and shift order, such as from Dashboard or My Shifts, using neutral language. Staff may see the actual Lottery order and reduction volunteer list as read-only context so they can understand whether they are likely to work. This context should appear only when relevant to an upcoming scheduled shift or selected day, not as always-on dashboard clutter. This does not make Lottery a full therapist primary workflow or give staff decision authority.
 Staff Lottery visibility may show the logged-in therapist a light note about their own last movement, such as "Moved after reduction on July 22." Staff should not see full rationale or movement history for everyone.
 Staff infer coworker Lottery movement from the current order; the app does not need to show movement events for other staff.
 Manager/lead Lottery history should be filterable by Day/Night and by staff member so operational history is explainable without scanning a giant log.
@@ -549,10 +576,14 @@ _Avoid_: making staff infer whether an open item is coverage or trade from hidde
 **Open Shifts Responder Queue**:
 The ordered list of therapists who respond to an Open Shifts post. The first responder is primary, later responders are backups, and the manager selects or approves the final resolution. Staff who responded should see neutral position language such as "You're first in line" or "Backup responder #2."
 Staff may withdraw their offer while the Open Shifts item is still pending manager approval. After manager approval finalizes them, backing out is a manager-handled schedule change rather than responder self-withdrawal.
+Open Shifts pickup response should block before submission when it would schedule a night shift before the therapist works the next day, or a day shift after the therapist worked the night before.
+Staff may express interest in cross-shift pickup when necessary and no rest-rule conflict exists, but manager approval remains required and the UI should treat cross-shift work as an exception rather than the common path.
+Cross-shift pickup opportunities should be visibly distinguished with restrained labels such as Day shift, Night shift, or Cross-shift so staff do not accidentally volunteer for the wrong shift.
 _Avoid_: hiding responder order from therapists or managers
 _Avoid_: winner/loser language for responder position
 _Avoid_: locking staff into an unresolved offer they can no longer cover
 _Avoid_: letting staff undo an approved schedule change without manager involvement
+_Avoid_: relying on manager review to catch night-before/day-after pickup conflicts
 
 **Approved Swap**:
 A manager-approved swap whose final assignments are reflected on Team Schedule and My Shifts while Shift Board preserves the request lifecycle and history.
@@ -593,6 +624,7 @@ _Avoid_: letting same-day urgent coverage needs look like routine Shift Board re
 
 **Calendar-started Shift Request**:
 A shift board request started from a selected scheduled day in My Shifts, prefilled with the selected shift. Selected My Shifts day or cell detail should offer Need coverage and Trade this shift so therapists do not have to leave the calendar and re-select the same shift.
+My Shifts should use specific action labels instead of a generic Request change label: Pick up this shift for unscheduled below-threshold opportunities, and Need coverage or Trade this shift for the therapist's own scheduled shift when that lifecycle allows those actions.
 Same-calendar-day staff shift changes should not enter normal Shift Board request creation. The UI should guide the therapist to call the manager by phone for any same-day Need coverage or Trade shift situation.
 Same-calendar-day is evaluated in the hospital or site local date, not the therapist device timezone.
 Past shifts and shifts that have already started are read-only for staff request creation. Corrections to those shifts are manager-owned schedule or audit cleanup, not therapist-created Shift Board requests.
@@ -669,18 +701,26 @@ _Avoid_: using My Schedule as a primary therapist navigation label
 
 **Attention Surface**:
 The combination of Dashboard summary, inline workflow context, and notification history used to show user-relevant changes without duplicating noise.
+Therapist dashboards should include a compact attention strip above or near the schedule-first content for urgent actionable items such as Preliminary review, availability due, direct request waiting, or Final schedule published.
+Therapist dashboards may show a compact recent schedule changes summary that links into My Shifts, while affected My Shifts days carry the actual post-publish change markers.
+Final Publish should create an app notification and prominent schedule context, but should not force staff to acknowledge the schedule before continuing to use the app.
 _Avoid_: relying only on global notifications or repeating the same alert everywhere
+_Avoid_: blocking staff behind a Final schedule acknowledgement gate
 
 **Role-specific Dashboard**:
 A dashboard whose information hierarchy matches the user's role: therapist personal next action, lead day-of regular-shift operations, or manager both-shift operational triage.
+Therapist Dashboard should be schedule-first: the six-week My Shifts view is the primary content, while attention items, next shift, recent changes, open needs, availability, Shift Board, Lottery context, and Team Schedule print access support that schedule view.
 Therapist dashboards should include a compact recent schedule changes summary that links into My Shifts or Shift Board instead of becoming a full history surface.
 Therapist dashboard and My Shifts surfaces must make Preliminary Schedule and Final Schedule visibly distinct with plain labels such as "Preliminary - review open" and "Final schedule published."
 Therapist dashboards should make the next availability block needing action primary, with later future blocks summarized secondarily rather than shown as equal competing cards.
+Therapist Dashboard empty states should explain why the schedule is not actionable yet and point to the next useful workflow, such as Availability, Preliminary review, Team Schedule, or waiting for Final Publish.
 _Avoid_: one generic dashboard trying to serve all roles equally
+_Avoid_: making ordinary therapists assemble their schedule picture from disconnected cards
 _Avoid_: making staff rely only on notification history to notice recent schedule changes
 _Avoid_: turning the dashboard into a detailed audit or history page
 _Avoid_: letting staff confuse a Preliminary Schedule with the official Final Schedule
 _Avoid_: overwhelming staff with multiple equal future availability cards when one next action is most important
+_Avoid_: letting attention items push the six-week My Shifts context out of the primary staff dashboard experience
 
 **Lead Dashboard**:
 The lead-facing dashboard for today or next-shift operations on the lead's regular shift, including Team Schedule status, Call In impact, operational status attention, Lottery decision context, and Shift Board visibility without manager final approval.
@@ -800,11 +840,14 @@ Staff may see aggregate preliminary interest such as how many people offered to 
 Staff may create Preliminary Cell Marks from Team Schedule context only on their own row or eligible own-shift cells when the UI makes ownership clear.
 Each therapist/date/shift cell has at most one current Preliminary Cell Mark state; history may exist behind it.
 A Flexible PRN add-work mark during Preliminary review is explicit work intent for manager review, even without prior date-level availability.
-Staff may use a Preliminary Cell Mark to offer to pick up an understaffed preliminary shift. This is preliminary add-work intent, not a post-publish Shift Board pickup.
+Staff may use Pick up this shift to create a Preliminary Cell Mark offering to pick up an understaffed preliminary shift. This is preliminary add-work intent, not a post-publish Shift Board pickup.
+Preliminary add-work marks should block before submission when they would create the same night-before/day-after conflict as a Final Open Shifts pickup response.
+Night-before/day-after pickup blocks should use plain staff-facing errors such as "You cannot pick up this night shift because you are scheduled the next day" or "You cannot pick up this day shift because you worked the night before."
 Below-minimum preliminary days should be highlighted as useful places to help, but staff may still add-work mark any eligible day they want to work.
 Preliminary add-work marks are manager-review requests, not automatic hard assignments like pre-schedule Need to Work.
 Staff-facing preliminary add-work UI should not warn about overstaffing. Staff offer availability; managers decide whether to accept over-coverage.
 During Preliminary review, staff feedback belongs in Preliminary Cell Marks only; Need coverage and Trade shift request creation belongs to post-publish Shift Board workflows.
+Preliminary scheduled-day actions should use preliminary-specific wording such as Ask to remove me or Move this shift, not post-publish Need coverage or Trade this shift labels.
 Preliminary mark-outs are also manager-review requests; the assignment is removed only if the manager approves the mark-out.
 Staff may withdraw their own unresolved Preliminary Cell Marks while Preliminary review is open.
 This includes preliminary add-work offers: staff may withdraw before manager resolution, but after approval the assignment is schedule truth and changes are manager-handled.
@@ -1010,8 +1053,8 @@ _Avoid_: embedded form, generic request page, mini composer
 - A therapist should complete swap actions inside a **Swap wizard**, not an embedded generic request form
 - A manager-facing review should present the **Operational consequence** directly, including the affected shift
 - **Shift Visibility** is independent from edit permission; a therapist may view both shifts on Team Schedule without gaining manager edit tools
-- **Shift Default** for Team Schedule is Day first, then Night, then Both; lead-scoped views use the lead's regular shift and therapist personal views use the therapist's own shift
-- Team Schedule's Both view is summary/read-only for operational status changes; managers and leads must select Day or Night before toggling live statuses
+- **Shift Default** for staff Team Schedule is the therapist's own shift with a Day/Night switch; manager broad views may still offer Both for summary/read-only context
+- Team Schedule's manager Both view is summary/read-only for operational status changes; managers and leads must select Day or Night before toggling live statuses
 - Dashboard defaults differ from Team Schedule: manager dashboards summarize both shifts, lead dashboards default to the lead's regular shift with optional cross-shift summary, and therapist dashboards stay personal
 - A **Regular Shift Change** affects future planning defaults only; historical assignments retain the Day or Night shift saved on the schedule row
 - An **Employment Type Change** affects future scheduling rules only; old Schedule Blocks preserve the employment and scheduling context used when they were built or published
@@ -1135,7 +1178,7 @@ _Avoid_: embedded form, generic request page, mini composer
 - **Primary Workflow Navigation** should stay small; supporting views such as Schedule Blocks, Roster View, History, Print, Export, Profile, and Settings stay nested or secondary
 - **Attention Surface** should use Dashboard for top action summaries, inline page context for relevant workflow state, and notification bell/history for full notification record
 - Dashboards should be **Role-specific Dashboard** surfaces that can share components but not the same information hierarchy
-- Therapists should land on their dashboard for next shift, availability state, Shift Board actions, and recent schedule changes, with My Shifts one click away
+- Therapists should land on a schedule-first dashboard where the 6-week My Shifts view is the primary content, with next shift, availability state, Shift Board actions, recent schedule changes, and Team Schedule access as supporting context
 - **Lead Dashboard** focuses on day-of regular-shift operations, not schedule planning
 - Leads should land on **Lead Dashboard**, with Team Schedule one click away for live schedule work
 - Managers should land on manager dashboard for triage, with Coverage one click away for build/edit work
