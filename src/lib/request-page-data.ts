@@ -53,10 +53,13 @@ export async function loadRequestPageSnapshot(
   const [myShiftsResult, myRequestsResult, myInterestRowsResult] = await Promise.all([
     supabase
       .from('shifts')
-      .select('id, date, shift_type, role, status, schedule_cycles!inner(published)')
+      .select(
+        'id, date, shift_type, role, status, assignment_status, schedule_cycles!inner(published)'
+      )
       .eq('user_id', user.id)
       .gt('date', todayKey)
       .eq('status', 'scheduled')
+      .or('assignment_status.is.null,assignment_status.eq.scheduled')
       .eq('schedule_cycles.published', true)
       .order('date', { ascending: true }),
     supabase

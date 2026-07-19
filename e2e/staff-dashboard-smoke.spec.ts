@@ -10,6 +10,7 @@ type StaffDashboardCtx = {
   supabase: SupabaseClient
   therapist: { id: string; email: string; password: string }
   cycleId: string
+  therapistShiftId: string
 }
 
 test.describe.serial('staff dashboard smoke', () => {
@@ -71,40 +72,48 @@ test.describe.serial('staff dashboard smoke', () => {
 
     createdCycleId = cycle.id
     const shiftDate = cycle.start_date
-    const shiftsInsert = await supabase.from('shifts').insert([
-      {
-        cycle_id: cycle.id,
-        user_id: therapist.id,
-        date: shiftDate,
-        shift_type: 'day',
-        site_id: 'default',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'staff',
-      },
-      {
-        cycle_id: cycle.id,
-        user_id: lead.id,
-        date: shiftDate,
-        shift_type: 'day',
-        site_id: 'default',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'lead',
-      },
-      {
-        cycle_id: cycle.id,
-        user_id: coworker.id,
-        date: shiftDate,
-        shift_type: 'day',
-        site_id: 'default',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'staff',
-      },
-    ])
+    const shiftsInsert = await supabase
+      .from('shifts')
+      .insert([
+        {
+          cycle_id: cycle.id,
+          user_id: therapist.id,
+          date: shiftDate,
+          shift_type: 'day',
+          site_id: 'default',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          role: 'staff',
+        },
+        {
+          cycle_id: cycle.id,
+          user_id: lead.id,
+          date: shiftDate,
+          shift_type: 'day',
+          site_id: 'default',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          role: 'lead',
+        },
+        {
+          cycle_id: cycle.id,
+          user_id: coworker.id,
+          date: shiftDate,
+          shift_type: 'day',
+          site_id: 'default',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          role: 'staff',
+        },
+      ])
+      .select('id, user_id')
     if (shiftsInsert.error) {
       throw new Error(`Could not seed staff dashboard shifts: ${shiftsInsert.error.message}`)
+    }
+    const therapistShiftId =
+      shiftsInsert.data?.find((shift) => shift.user_id === therapist.id)?.id ?? null
+    if (!therapistShiftId) {
+      throw new Error('Could not find seeded therapist shift for staff dashboard smoke.')
     }
 
     ctx = {
@@ -115,6 +124,7 @@ test.describe.serial('staff dashboard smoke', () => {
         password: therapistPassword,
       },
       cycleId: cycle.id,
+      therapistShiftId,
     }
   })
 
@@ -156,6 +166,26 @@ test.describe.serial('staff dashboard smoke', () => {
     await expect(page.getByText('Final schedule published')).toBeVisible()
     await expect(page.getByText('Lead: Dashboard Lead')).toBeVisible()
     await expect(page.getByText(/With Dashboard Lead, Dashboard Coworker/)).toBeVisible()
+    const coverageLink = page.getByRole('link', { name: /Need coverage/ })
+    await expect(coverageLink).toHaveAttribute(
+      'href',
+      `/therapist/swaps?new=1&shiftId=${ctx!.therapistShiftId}&type=pickup`
+    )
+    await expect(page.getByRole('link', { name: /Trade shift/ })).toHaveAttribute(
+      'href',
+      `/therapist/swaps?new=1&shiftId=${ctx!.therapistShiftId}&type=swap`
+    )
+
+    await coverageLink.click()
+    await expect(page).toHaveURL(
+      new RegExp(`/therapist/swaps\\?new=1&shiftId=${ctx!.therapistShiftId}&type=pickup`)
+    )
+    await expect(page.getByRole('heading', { name: 'Need coverage' })).toBeVisible({
+      timeout: 10_000,
+    })
+    await expect(page.getByLabel('Select shift')).toHaveValue(ctx!.therapistShiftId)
+
+    await page.goto('/dashboard/staff', { waitUntil: 'domcontentloaded' })
 
     const primaryLinks = nextStepCard.locator('a').filter({ hasNotText: 'View schedule' })
     await expect(primaryLinks.first()).toBeVisible()

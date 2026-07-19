@@ -45,6 +45,7 @@ export type StaffScheduleBlockDay = {
     role: string
     status: string
     assignmentStatus: string | null
+    canRequestChange: boolean
     isLead: boolean
     leadName: string | null
     coworkerNames: string[]
@@ -80,6 +81,13 @@ function lifecycleLabelForCycle(cycle: StaffScheduleBlockCycle): string {
 
 function isWorkingAssignment(row: StaffScheduleBlockShiftRow): boolean {
   return row.assignment_status !== 'cancelled' && row.assignment_status !== 'call_in'
+}
+
+function canRequestChange(row: StaffScheduleBlockShiftRow): boolean {
+  return (
+    (row.status ?? 'scheduled') === 'scheduled' &&
+    normalizeAssignmentStatus(row.assignment_status) === null
+  )
 }
 
 export function buildStaffScheduleBlockView(params: {
@@ -131,6 +139,7 @@ export function buildStaffScheduleBlockView(params: {
         role: ownShift.role ?? 'staff',
         status: ownShift.status ?? 'scheduled',
         assignmentStatus: normalizeAssignmentStatus(ownShift.assignment_status),
+        canRequestChange: canRequestChange(ownShift),
         isLead: ownShift.role === 'lead',
         leadName: ownShift.role === 'lead' ? null : (getOne(leadRow?.profiles)?.full_name ?? null),
         coworkerNames: coworkerNames.slice(0, 3),

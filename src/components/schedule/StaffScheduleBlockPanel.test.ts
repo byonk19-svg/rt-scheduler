@@ -35,6 +35,7 @@ const sampleSchedule: StaffScheduleBlockView = {
         role: 'staff',
         status: 'scheduled',
         assignmentStatus: null,
+        canRequestChange: true,
         isLead: false,
         leadName: 'Lead Avery',
         coworkerNames: ['Jordan Lee', 'Sam Patel'],
@@ -51,6 +52,7 @@ const sampleSchedule: StaffScheduleBlockView = {
         role: 'lead',
         status: 'scheduled',
         assignmentStatus: 'on_call',
+        canRequestChange: false,
         isLead: true,
         leadName: null,
         coworkerNames: [],
@@ -73,6 +75,12 @@ describe('StaffScheduleBlockPanel', () => {
     expect(html).toContain('Lead: Lead Avery')
     expect(html).toContain('With Jordan Lee, Sam Patel +1')
     expect(html).toContain('On Call')
+    expect(html).toContain('Need coverage')
+    expect(html).toContain('href="/therapist/swaps?new=1&amp;shiftId=shift-1&amp;type=pickup"')
+    expect(html).toContain('Trade shift')
+    expect(html).toContain('href="/therapist/swaps?new=1&amp;shiftId=shift-1&amp;type=swap"')
+    expect(html).not.toContain('shiftId=shift-2&amp;type=pickup')
+    expect(html).not.toContain('shiftId=shift-2&amp;type=swap')
     expect(html).toContain('View Team Schedule')
     expect(html).toContain('href="/schedule?cycle=cycle-1"')
     expect(html).toContain('Print from Team Schedule')

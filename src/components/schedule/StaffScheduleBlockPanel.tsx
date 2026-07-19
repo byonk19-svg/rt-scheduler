@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarDays, Crown, Printer, Users } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, Crown, Printer, Users } from 'lucide-react'
 
 import type { StaffScheduleBlockView } from '@/lib/staff-my-schedule'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,10 @@ function coworkerLine(names: string[], count: number): string | null {
   if (names.length === 0) return `With ${count} coworker${count === 1 ? '' : 's'}`
   const suffix = count > names.length ? ` +${count - names.length}` : ''
   return `With ${names.join(', ')}${suffix}`
+}
+
+function requestHref(shiftId: string, type: 'pickup' | 'swap'): string {
+  return `/therapist/swaps?new=1&shiftId=${encodeURIComponent(shiftId)}&type=${type}`
 }
 
 export function StaffScheduleBlockPanel({ schedule }: StaffScheduleBlockPanelProps) {
@@ -206,6 +210,41 @@ export function StaffScheduleBlockPanel({ schedule }: StaffScheduleBlockPanelPro
                           <Users className="mr-1 inline h-3 w-3 align-[-2px]" />
                           {coworkers}
                         </p>
+                      ) : null}
+                      {assignment.canRequestChange ? (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2 text-[11px]"
+                          >
+                            <Link href={requestHref(assignment.id, 'pickup')}>
+                              Need coverage
+                              <span className="sr-only">
+                                {' '}
+                                for {formatFullDate(day.date)} {shiftLabel(assignment.shiftType)}{' '}
+                                shift
+                              </span>
+                            </Link>
+                          </Button>
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-[11px]"
+                          >
+                            <Link className="gap-1" href={requestHref(assignment.id, 'swap')}>
+                              <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                              Trade shift
+                              <span className="sr-only">
+                                {' '}
+                                for {formatFullDate(day.date)} {shiftLabel(assignment.shiftType)}{' '}
+                                shift
+                              </span>
+                            </Link>
+                          </Button>
+                        </div>
                       ) : null}
                     </div>
                   ) : (

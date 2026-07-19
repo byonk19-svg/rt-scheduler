@@ -1,4 +1,4 @@
-import type { ShiftRole, ShiftStatus, ShiftType } from '@/lib/shift-types'
+import type { AssignmentStatus, ShiftRole, ShiftStatus, ShiftType } from '@/lib/shift-types'
 
 export type RequestType = 'swap' | 'pickup'
 export type PersistedRequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'withdrawn'
@@ -17,6 +17,7 @@ export type RequestShiftRow = {
   shift_type: ShiftType
   role: ShiftRole
   status: ShiftStatus
+  assignment_status?: AssignmentStatus | null
   schedule_cycles?: { published: boolean } | { published: boolean }[] | null
 }
 

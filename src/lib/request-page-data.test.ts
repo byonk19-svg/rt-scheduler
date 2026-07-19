@@ -68,21 +68,26 @@ function createSupabaseMock(overrides?: {
             return {
               eq() {
                 return {
-                  eq() {
+                  or() {
                     return {
-                      order: async () => ({
-                        data: [
-                          {
-                            id: 'shift-1',
-                            date: '2026-05-01',
-                            shift_type: 'day',
-                            role: 'lead',
-                            status: 'scheduled',
-                            schedule_cycles: { published: true },
-                          },
-                        ],
-                        error: null,
-                      }),
+                      eq() {
+                        return {
+                          order: async () => ({
+                            data: [
+                              {
+                                id: 'shift-1',
+                                date: '2026-05-01',
+                                shift_type: 'day',
+                                role: 'lead',
+                                status: 'scheduled',
+                                assignment_status: 'scheduled',
+                                schedule_cycles: { published: true },
+                              },
+                            ],
+                            error: null,
+                          }),
+                        }
+                      },
                     }
                   },
                 }
