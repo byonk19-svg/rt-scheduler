@@ -18,6 +18,9 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { SkeletonCard, SkeletonListItem } from '@/components/ui/skeleton'
 
+const UNREQUESTABLE_PREFILLED_SHIFT_MESSAGE =
+  'That shift is not available for a routine Shift Board request. Choose a future scheduled shift, or call the manager by phone for same-day issues.'
+
 function SwapRequestPageContent() {
   const router = useRouter()
   const pathname = usePathname()
@@ -138,13 +141,20 @@ function SwapRequestPageContent() {
   }, [selectedShift])
 
   useEffect(() => {
-    if (!shiftIdFromQuery || myShifts.length === 0) return
+    if (!shiftIdFromQuery || loading) return
     const exists = myShifts.some((shift) => shift.id === shiftIdFromQuery)
-    if (!exists) return
+    if (!exists) {
+      setView('form')
+      setStep(1)
+      setSelectedShift(null)
+      setError(UNREQUESTABLE_PREFILLED_SHIFT_MESSAGE)
+      return
+    }
     setView('form')
     setStep(1)
     setSelectedShift(shiftIdFromQuery)
-  }, [myShifts, shiftIdFromQuery])
+    setError(null)
+  }, [loading, myShifts, shiftIdFromQuery])
 
   useEffect(() => {
     if (requestType === 'pickup') {

@@ -16,7 +16,7 @@ const sampleSchedule: StaffScheduleBlockView = {
   title: 'July Block',
   dateRangeLabel: 'Jul 19 - Aug 29, 2026',
   lifecycleLabel: 'Final schedule published',
-  assignedCount: 2,
+  assignedCount: 3,
   nextAssignmentDate: '2026-07-20',
   days: [
     {
@@ -35,7 +35,8 @@ const sampleSchedule: StaffScheduleBlockView = {
         role: 'staff',
         status: 'scheduled',
         assignmentStatus: null,
-        canRequestChange: true,
+        canRequestChange: false,
+        requestGuidance: 'same_day_contact_manager',
         isLead: false,
         leadName: 'Lead Avery',
         coworkerNames: ['Jordan Lee', 'Sam Patel'],
@@ -53,8 +54,27 @@ const sampleSchedule: StaffScheduleBlockView = {
         status: 'scheduled',
         assignmentStatus: 'on_call',
         canRequestChange: false,
+        requestGuidance: null,
         isLead: true,
         leadName: null,
+        coworkerNames: [],
+        coworkerCount: 0,
+      },
+    },
+    {
+      date: '2026-07-22',
+      isToday: false,
+      isWeekend: false,
+      assignment: {
+        id: 'shift-3',
+        shiftType: 'day',
+        role: 'staff',
+        status: 'scheduled',
+        assignmentStatus: null,
+        canRequestChange: true,
+        requestGuidance: null,
+        isLead: false,
+        leadName: 'Lead Morgan',
         coworkerNames: [],
         coworkerCount: 0,
       },
@@ -71,14 +91,17 @@ describe('StaffScheduleBlockPanel', () => {
     expect(html).toContain('My Shifts')
     expect(html).toContain('Your six-week schedule')
     expect(html).toContain('Final schedule published')
-    expect(html).toContain('2 assigned days')
+    expect(html).toContain('3 assigned days')
     expect(html).toContain('Lead: Lead Avery')
     expect(html).toContain('With Jordan Lee, Sam Patel +1')
     expect(html).toContain('On Call')
+    expect(html).toContain('Same-day issue? Call manager.')
     expect(html).toContain('Need coverage')
-    expect(html).toContain('href="/therapist/swaps?new=1&amp;shiftId=shift-1&amp;type=pickup"')
+    expect(html).toContain('href="/therapist/swaps?new=1&amp;shiftId=shift-3&amp;type=pickup"')
     expect(html).toContain('Trade shift')
-    expect(html).toContain('href="/therapist/swaps?new=1&amp;shiftId=shift-1&amp;type=swap"')
+    expect(html).toContain('href="/therapist/swaps?new=1&amp;shiftId=shift-3&amp;type=swap"')
+    expect(html).not.toContain('shiftId=shift-1&amp;type=pickup')
+    expect(html).not.toContain('shiftId=shift-1&amp;type=swap')
     expect(html).not.toContain('shiftId=shift-2&amp;type=pickup')
     expect(html).not.toContain('shiftId=shift-2&amp;type=swap')
     expect(html).toContain('View Team Schedule')

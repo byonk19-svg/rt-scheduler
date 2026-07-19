@@ -35,6 +35,8 @@ export type StaffScheduleBlockShiftRow = {
   profiles: { full_name: string | null } | { full_name: string | null }[] | null
 }
 
+type StaffScheduleRequestGuidance = 'same_day_contact_manager' | null
+
 export type StaffScheduleBlockDay = {
   date: string
   isToday: boolean
@@ -46,6 +48,7 @@ export type StaffScheduleBlockDay = {
     status: string
     assignmentStatus: string | null
     canRequestChange: boolean
+    requestGuidance: StaffScheduleRequestGuidance
     isLead: boolean
     leadName: string | null
     coworkerNames: string[]
@@ -83,7 +86,7 @@ function isWorkingAssignment(row: StaffScheduleBlockShiftRow): boolean {
   return row.assignment_status !== 'cancelled' && row.assignment_status !== 'call_in'
 }
 
-function canRequestChange(row: StaffScheduleBlockShiftRow): boolean {
+function hasNormalScheduledStatus(row: StaffScheduleBlockShiftRow): boolean {
   return (
     (row.status ?? 'scheduled') === 'scheduled' &&
     normalizeAssignmentStatus(row.assignment_status) === null
@@ -128,6 +131,10 @@ export function buildStaffScheduleBlockView(params: {
       .filter((shift) => shift.user_id && shift.user_id !== params.userId)
       .map((shift) => getOne(shift.profiles)?.full_name ?? 'Coworker')
       .filter((name, index, list) => list.indexOf(name) === index)
+    const requestGuidance: StaffScheduleRequestGuidance =
+      hasNormalScheduledStatus(ownShift) && date === params.todayKey
+        ? 'same_day_contact_manager'
+        : null
 
     return {
       date,
@@ -139,7 +146,8 @@ export function buildStaffScheduleBlockView(params: {
         role: ownShift.role ?? 'staff',
         status: ownShift.status ?? 'scheduled',
         assignmentStatus: normalizeAssignmentStatus(ownShift.assignment_status),
-        canRequestChange: canRequestChange(ownShift),
+        canRequestChange: hasNormalScheduledStatus(ownShift) && date > params.todayKey,
+        requestGuidance,
         isLead: ownShift.role === 'lead',
         leadName: ownShift.role === 'lead' ? null : (getOne(leadRow?.profiles)?.full_name ?? null),
         coworkerNames: coworkerNames.slice(0, 3),

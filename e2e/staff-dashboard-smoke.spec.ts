@@ -185,6 +185,16 @@ test.describe.serial('staff dashboard smoke', () => {
     })
     await expect(page.getByLabel('Select shift')).toHaveValue(ctx!.therapistShiftId)
 
+    await page.goto('/therapist/swaps?new=1&shiftId=not-a-requestable-shift&type=pickup', {
+      waitUntil: 'domcontentloaded',
+    })
+    await expect(
+      page.getByText(
+        'That shift is not available for a routine Shift Board request. Choose a future scheduled shift, or call the manager by phone for same-day issues.'
+      )
+    ).toBeVisible()
+    await expect(page.getByLabel('Select shift')).toHaveValue('')
+
     await page.goto('/dashboard/staff', { waitUntil: 'domcontentloaded' })
 
     const primaryLinks = nextStepCard.locator('a').filter({ hasNotText: 'View schedule' })

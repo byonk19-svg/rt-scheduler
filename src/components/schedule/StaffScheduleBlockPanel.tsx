@@ -246,6 +246,11 @@ export function StaffScheduleBlockPanel({ schedule }: StaffScheduleBlockPanelPro
                           </Button>
                         </div>
                       ) : null}
+                      {assignment.requestGuidance === 'same_day_contact_manager' ? (
+                        <p className="rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-1.5 text-[11px] font-medium leading-4 text-[var(--warning-text)]">
+                          Same-day issue? Call manager.
+                        </p>
+                      ) : null}
                     </div>
                   ) : (
                     <p className="mt-5 text-xs text-muted-foreground">Not scheduled</p>

@@ -52,6 +52,10 @@ describe('requests composer route source contract', () => {
     expect(composerSource).not.toContain('Friendly')
     expect(pageSource).toContain("searchParams.get('type') === 'pickup' ? 'pickup' : 'swap'")
     expect(pageSource).toContain('setRequestType(requestTypeFromQuery)')
+    expect(pageSource).toContain('UNREQUESTABLE_PREFILLED_SHIFT_MESSAGE')
+    expect(pageSource).toContain('call the manager by phone for same-day issues')
+    expect(pageSource).toContain('if (!shiftIdFromQuery || loading) return')
+    expect(pageSource).toContain('setError(UNREQUESTABLE_PREFILLED_SHIFT_MESSAGE)')
     expect(pageSource).toContain(
       "setRequestVisibility(requestTypeFromQuery === 'pickup' ? 'team' : 'direct')"
     )

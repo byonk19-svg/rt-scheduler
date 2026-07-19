@@ -74,7 +74,8 @@ describe('buildStaffScheduleBlockView', () => {
       shiftType: 'day',
       role: 'staff',
       assignmentStatus: null,
-      canRequestChange: true,
+      canRequestChange: false,
+      requestGuidance: 'same_day_contact_manager',
       isLead: false,
       leadName: 'Lead Avery',
       coworkerNames: ['Lead Avery', 'Jordan Lee'],
@@ -97,15 +98,27 @@ describe('buildStaffScheduleBlockView', () => {
     expect(schedule.lifecycleLabel).toBe('Final schedule published')
   })
 
-  it('only allows request starts for normal scheduled assignments', () => {
+  it('only allows request starts for future normal scheduled assignments', () => {
     const schedule = buildStaffScheduleBlockView({
       cycle: baseCycle,
       todayKey: '2026-07-20',
       userId: 'therapist-1',
       shifts: [
         shift({
-          id: 'normal-scheduled',
+          id: 'past-scheduled',
+          date: '2026-07-19',
+          assignment_status: 'scheduled',
+          status: 'scheduled',
+        }),
+        shift({
+          id: 'today-scheduled',
           date: '2026-07-20',
+          assignment_status: 'scheduled',
+          status: 'scheduled',
+        }),
+        shift({
+          id: 'future-scheduled',
+          date: '2026-07-24',
           assignment_status: 'scheduled',
           status: 'scheduled',
         }),
@@ -130,21 +143,35 @@ describe('buildStaffScheduleBlockView', () => {
       ],
     })
 
+    expect(schedule.days.find((day) => day.date === '2026-07-19')?.assignment).toMatchObject({
+      id: 'past-scheduled',
+      canRequestChange: false,
+      requestGuidance: null,
+    })
     expect(schedule.days.find((day) => day.date === '2026-07-20')?.assignment).toMatchObject({
-      id: 'normal-scheduled',
+      id: 'today-scheduled',
+      canRequestChange: false,
+      requestGuidance: 'same_day_contact_manager',
+    })
+    expect(schedule.days.find((day) => day.date === '2026-07-24')?.assignment).toMatchObject({
+      id: 'future-scheduled',
       canRequestChange: true,
+      requestGuidance: null,
     })
     expect(schedule.days.find((day) => day.date === '2026-07-21')?.assignment).toMatchObject({
       id: 'on-call',
       canRequestChange: false,
+      requestGuidance: null,
     })
     expect(schedule.days.find((day) => day.date === '2026-07-22')?.assignment).toMatchObject({
       id: 'left-early',
       canRequestChange: false,
+      requestGuidance: null,
     })
     expect(schedule.days.find((day) => day.date === '2026-07-23')?.assignment).toMatchObject({
       id: 'call-in',
       canRequestChange: false,
+      requestGuidance: null,
     })
   })
 })
