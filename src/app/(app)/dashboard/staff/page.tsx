@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeftRight, CalendarClock, Clock, History } from 'lucide-react'
+import { ArrowLeftRight, CalendarClock, History } from 'lucide-react'
 
 import {
   StaffAttentionCard,
@@ -9,7 +9,7 @@ import {
   dueChipToneClasses,
 } from '@/components/dashboard/StaffAttentionCard'
 import { FeedbackToast } from '@/components/feedback-toast'
-import { MyScheduleCard } from '@/components/schedule/MyScheduleCard'
+import { StaffScheduleBlockPanel } from '@/components/schedule/StaffScheduleBlockPanel'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { resolveUserRole } from '@/lib/auth/role-source'
@@ -31,7 +31,11 @@ import {
 import { deriveRequestStage } from '@/lib/request-page-data'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { fetchMyPublishedUpcomingShifts } from '@/lib/staff-my-schedule'
+import {
+  fetchMyPublishedUpcomingShifts,
+  fetchStaffScheduleBlockView,
+  type StaffScheduleBlockCycle,
+} from '@/lib/staff-my-schedule'
 import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = {
@@ -46,6 +50,8 @@ type SubmissionRow = {
   submitted_at: string
   last_edited_at: string
 }
+
+type StaffDashboardCycle = TherapistWorkflowCycle & StaffScheduleBlockCycle
 
 type StaffSwapAttentionItem = {
   href: string
@@ -195,7 +201,7 @@ export default async function StaffDashboardPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, role, staff_onboarding_required, staff_onboarding_completed_at')
+    .select('full_name, role, site_id, staff_onboarding_required, staff_onboarding_completed_at')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -211,14 +217,20 @@ export default async function StaffDashboardPage({
   const firstName = fullName.split(/\s+/)[0] ?? fullName
   const todayKey = new Date().toISOString().slice(0, 10)
 
-  const { data: cyclesData } = await admin
+  let cyclesQuery = admin
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, archived_at, published, availability_due_at')
+    .select('id, label, start_date, end_date, archived_at, published, status, availability_due_at')
     .is('archived_at', null)
     .gte('end_date', todayKey)
     .order('start_date', { ascending: true })
 
-  const cycles = ((cyclesData ?? []) as TherapistWorkflowCycle[]).map((cycle) => ({
+  if (profile?.site_id) {
+    cyclesQuery = cyclesQuery.eq('site_id', profile.site_id)
+  }
+
+  const { data: cyclesData } = await cyclesQuery
+
+  const cycles = ((cyclesData ?? []) as StaffDashboardCycle[]).map((cycle) => ({
     ...cycle,
     availability_due_at: cycle.availability_due_at ?? null,
   }))
@@ -230,6 +242,7 @@ export default async function StaffDashboardPage({
     therapistSubmissionRowsResult,
     preliminarySnapshotsResult,
     relevantShiftPostsResult,
+    staffScheduleAssignmentRowsResult,
   ] = await Promise.all([
     fetchMyPublishedUpcomingShifts(supabase, user.id, 5),
     cycleIds.length > 0
@@ -259,6 +272,9 @@ export default async function StaffDashboardPage({
         'id, type, status, visibility, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, message, shifts!shift_posts_shift_id_fkey(date, shift_type)'
       )
       .or(`posted_by.eq.${user.id},claimed_by.eq.${user.id}`),
+    cycleIds.length > 0
+      ? admin.from('shifts').select('cycle_id').eq('user_id', user.id).in('cycle_id', cycleIds)
+      : Promise.resolve({ data: [] }),
   ])
 
   const availabilityEntryCountsByCycleId: Record<string, number> = {}
@@ -282,6 +298,11 @@ export default async function StaffDashboardPage({
     currentUserId: user.id,
     requests: relevantShiftPosts,
   })
+  const assignedScheduleCycleIds = new Set(
+    ((staffScheduleAssignmentRowsResult.data ?? []) as Array<{ cycle_id: string }>).map(
+      (row) => row.cycle_id
+    )
+  )
 
   const workflow = resolveTherapistWorkflow({
     todayKey,
@@ -297,6 +318,28 @@ export default async function StaffDashboardPage({
       pendingCount: countPendingRequestRows(relevantShiftPosts),
       totalCount: relevantShiftPosts.length,
     },
+  })
+  const workflowScheduleCycle =
+    workflow.state === 'preliminary_review_available' ||
+    workflow.state === 'published_schedule_available'
+      ? cycles.find((cycle) => cycle.id === workflow.actionCycle?.id)
+      : null
+  const schedulePanelCycle = (cycles.find(
+    (cycle) => cycle.status === 'preliminary' && assignedScheduleCycleIds.has(cycle.id)
+  ) ??
+    cycles.find(
+      (cycle) =>
+        (cycle.published || cycle.status === 'final') && assignedScheduleCycleIds.has(cycle.id)
+    ) ??
+    workflowScheduleCycle ??
+    cycles.find((cycle) => cycle.status === 'preliminary') ??
+    cycles.find((cycle) => cycle.published || cycle.status === 'final') ??
+    null) as StaffScheduleBlockCycle | null
+  const scheduleBlockView = await fetchStaffScheduleBlockView({
+    supabase: admin,
+    cycle: schedulePanelCycle,
+    userId: user.id,
+    todayKey,
   })
 
   const actionCycleSubmission = workflow.actionCycle
@@ -371,74 +414,29 @@ export default async function StaffDashboardPage({
             ) : null}
           </div>
           <p className="text-sm text-muted-foreground">
-            Start with the next-step card below. The other cards are where you check shifts,
-            requests, and history.
+            Start with your schedule. Use the next-step card when availability, preliminary review,
+            or a request needs your attention.
           </p>
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_1fr_1fr]">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            <CalendarClock className="h-3.5 w-3.5" />
-            Next step
-          </div>
-          <StaffAttentionCard
-            workflow={workflow}
-            submissionUi={submissionUi}
-            availabilityDueStatus={availabilityDueStatus}
-            availabilityDueLine={availabilityDueLine}
-            workflowAlreadyLinksToSchedule={workflowAlreadyLinksToSchedule}
-          />
-        </div>
-
-        <article className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                My Schedule
-              </p>
-              <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
-                {workflow.publishedShiftSummary.upcomingCount} upcoming published shift
-                {workflow.publishedShiftSummary.upcomingCount === 1 ? '' : 's'}
-              </h2>
-            </div>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            This is where your published shifts show up. Draft and preliminary assignments stay out
-            of this view.
-          </p>
-          {upcomingPublishedWidget.length > 0 ? (
-            <div className="mt-4 space-y-2">
-              {upcomingPublishedWidget.slice(0, 3).map((row) => (
-                <MyScheduleCard
-                  key={row.id}
-                  date={row.date}
-                  shiftType={row.shift_type === 'night' ? 'night' : 'day'}
-                  role={row.role ?? 'staff'}
-                  status={row.status}
-                  assignmentStatus={row.assignment_status}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="mt-3 rounded-lg border border-border bg-muted p-4 text-center text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">No published shifts yet.</p>
-              <p className="mt-1">
-                Your manager has not published upcoming shifts for you. Check Schedule after the
-                next Schedule Block is published.
-              </p>
-            </div>
-          )}
-          <div className="mt-4">
-            <Button asChild size="sm" variant="outline">
-              <Link href="/schedule">View schedule</Link>
-            </Button>
-          </div>
-        </article>
-
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <StaffScheduleBlockPanel schedule={scheduleBlockView} />
         <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <CalendarClock className="h-3.5 w-3.5" />
+              Next step
+            </div>
+            <StaffAttentionCard
+              workflow={workflow}
+              submissionUi={submissionUi}
+              availabilityDueStatus={availabilityDueStatus}
+              availabilityDueLine={availabilityDueLine}
+              workflowAlreadyLinksToSchedule={workflowAlreadyLinksToSchedule}
+            />
+          </div>
+
           <article className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-sm">
             <div className="flex items-center justify-between gap-3">
               <div>

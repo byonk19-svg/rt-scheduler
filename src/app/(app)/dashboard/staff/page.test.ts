@@ -33,16 +33,20 @@ describe('staff dashboard therapist action-center copy', () => {
   it('keeps the staff page wired to the extracted next-step surface and therapist-owned destinations', () => {
     expect(staffDashboardSource).toContain('Next step')
     expect(staffDashboardSource).toContain('StaffAttentionCard')
-    expect(staffDashboardSource).toContain('My Schedule')
+    expect(staffDashboardSource).toContain('StaffScheduleBlockPanel')
+    expect(staffDashboardSource).toContain('scheduleBlockView')
+    expect(staffDashboardSource).toContain('Start with your schedule')
     expect(staffDashboardSource).toContain('Trade &amp; Coverage Requests')
     expect(staffDashboardSource).toContain('Past requests and outcomes')
     expect(staffDashboardSource).toContain('resolveTherapistWorkflow')
   })
 
-  it('uses a plain no-published-shifts empty state with a next step', () => {
-    expect(staffDashboardSource).toContain('No published shifts yet.')
-    expect(staffDashboardSource).toContain('Check Schedule after the')
-    expect(staffDashboardSource).toContain('next Schedule Block is published')
+  it('loads a preliminary or final schedule block for the primary staff schedule surface', () => {
+    expect(staffDashboardSource).toContain('fetchStaffScheduleBlockView')
+    expect(staffDashboardSource).toContain("workflow.state === 'preliminary_review_available'")
+    expect(staffDashboardSource).toContain("workflow.state === 'published_schedule_available'")
+    expect(staffDashboardSource).toContain("cycle.status === 'preliminary'")
+    expect(staffDashboardSource).toContain("cycle.published || cycle.status === 'final'")
   })
 
   it('keeps first-run staff out of the dashboard until onboarding is completed', () => {
