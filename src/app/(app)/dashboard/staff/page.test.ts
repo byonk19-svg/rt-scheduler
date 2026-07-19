@@ -35,6 +35,8 @@ describe('staff dashboard therapist action-center copy', () => {
     expect(staffDashboardSource).toContain('StaffAttentionCard')
     expect(staffDashboardSource).toContain('StaffScheduleBlockPanel')
     expect(staffDashboardSource).toContain('scheduleBlockView')
+    expect(staffDashboardSource).toContain('staff-dashboard-print-page')
+    expect(staffDashboardSource).toContain('print:hidden')
     expect(staffDashboardSource).toContain('Start with your schedule')
     expect(staffDashboardSource).toContain('Trade &amp; Coverage Requests')
     expect(staffDashboardSource).toContain('Past requests and outcomes')

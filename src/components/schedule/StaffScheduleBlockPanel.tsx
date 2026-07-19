@@ -1,7 +1,8 @@
 import Link from 'next/link'
-import { ArrowRightLeft, CalendarDays, Crown, Printer, Users } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, Crown, Users } from 'lucide-react'
 
 import type { StaffScheduleBlockView } from '@/lib/staff-my-schedule'
+import { StaffSchedulePrintButton } from '@/components/schedule/StaffSchedulePrintButton'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -53,6 +54,16 @@ function requestHref(shiftId: string, type: 'pickup' | 'swap'): string {
   return `/therapist/swaps?new=1&shiftId=${encodeURIComponent(shiftId)}&type=${type}`
 }
 
+function lifecycleSupportLine(label: string): string {
+  if (label.startsWith('Preliminary')) {
+    return 'Preliminary schedule: review it now, but expect manager updates before final publish.'
+  }
+  if (label.startsWith('Final')) {
+    return 'Final schedule: this is the official staffing plan for this Schedule Block.'
+  }
+  return 'Schedule Block is visible, but it is not final yet.'
+}
+
 export function StaffScheduleBlockPanel({ schedule }: StaffScheduleBlockPanelProps) {
   if (!schedule) {
     return (
@@ -81,7 +92,7 @@ export function StaffScheduleBlockPanel({ schedule }: StaffScheduleBlockPanelPro
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-card px-4 py-5 shadow-tw-float-lg sm:px-5">
+    <section className="staff-schedule-print-panel rounded-2xl border border-border bg-card px-4 py-5 shadow-tw-float-lg sm:px-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -94,8 +105,11 @@ export function StaffScheduleBlockPanel({ schedule }: StaffScheduleBlockPanelPro
           <p className="mt-1 text-sm text-muted-foreground">
             {schedule.title} - {schedule.dateRangeLabel}
           </p>
+          <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-foreground">
+            {lifecycleSupportLine(schedule.lifecycleLabel)}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="staff-schedule-print-actions flex flex-wrap items-center gap-2">
           <span
             className={cn(
               'rounded-full border px-2.5 py-1 text-xs font-semibold',
@@ -114,17 +128,16 @@ export function StaffScheduleBlockPanel({ schedule }: StaffScheduleBlockPanelPro
           <Button asChild size="sm" variant="outline">
             <Link href={`/schedule?cycle=${schedule.cycleId}`}>View Team Schedule</Link>
           </Button>
-          <Button asChild size="sm" variant="ghost">
-            <Link className="gap-1.5" href={`/schedule?cycle=${schedule.cycleId}`}>
-              <Printer className="h-4 w-4" />
-              Print from Team Schedule
-            </Link>
-          </Button>
+          <StaffSchedulePrintButton />
         </div>
       </div>
 
-      <div className="mt-5 overflow-x-auto pb-2">
-        <div className="min-w-[52rem]" role="table" aria-label="Six-week schedule">
+      <div className="staff-schedule-print-scroll mt-5 overflow-x-auto pb-2">
+        <div
+          className="staff-schedule-print-grid min-w-[52rem]"
+          role="table"
+          aria-label="Six-week schedule"
+        >
           <div
             className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
             role="row"
@@ -158,7 +171,7 @@ export function StaffScheduleBlockPanel({ schedule }: StaffScheduleBlockPanelPro
                       : 'not scheduled'
                   }`}
                   className={cn(
-                    'min-h-[6.5rem] rounded-lg border p-2 text-left transition-colors',
+                    'staff-schedule-print-day min-h-[6.5rem] rounded-lg border p-2 text-left transition-colors',
                     day.isWeekend ? 'bg-muted/45' : 'bg-background',
                     assignment
                       ? 'border-primary/35 shadow-tw-sm ring-1 ring-primary/15'
@@ -206,13 +219,13 @@ export function StaffScheduleBlockPanel({ schedule }: StaffScheduleBlockPanelPro
                         </p>
                       ) : null}
                       {coworkers ? (
-                        <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+                        <p className="staff-schedule-print-coworkers line-clamp-2 text-xs leading-5 text-muted-foreground">
                           <Users className="mr-1 inline h-3 w-3 align-[-2px]" />
                           {coworkers}
                         </p>
                       ) : null}
                       {assignment.canRequestChange ? (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
+                        <div className="staff-schedule-print-day-actions flex flex-wrap gap-1.5 pt-1">
                           <Button
                             asChild
                             size="sm"

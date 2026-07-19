@@ -386,10 +386,10 @@ export default async function StaffDashboardPage({
   ].some((href) => href?.startsWith('/schedule'))
 
   return (
-    <div className="space-y-4">
+    <div className="staff-dashboard-print-page space-y-4">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <section className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-float-lg">
+      <section className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-float-lg print:hidden">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
@@ -421,9 +421,9 @@ export default async function StaffDashboardPage({
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <section className="grid grid-cols-1 gap-4 print:block xl:grid-cols-[minmax(0,1fr)_24rem]">
         <StaffScheduleBlockPanel schedule={scheduleBlockView} />
-        <div className="space-y-4">
+        <div className="space-y-4 print:hidden">
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               <CalendarClock className="h-3.5 w-3.5" />

@@ -132,6 +132,19 @@ describe('global CSS tokens and theme overrides', () => {
     expect(cssSource).toContain('overflow: visible !important;')
   })
 
+  it('lets the staff dashboard six-week schedule print without the dashboard chrome', () => {
+    expect(cssSource).toContain('.staff-dashboard-print-page')
+    expect(cssSource).toContain('.staff-schedule-print-panel')
+    expect(cssSource).toContain('.staff-schedule-print-actions')
+    expect(cssSource).toContain('.staff-schedule-print-day-actions')
+    expect(cssSource).toContain('.staff-schedule-print-scroll')
+    expect(cssSource).toContain('.staff-schedule-print-grid')
+    expect(cssSource).toContain('.staff-schedule-print-day')
+    expect(cssSource).toContain('.staff-schedule-print-coworkers')
+    expect(cssSource).toContain('break-inside: avoid;')
+    expect(cssSource).toContain('-webkit-line-clamp: unset !important;')
+  })
+
   it('reserves scroll offset for the fixed authenticated header', () => {
     expect(cssSource).toContain('scroll-padding-top: 5rem;')
   })

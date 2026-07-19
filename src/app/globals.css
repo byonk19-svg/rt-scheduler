@@ -795,6 +795,47 @@ html {
   }
 }
 
+/* Staff dashboard schedule print: keep the six-week schedule readable on paper. */
+@media print {
+  .staff-dashboard-print-page {
+    margin: 0 !important;
+  }
+
+  .staff-schedule-print-panel {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  .staff-schedule-print-actions,
+  .staff-schedule-print-day-actions {
+    display: none !important;
+  }
+
+  .staff-schedule-print-scroll {
+    overflow: visible !important;
+    padding-bottom: 0 !important;
+  }
+
+  .staff-schedule-print-grid {
+    min-width: 0 !important;
+  }
+
+  .staff-schedule-print-day {
+    break-inside: avoid;
+    min-height: 0 !important;
+    padding: 0.1in !important;
+  }
+
+  .staff-schedule-print-coworkers {
+    display: block !important;
+    overflow: visible !important;
+    -webkit-line-clamp: unset !important;
+    -webkit-box-orient: unset !important;
+  }
+}
+
 /* ─── Animations ──────────────────────────────────────────────────────────── */
 
 @keyframes fadeUp {

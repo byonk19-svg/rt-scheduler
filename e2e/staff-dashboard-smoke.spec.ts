@@ -166,6 +166,20 @@ test.describe.serial('staff dashboard smoke', () => {
     await expect(page.getByText('Final schedule published')).toBeVisible()
     await expect(page.getByText('Lead: Dashboard Lead')).toBeVisible()
     await expect(page.getByText(/With Dashboard Lead, Dashboard Coworker/)).toBeVisible()
+    await page.evaluate(() => {
+      window.print = () => {
+        document.body.setAttribute('data-print-called', 'true')
+      }
+    })
+    await page.getByRole('button', { name: 'Print 6-week schedule' }).click()
+    await expect(page.locator('body')).toHaveAttribute('data-print-called', 'true')
+    await page.emulateMedia({ media: 'print' })
+    await expect(page.getByRole('heading', { name: /Welcome,/ })).toBeHidden()
+    await expect(page.locator('.staff-schedule-print-panel')).toBeVisible()
+    await expect(page.locator('.staff-schedule-print-grid')).toBeVisible()
+    await expect(page.locator('.staff-schedule-print-actions')).toBeHidden()
+    await expect(page.getByText(/With Dashboard Lead, Dashboard Coworker/)).toBeVisible()
+    await page.emulateMedia({ media: 'screen' })
     const coverageLink = page.getByRole('link', { name: /Need coverage/ })
     await expect(coverageLink).toHaveAttribute(
       'href',

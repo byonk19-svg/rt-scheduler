@@ -83,7 +83,7 @@ const sampleSchedule: StaffScheduleBlockView = {
 }
 
 describe('StaffScheduleBlockPanel', () => {
-  it('renders the six-week staff schedule context with coworkers, lead, and team schedule links', () => {
+  it('renders the six-week staff schedule context with coworkers, lead, and print control', () => {
     const html = renderToStaticMarkup(
       createElement(StaffScheduleBlockPanel, { schedule: sampleSchedule })
     )
@@ -91,6 +91,9 @@ describe('StaffScheduleBlockPanel', () => {
     expect(html).toContain('My Shifts')
     expect(html).toContain('Your six-week schedule')
     expect(html).toContain('Final schedule published')
+    expect(html).toContain(
+      'Final schedule: this is the official staffing plan for this Schedule Block.'
+    )
     expect(html).toContain('3 assigned days')
     expect(html).toContain('Lead: Lead Avery')
     expect(html).toContain('With Jordan Lee, Sam Patel +1')
@@ -106,8 +109,28 @@ describe('StaffScheduleBlockPanel', () => {
     expect(html).not.toContain('shiftId=shift-2&amp;type=swap')
     expect(html).toContain('View Team Schedule')
     expect(html).toContain('href="/schedule?cycle=cycle-1"')
-    expect(html).toContain('Print from Team Schedule')
+    expect(html).toContain('Print 6-week schedule')
+    expect(html).not.toContain('Print from Team Schedule')
     expect(html).toContain('role="table"')
+    expect(html).toContain('staff-schedule-print-panel')
+    expect(html).toContain('staff-schedule-print-grid')
+    expect(html).toContain('staff-schedule-print-coworkers')
+  })
+
+  it('makes preliminary schedules visibly different from final schedules', () => {
+    const html = renderToStaticMarkup(
+      createElement(StaffScheduleBlockPanel, {
+        schedule: {
+          ...sampleSchedule,
+          lifecycleLabel: 'Preliminary - review open',
+        },
+      })
+    )
+
+    expect(html).toContain('Preliminary - review open')
+    expect(html).toContain(
+      'Preliminary schedule: review it now, but expect manager updates before final publish.'
+    )
   })
 
   it('explains when no preliminary or final schedule block is visible yet', () => {
