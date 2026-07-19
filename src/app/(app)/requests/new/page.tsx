@@ -7,7 +7,7 @@ import { RequestComposer, type SwapRequestPath } from '@/components/requests/Req
 import { RequestsHistoryView } from '@/components/requests/RequestsHistoryView'
 import type { MyShift, OpenRequest, TeamMember } from '@/components/requests/request-page-model'
 import { loadEligibleRequestTeammates, loadRequestPageSnapshot } from '@/lib/request-page-data'
-import { dateKeyFromDate } from '@/lib/schedule-helpers'
+import { siteLocalDateKey } from '@/lib/calendar-utils'
 import {
   defaultRequestMessage,
   mutateShiftPost,
@@ -92,7 +92,7 @@ function SwapRequestPageContent() {
     try {
       setLoading(true)
       setError(null)
-      const todayKey = dateKeyFromDate(new Date())
+      const todayKey = siteLocalDateKey()
       const {
         currentUserId: nextUserId,
         leadCountsBySlot: nextLeadCountsBySlot,

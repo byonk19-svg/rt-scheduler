@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { fetchActiveOperationalCodeMap, isWorkingScheduledShift } from '@/lib/operational-codes'
-import { dateKeyFromDate } from '@/lib/schedule-helpers'
+import { siteLocalDateKey } from '@/lib/calendar-utils'
 
 type RequestType = 'swap' | 'pickup'
 
@@ -106,7 +106,7 @@ export async function GET(request: Request) {
   }
 
   const admin = createAdminClient()
-  const todayKey = dateKeyFromDate(new Date())
+  const todayKey = siteLocalDateKey()
 
   const [{ data: shift, error: shiftError }, { data: requesterProfile }] = await Promise.all([
     admin

@@ -11,7 +11,7 @@ import {
   shiftPostCommandRequiresManager,
 } from '@/lib/shift-post-transition-model'
 import { buildShiftPostReviewRpcCall } from '@/lib/shift-board/review-classifier'
-import { dateKeyFromDate } from '@/lib/schedule-helpers'
+import { siteLocalDateKey } from '@/lib/calendar-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -352,7 +352,7 @@ async function resolveSameCycleSwapShiftId(params: {
   shiftId: string
 }): Promise<string | null> {
   const { admin, actorId, partnerId, shiftId } = params
-  const todayKey = dateKeyFromDate(new Date())
+  const todayKey = siteLocalDateKey()
   const { data: requesterShift, error: requesterShiftError } = await admin
     .from('shifts')
     .select('cycle_id, date, shift_type')
@@ -428,7 +428,7 @@ async function validateCreateRequestShiftBeforeRpc(params: {
   ) {
     return 'Requests can only be created from a working scheduled shift.'
   }
-  const todayKey = dateKeyFromDate(new Date())
+  const todayKey = siteLocalDateKey()
   if (shift.date && shift.date < todayKey) {
     return 'Past shifts cannot be used to create Shift Board requests.'
   }

@@ -8,7 +8,8 @@ import {
   isRequestVisibleInOpenView,
   toRequestUiStatus,
 } from '@/lib/request-workflow'
-import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
+import { siteLocalDateKey } from '@/lib/calendar-utils'
+import { buildDateRange } from '@/lib/schedule-helpers'
 import { canUserSeeShiftPost } from '@/lib/shift-post-visibility'
 
 export type ShiftBoardTab = 'open' | 'history'
@@ -207,7 +208,7 @@ export async function loadShiftBoardSnapshot({
     return { unauthorized: true }
   }
 
-  const todayKey = dateKeyFromDate(new Date())
+  const todayKey = siteLocalDateKey()
   let postsQuery = supabase
     .from('shift_posts')
     .select(

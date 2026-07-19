@@ -43,6 +43,8 @@ describe('staff dashboard therapist action-center copy', () => {
 
   it('loads a preliminary or final schedule block for the primary staff schedule surface', () => {
     expect(staffDashboardSource).toContain('fetchStaffScheduleBlockView')
+    expect(staffDashboardSource).toContain('siteLocalDateKey()')
+    expect(staffDashboardSource).not.toContain('new Date().toISOString().slice(0, 10)')
     expect(staffDashboardSource).toContain("workflow.state === 'preliminary_review_available'")
     expect(staffDashboardSource).toContain("workflow.state === 'published_schedule_available'")
     expect(staffDashboardSource).toContain("cycle.status === 'preliminary'")

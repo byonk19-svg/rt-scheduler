@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { dateRange, formatHumanCycleRange } from '@/lib/calendar-utils'
+import { dateRange, formatHumanCycleRange, siteLocalDateKey } from '@/lib/calendar-utils'
 
 export type MyScheduleShiftRow = {
   id: string
@@ -210,7 +210,7 @@ export async function fetchMyPublishedUpcomingShifts(
   userId: string,
   limit: number
 ): Promise<MyScheduleShiftRow[]> {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = siteLocalDateKey()
   const { data, error } = await supabase
     .from('shifts')
     .select(

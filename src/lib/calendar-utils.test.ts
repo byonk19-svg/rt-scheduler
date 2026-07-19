@@ -2,12 +2,31 @@ import { describe, expect, it } from 'vitest'
 
 import {
   shiftMonthKey,
+  siteLocalDateKey,
   toMonthEndKey,
   toMonthStartKey,
   formatMonthLabel,
   formatHumanCycleRange,
   formatSubmittedDateTime,
 } from '@/lib/calendar-utils'
+
+// ---------------------------------------------------------------------------
+// siteLocalDateKey
+// ---------------------------------------------------------------------------
+
+describe('siteLocalDateKey', () => {
+  it('uses the hospital timezone instead of UTC around midnight', () => {
+    expect(siteLocalDateKey(new Date('2026-05-04T04:59:59.000Z'))).toBe('2026-05-03')
+    expect(siteLocalDateKey(new Date('2026-05-04T05:00:00.000Z'))).toBe('2026-05-04')
+  })
+
+  it('accepts an explicit timezone for future site-specific behavior', () => {
+    const timestamp = new Date('2026-05-04T06:30:00.000Z')
+
+    expect(siteLocalDateKey(timestamp, 'America/Chicago')).toBe('2026-05-04')
+    expect(siteLocalDateKey(timestamp, 'America/Los_Angeles')).toBe('2026-05-03')
+  })
+})
 
 // ---------------------------------------------------------------------------
 // toMonthStartKey

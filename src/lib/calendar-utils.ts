@@ -45,6 +45,26 @@ export function toIsoDate(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
+export const DEFAULT_SITE_TIME_ZONE = 'America/Chicago'
+
+export function siteLocalDateKey(
+  date: Date = new Date(),
+  timeZone: string = DEFAULT_SITE_TIME_ZONE
+): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
+
+  if (!year || !month || !day) return toIsoDate(date)
+  return `${year}-${month}-${day}`
+}
+
 export function dateRange(startDate: string, endDate: string): string[] {
   const start = new Date(`${startDate}T00:00:00`)
   const end = new Date(`${endDate}T00:00:00`)

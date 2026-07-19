@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
@@ -351,5 +354,12 @@ describe('loadShiftBoardSnapshot', () => {
     expect(snapshot.requests.map((request) => [request.id, request.status])).toEqual([
       ['old-pending', 'expired'],
     ])
+  })
+
+  it('uses the site-local today key for active schedule context', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/lib/shift-board-snapshot.ts'), 'utf8')
+
+    expect(source).toContain('siteLocalDateKey()')
+    expect(source).not.toContain('dateKeyFromDate(new Date())')
   })
 })

@@ -28,6 +28,7 @@ import {
   formatRequestShiftLabel,
   type RequestShiftPostRow,
 } from '@/lib/request-workflow'
+import { siteLocalDateKey } from '@/lib/calendar-utils'
 import { deriveRequestStage } from '@/lib/request-page-data'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -215,7 +216,7 @@ export default async function StaffDashboardPage({
 
   const fullName = profile?.full_name ?? user.user_metadata?.full_name ?? 'Staff member'
   const firstName = fullName.split(/\s+/)[0] ?? fullName
-  const todayKey = new Date().toISOString().slice(0, 10)
+  const todayKey = siteLocalDateKey()
 
   let cyclesQuery = admin
     .from('schedule_cycles')

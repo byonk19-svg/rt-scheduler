@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { createClientMock, createAdminClientMock } = vi.hoisted(() => ({
@@ -649,5 +652,15 @@ describe('eligible request teammates API', () => {
         isLead: false,
       },
     ])
+  })
+
+  it('uses the site-local today key for future teammate eligibility', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/api/shift-posts/eligible-teammates/route.ts'),
+      'utf8'
+    )
+
+    expect(source).toContain('siteLocalDateKey()')
+    expect(source).not.toContain('dateKeyFromDate(new Date())')
   })
 })

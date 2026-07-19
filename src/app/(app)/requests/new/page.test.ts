@@ -51,6 +51,8 @@ describe('requests composer route source contract', () => {
     expect(composerSource).not.toContain('Sort: Best match')
     expect(composerSource).not.toContain('Friendly')
     expect(pageSource).toContain("searchParams.get('type') === 'pickup' ? 'pickup' : 'swap'")
+    expect(pageSource).toContain('siteLocalDateKey()')
+    expect(pageSource).not.toContain('dateKeyFromDate(new Date())')
     expect(pageSource).toContain('setRequestType(requestTypeFromQuery)')
     expect(pageSource).toContain('UNREQUESTABLE_PREFILLED_SHIFT_MESSAGE')
     expect(pageSource).toContain('call the manager by phone for same-day issues')

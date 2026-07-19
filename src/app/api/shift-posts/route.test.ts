@@ -333,6 +333,68 @@ describe('shift-post mutation API', () => {
     }
   })
 
+  it('treats a UTC same-day shift as future when it is still tomorrow in hospital time', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-04T04:30:00.000Z'))
+    const rpcMock = vi.fn(async () => ({
+      data: { id: 'post-1' },
+      error: null,
+    }))
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'shift_operational_entries') {
+        return makeAdminQuery({ data: [], error: null })
+      }
+      if (table !== 'shifts') {
+        throw new Error(`Unexpected admin table ${table}`)
+      }
+      return makeAdminQuery({
+        data: {
+          id: 'shift-1',
+          cycle_id: 'cycle-1',
+          date: '2026-05-04',
+          shift_type: 'day',
+          user_id: 'therapist-1',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          schedule_cycles: { published: true },
+        },
+        error: null,
+      })
+    })
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'therapist-1', role: 'therapist' })
+    )
+    createAdminClientMock.mockReturnValue({
+      from: fromMock,
+      rpc: rpcMock,
+    })
+
+    try {
+      const response = await POST(
+        makeRequest({
+          action: 'create_request',
+          shiftId: 'shift-1',
+          requestType: 'pickup',
+          visibility: 'team',
+          message: 'Need help tomorrow',
+        })
+      )
+
+      expect(response.status).toBe(200)
+      expect(rpcMock).toHaveBeenCalledWith('app_create_shift_post_request', {
+        p_actor_id: 'therapist-1',
+        p_shift_id: 'shift-1',
+        p_type: 'pickup',
+        p_visibility: 'team',
+        p_claimed_by: null,
+        p_message: 'Need help tomorrow',
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('blocks requests for shifts with active operational entries before the RPC', async () => {
     const rpcMock = vi.fn()
     const fromMock = vi.fn((table: string) => {
