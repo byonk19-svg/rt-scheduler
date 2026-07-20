@@ -2,6 +2,7 @@ import {
   SCHEDULE_MUTATION_ERROR_CODES as ERROR_CODES,
   type ScheduleMutationErrorCode,
 } from '@/lib/schedule-mutations/errors'
+import { isReadOnlyScheduleBlock } from '@/lib/schedule-block-state'
 import type { createClient } from '@/lib/supabase/server'
 
 type ScheduleMutationSupabaseClient = Awaited<ReturnType<typeof createClient>>
@@ -59,7 +60,7 @@ export async function loadScheduleMutationCycle(
     }
   }
 
-  if (cycle.status === 'offline' || cycle.status === 'archived' || cycle.archived_at) {
+  if (isReadOnlyScheduleBlock(cycle)) {
     return {
       ok: false,
       status: 409,

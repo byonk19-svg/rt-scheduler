@@ -1,4 +1,5 @@
 import { writeAuditLog } from '@/lib/audit-log'
+import { isArchivedScheduleBlock, isPublishedScheduleBlock } from '@/lib/schedule-block-state'
 import { canTakeScheduleBlockOffline } from '@/lib/schedule-lifecycle-matrix'
 import type { createClient } from '@/lib/supabase/server'
 
@@ -185,7 +186,7 @@ export async function archiveScheduleBlockLifecycle(params: {
   }
 
   const lifecycleCycle = cycle as ArchiveScheduleBlockLifecycleRow
-  if (lifecycleCycle.published) {
+  if (isPublishedScheduleBlock(lifecycleCycle)) {
     return { ok: false, reason: 'live' }
   }
 
@@ -193,7 +194,7 @@ export async function archiveScheduleBlockLifecycle(params: {
     return { ok: false, reason: 'outside_site' }
   }
 
-  if (lifecycleCycle.archived_at || lifecycleCycle.status === 'archived') {
+  if (isArchivedScheduleBlock(lifecycleCycle)) {
     return { ok: true }
   }
 

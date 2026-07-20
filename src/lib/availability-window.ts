@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { resolveScheduleBlockState } from '@/lib/schedule-block-state'
+
 type AvailabilityWindowCycle = {
   id: string
   published?: boolean | null
@@ -28,10 +30,13 @@ export function resolveAvailabilityWindowState(params: {
   const cycle = params.cycle
   if (!cycle) return { locked: true, reason: 'manager_closed' }
 
-  if (cycle.archived_at || cycle.status === 'archived') return { locked: true, reason: 'archived' }
-  if (cycle.published || cycle.status === 'final') return { locked: true, reason: 'published' }
-  if (cycle.status === 'offline') return { locked: true, reason: 'offline' }
-  if (cycle.status === 'preliminary') return { locked: true, reason: 'preliminary' }
+  const scheduleBlockState = resolveScheduleBlockState(cycle)
+  if (scheduleBlockState === 'archived') return { locked: true, reason: 'archived' }
+  if (scheduleBlockState === 'published') return { locked: true, reason: 'published' }
+  if (scheduleBlockState === 'offline') return { locked: true, reason: 'offline' }
+  if (scheduleBlockState === 'preliminary_sent') {
+    return { locked: true, reason: 'preliminary' }
+  }
 
   const closedAt = cycle.availability_closed_at
     ? new Date(cycle.availability_closed_at).getTime()

@@ -10,6 +10,11 @@ import {
   isScheduleGridAssignmentStatus,
   type ScheduleGridAssignmentStatus,
 } from '@/lib/schedule/schedule-status-model'
+import {
+  isPublishedScheduleBlock,
+  isReadOnlyScheduleBlock,
+  type ScheduleBlockStatus,
+} from '@/lib/schedule-block-state'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { captureSafeException, logStructuredEvent } from '@/lib/observability'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -54,12 +59,12 @@ type ShiftNotificationLookupRow = {
   schedule_cycles:
     | {
         published: boolean
-        status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+        status: ScheduleBlockStatus | null
         archived_at: string | null
       }
     | {
         published: boolean
-        status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+        status: ScheduleBlockStatus | null
         archived_at: string | null
       }[]
     | null
@@ -171,12 +176,12 @@ export async function POST(request: Request) {
         schedule_cycles:
           | {
               published: boolean
-              status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+              status: ScheduleBlockStatus | null
               archived_at: string | null
             }
           | {
               published: boolean
-              status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+              status: ScheduleBlockStatus | null
               archived_at: string | null
             }[]
           | null
@@ -184,11 +189,7 @@ export async function POST(request: Request) {
     ).schedule_cycles
   )
 
-  if (
-    preflightCycle?.status === 'offline' ||
-    preflightCycle?.status === 'archived' ||
-    preflightCycle?.archived_at
-  ) {
+  if (preflightCycle && isReadOnlyScheduleBlock(preflightCycle)) {
     return NextResponse.json(
       { error: 'This Schedule Block is read-only until it is republished.' },
       { status: 409 }
@@ -203,7 +204,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Assignment is outside your site scope.' }, { status: 403 })
   }
 
-  if (isIncidentAssignmentStatus(status) && !preflightCycle?.published) {
+  if (isIncidentAssignmentStatus(status) && !isPublishedScheduleBlock(preflightCycle ?? {})) {
     return NextResponse.json(
       { error: 'Operational statuses can only be applied after the Schedule Block is published.' },
       { status: 409 }
@@ -284,8 +285,9 @@ export async function POST(request: Request) {
   const shift = (shiftLookup ?? null) as ShiftNotificationLookupRow | null
   const cycle = getOne(shift?.schedule_cycles)
   const shiftInActorSite = shift?.site_id === actorProfile.site_id
+  const shiftCyclePublished = cycle ? isPublishedScheduleBlock(cycle) : false
 
-  if (shift && shiftInActorSite && cycle?.published) {
+  if (shift && shiftInActorSite && shiftCyclePublished) {
     await writeAuditLog(admin as never, {
       userId: user.id,
       action: 'post_publish_modification',
@@ -294,7 +296,7 @@ export async function POST(request: Request) {
     })
   }
 
-  if (shift?.user_id && shiftInActorSite && cycle?.published) {
+  if (shift?.user_id && shiftInActorSite && shiftCyclePublished) {
     if (shouldNotifyAffectedTherapist(row.assignment_status)) {
       await notifyPublishedShiftStatusChanged(admin as never, {
         cyclePublished: true,

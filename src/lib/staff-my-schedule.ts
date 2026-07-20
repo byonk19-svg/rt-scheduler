@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { dateRange, formatHumanCycleRange, siteLocalDateKey } from '@/lib/calendar-utils'
+import { isPreliminaryScheduleBlock, isPublishedScheduleBlock } from '@/lib/schedule-block-state'
 
 export type MyScheduleShiftRow = {
   id: string
@@ -77,8 +78,8 @@ function normalizeAssignmentStatus(value: string | null): string | null {
 }
 
 function lifecycleLabelForCycle(cycle: StaffScheduleBlockCycle): string {
-  if (cycle.published || cycle.status === 'final') return 'Final schedule published'
-  if (cycle.status === 'preliminary') return 'Preliminary - review open'
+  if (isPublishedScheduleBlock(cycle)) return 'Final schedule published'
+  if (isPreliminaryScheduleBlock(cycle)) return 'Preliminary - review open'
   return 'Schedule not final yet'
 }
 

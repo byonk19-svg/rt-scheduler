@@ -49,8 +49,8 @@ describe('staff dashboard therapist action-center copy', () => {
     expect(staffDashboardSource).not.toContain('new Date().toISOString().slice(0, 10)')
     expect(staffDashboardSource).toContain("workflow.state === 'preliminary_review_available'")
     expect(staffDashboardSource).toContain("workflow.state === 'published_schedule_available'")
-    expect(staffDashboardSource).toContain("cycle.status === 'preliminary'")
-    expect(staffDashboardSource).toContain("cycle.published || cycle.status === 'final'")
+    expect(staffDashboardSource).toContain('isPreliminaryScheduleBlock')
+    expect(staffDashboardSource).toContain('isPublishedScheduleBlock')
   })
 
   it('keeps first-run staff out of the dashboard until onboarding is completed', () => {
