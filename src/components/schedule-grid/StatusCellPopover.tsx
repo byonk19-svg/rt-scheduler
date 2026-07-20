@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
@@ -117,6 +117,7 @@ export function StatusCellPopover({
   children,
 }: StatusCellPopoverProps) {
   const virtualRef = anchorEl ? ({ current: anchorEl } as RefObject<HTMLElement>) : undefined
+  const titleId = useId()
   const currentAssignment = toScheduleGridAssignmentStatus(cell.status)
   const [pendingStatus, setPendingStatus] = useState<ScheduleGridAssignmentStatus | null>(null)
   const [leftEarlyTime, setLeftEarlyTime] = useState('')
@@ -135,8 +136,8 @@ export function StatusCellPopover({
     <Popover open={open} onOpenChange={onOpenChange}>
       {virtualRef ? <PopoverAnchor virtualRef={virtualRef} /> : null}
       {children}
-      <PopoverContent className="w-64 p-3">
-        <p className="text-sm font-semibold text-foreground">
+      <PopoverContent role="dialog" aria-labelledby={titleId} className="w-64 p-3">
+        <p id={titleId} className="text-sm font-semibold text-foreground">
           {therapistName} -{' '}
           {formatDisplayDate(date, { month: 'short', day: 'numeric', year: 'numeric' })}
         </p>

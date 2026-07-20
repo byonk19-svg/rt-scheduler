@@ -112,8 +112,8 @@ function statusPopoverResetPlugin(): Plugin {
               return null
             }
 
-            export function PopoverContent({ children }) {
-              return React.createElement('div', { 'data-testid': 'popover-content' }, children)
+            export function PopoverContent({ children, ...props }) {
+              return React.createElement('div', { ...props, 'data-testid': 'popover-content' }, children)
             }
           `,
         })
@@ -156,7 +156,7 @@ describe('StatusCellPopover target reset behavior', () => {
 
   afterAll(async () => {
     await browser.close()
-  })
+  }, PLAYWRIGHT_TEST_TIMEOUT)
 
   it(
     'clears pending confirmation, note, and left-early time when retargeted',

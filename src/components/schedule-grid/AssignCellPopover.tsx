@@ -1,5 +1,6 @@
 'use client'
 
+import { useId } from 'react'
 import type { RefObject, ReactNode } from 'react'
 
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
@@ -32,13 +33,14 @@ export function AssignCellPopover({
   children,
 }: AssignCellPopoverProps) {
   const virtualRef = anchorEl ? ({ current: anchorEl } as RefObject<HTMLElement>) : undefined
+  const titleId = useId()
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       {virtualRef ? <PopoverAnchor virtualRef={virtualRef} /> : null}
       {children}
-      <PopoverContent className="w-60 p-3">
-        <p className="text-sm font-semibold text-foreground">
+      <PopoverContent role="dialog" aria-labelledby={titleId} className="w-60 p-3">
+        <p id={titleId} className="text-sm font-semibold text-foreground">
           {therapistName} -{' '}
           {formatDisplayDate(date, { month: 'short', day: 'numeric', year: 'numeric' })}
         </p>
