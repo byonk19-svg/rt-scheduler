@@ -34,6 +34,7 @@ import {
   SCHEDULE_MUTATION_ERROR_CODES as ERROR_CODES,
   type ScheduleMutationErrorCode,
 } from '@/lib/schedule-mutations/errors'
+import { isPreliminaryScheduleBlock, isPublishedScheduleBlock } from '@/lib/schedule-block-state'
 import { authorizeScheduleMutationManager } from '@/lib/schedule-mutations/authorize-manager'
 import { loadScheduleMutationCycle } from '@/lib/schedule-mutations/load-cycle'
 import { parseActionBody, type DragAction } from '@/lib/schedule-mutations/parse-action-body'
@@ -376,7 +377,11 @@ export async function POST(request: Request) {
     .eq('cycle_id', payload.cycleId)
     .eq('status', 'active')
     .maybeSingle()
-  const preliminaryActive = Boolean(activePreliminarySnapshot) && !Boolean(cycle.published)
+  const cyclePublished = isPublishedScheduleBlock(cycle)
+  const preliminaryActive = isPreliminaryScheduleBlock({
+    ...cycle,
+    hasActivePreliminarySnapshot: Boolean(activePreliminarySnapshot),
+  })
 
   if (payload.action === 'assign') {
     if (!payload.userId || !payload.shiftType || !payload.date) {
@@ -530,7 +535,7 @@ export async function POST(request: Request) {
       payload.cycleId,
       payload.date,
       payload.shiftType,
-      Boolean(cycle.published)
+      cyclePublished
     )
 
     if (shouldLogPostPublishModification && insertedShift?.id) {
@@ -543,7 +548,7 @@ export async function POST(request: Request) {
     }
 
     await notifyPublishedShiftAdded(supabase, {
-      cyclePublished: Boolean(cycle.published),
+      cyclePublished,
       userId: payload.userId,
       date: payload.date,
       shiftType: payload.shiftType,
@@ -756,7 +761,7 @@ export async function POST(request: Request) {
       return scheduleMutationErrorResponse('Incomplete shift data', ERROR_CODES.internalError, 422)
     }
 
-    if (cycle.published || preliminaryActive) {
+    if (cyclePublished || preliminaryActive) {
       try {
         await closePendingShiftPostsForShiftIds(
           supabase,
@@ -769,7 +774,7 @@ export async function POST(request: Request) {
     }
 
     await notifyPublishedShiftMoved(supabase, {
-      cyclePublished: Boolean(cycle.published),
+      cyclePublished,
       userId: shift.user_id,
       fromDate: shift.date,
       fromShiftType: shift.shift_type as 'day' | 'night',
@@ -801,14 +806,14 @@ export async function POST(request: Request) {
       payload.cycleId,
       shift.date,
       shift.shift_type as 'day' | 'night',
-      Boolean(cycle.published)
+      cyclePublished
     )
     const targetNeedsAudit = await shouldLogPostPublishModificationForSlot(
       supabase,
       payload.cycleId,
       payload.targetDate,
       payload.targetShiftType,
-      Boolean(cycle.published)
+      cyclePublished
     )
 
     if (sourceNeedsAudit || targetNeedsAudit) {
@@ -891,7 +896,7 @@ export async function POST(request: Request) {
     })
 
     await notifyPublishedShiftRemoved(supabase, {
-      cyclePublished: Boolean(cycle.published),
+      cyclePublished,
       userId: shift.user_id,
       date: shift.date,
       shiftType: shift.shift_type,
@@ -919,7 +924,7 @@ export async function POST(request: Request) {
       payload.cycleId,
       shift.date,
       shift.shift_type,
-      Boolean(cycle.published)
+      cyclePublished
     )
 
     if (shouldLogPostPublishModification) {
@@ -1130,7 +1135,7 @@ export async function POST(request: Request) {
 
     if (!existingShift) {
       await notifyPublishedShiftAdded(supabase, {
-        cyclePublished: Boolean(cycle.published),
+        cyclePublished,
         userId: payload.therapistId,
         date: payload.date,
         shiftType: payload.shiftType,
@@ -1153,7 +1158,7 @@ export async function POST(request: Request) {
       ).data?.id ??
       `${payload.cycleId}:${payload.therapistId}:${payload.date}:${payload.shiftType}`
 
-    if (cycle.published || preliminaryActive) {
+    if (cyclePublished || preliminaryActive) {
       try {
         await closePendingShiftPostsForShiftIds(
           supabase,
@@ -1170,7 +1175,7 @@ export async function POST(request: Request) {
       payload.cycleId,
       payload.date,
       payload.shiftType,
-      Boolean(cycle.published)
+      cyclePublished
     )
 
     if (shouldLogPostPublishModification) {

@@ -9,6 +9,7 @@ import type {
   TherapistGridRow,
 } from '@/components/schedule-grid/schedule-grid-types'
 import type { ActiveOperationalDetail } from '@/lib/operational-codes'
+import { isPreliminaryScheduleBlock, isPublishedScheduleBlock } from '@/lib/schedule-block-state'
 import { toScheduleGridCellStatus } from '@/lib/schedule/schedule-status-model'
 import type { AssignmentStatus, ShiftStatus } from '@/lib/shift-types'
 
@@ -106,11 +107,11 @@ export function resolveScheduleInteractionMode({
 }
 
 export function isCyclePublished(cycle: CycleRow): boolean {
-  return cycle.published || cycle.status === 'final'
+  return isPublishedScheduleBlock(cycle)
 }
 
 function isCycleVisibleToStaff(cycle: CycleRow): boolean {
-  return isCyclePublished(cycle) || cycle.status === 'preliminary'
+  return isCyclePublished(cycle) || isPreliminaryScheduleBlock(cycle)
 }
 
 export function selectScheduleCycle({

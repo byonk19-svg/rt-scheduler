@@ -439,6 +439,7 @@ describe('archiveCycleAction', () => {
       role: 'manager',
     })
     supabase.state.cyclePublished = false
+    supabase.state.cycleStatus = 'draft'
     createClientMock.mockResolvedValue(supabase)
 
     await expect(archiveCycleAction(makeFormData())).rejects.toThrow(
@@ -465,6 +466,7 @@ describe('archiveCycleAction', () => {
       cycleSiteId: 'site-b',
     })
     supabase.state.cyclePublished = false
+    supabase.state.cycleStatus = 'draft'
     createClientMock.mockResolvedValue(supabase)
 
     await expect(archiveCycleAction(makeFormData())).rejects.toThrow(

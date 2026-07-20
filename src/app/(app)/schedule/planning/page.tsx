@@ -36,6 +36,11 @@ import {
   validateScheduleBlockPlanning,
   type ScheduleBlockPlanningCycle,
 } from '@/lib/schedule-block-planning'
+import {
+  isArchivedScheduleBlock,
+  isPreliminaryScheduleBlock,
+  isPublishedScheduleBlock,
+} from '@/lib/schedule-block-state'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 
@@ -149,22 +154,21 @@ function feedbackMessage(
 }
 
 function scheduleBuildStatus(cycle: PlanningCycleRow): string {
-  if (cycle.published || cycle.status === 'final') return 'Published'
-  if (cycle.status === 'preliminary') return 'Preliminary sent'
+  if (isPublishedScheduleBlock(cycle)) return 'Published'
+  if (isPreliminaryScheduleBlock(cycle)) return 'Preliminary sent'
   return 'Draft'
 }
 
 function isReadOnlyContextCycle(cycle: PlanningCycleRow, today: string): boolean {
   return (
     cycle.start_date <= today ||
-    cycle.published ||
-    cycle.status === 'final' ||
-    cycle.status === 'preliminary'
+    isPublishedScheduleBlock(cycle) ||
+    isPreliminaryScheduleBlock(cycle)
   )
 }
 
 function isEditableUpcomingCycle(cycle: PlanningCycleRow, today: string): boolean {
-  return cycle.status !== 'archived' && !isReadOnlyContextCycle(cycle, today)
+  return !isArchivedScheduleBlock(cycle) && !isReadOnlyContextCycle(cycle, today)
 }
 
 function hasPlanningGap(cycle: PlanningCycleRow, today: string): boolean {
@@ -181,7 +185,7 @@ function classifyCycles(cycles: PlanningCycleRow[], today: string) {
     editableUpcoming.filter((cycle) => !hasPlanningGap(cycle, today))
   )
   const currentOrRecent = cycles
-    .filter((cycle) => cycle.status !== 'archived' && isReadOnlyContextCycle(cycle, today))
+    .filter((cycle) => !isArchivedScheduleBlock(cycle) && isReadOnlyContextCycle(cycle, today))
     .sort((a, b) => b.start_date.localeCompare(a.start_date))
     .slice(0, 3)
 

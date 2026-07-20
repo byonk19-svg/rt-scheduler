@@ -28,6 +28,7 @@ import {
   formatRequestShiftLabel,
   type RequestShiftPostRow,
 } from '@/lib/request-workflow'
+import { isPreliminaryScheduleBlock, isPublishedScheduleBlock } from '@/lib/schedule-block-state'
 import { siteLocalDateKey } from '@/lib/calendar-utils'
 import { deriveRequestStage } from '@/lib/request-page-data'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -326,15 +327,14 @@ export default async function StaffDashboardPage({
       ? cycles.find((cycle) => cycle.id === workflow.actionCycle?.id)
       : null
   const schedulePanelCycle = (cycles.find(
-    (cycle) => cycle.status === 'preliminary' && assignedScheduleCycleIds.has(cycle.id)
+    (cycle) => isPreliminaryScheduleBlock(cycle) && assignedScheduleCycleIds.has(cycle.id)
   ) ??
     cycles.find(
-      (cycle) =>
-        (cycle.published || cycle.status === 'final') && assignedScheduleCycleIds.has(cycle.id)
+      (cycle) => isPublishedScheduleBlock(cycle) && assignedScheduleCycleIds.has(cycle.id)
     ) ??
     workflowScheduleCycle ??
-    cycles.find((cycle) => cycle.status === 'preliminary') ??
-    cycles.find((cycle) => cycle.published || cycle.status === 'final') ??
+    cycles.find((cycle) => isPreliminaryScheduleBlock(cycle)) ??
+    cycles.find((cycle) => isPublishedScheduleBlock(cycle)) ??
     null) as StaffScheduleBlockCycle | null
   const scheduleBlockView = await fetchStaffScheduleBlockView({
     supabase: admin,

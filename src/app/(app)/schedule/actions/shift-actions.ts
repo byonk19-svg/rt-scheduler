@@ -17,6 +17,7 @@ import { exceedsCoverageLimit, exceedsWeeklyLimit } from '@/lib/schedule-rule-va
 import { MAX_SHIFT_COVERAGE_PER_DAY, MAX_WORK_DAYS_PER_WEEK } from '@/lib/scheduling-constants'
 import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import { preserveShiftPostHistoryBeforeShiftDeletion } from '@/lib/shift-post-cleanup'
+import { isPublishedScheduleBlock, isReadOnlyScheduleBlock } from '@/lib/schedule-block-state'
 import { writeAuditLog } from '@/lib/audit-log'
 import { createClient } from '@/lib/supabase/server'
 import type { ShiftStatus } from '@/app/schedule/types'
@@ -35,10 +36,6 @@ type ShiftMutationCycle = {
   published: boolean
   status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
   archived_at: string | null
-}
-
-function isReadOnlyScheduleBlock(cycle: ShiftMutationCycle): boolean {
-  return cycle.status === 'offline' || cycle.status === 'archived' || Boolean(cycle.archived_at)
 }
 
 /**
@@ -226,7 +223,7 @@ export async function addShiftAction(formData: FormData) {
   }
 
   await notifyPublishedShiftAdded(supabase, {
-    cyclePublished: Boolean(cycle.published),
+    cyclePublished: isPublishedScheduleBlock(cycle),
     userId,
     date,
     shiftType: shiftType as 'day' | 'night',
@@ -309,7 +306,7 @@ export async function deleteShiftAction(formData: FormData) {
   })
 
   await notifyPublishedShiftRemoved(supabase, {
-    cyclePublished: Boolean(cycle.published),
+    cyclePublished: isPublishedScheduleBlock(cycle),
     userId: shift.user_id,
     date: shift.date,
     shiftType: shift.shift_type as 'day' | 'night',
@@ -502,7 +499,7 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
   if (!existingShift) {
     await notifyPublishedShiftAdded(supabase, {
-      cyclePublished: Boolean(cycle.published),
+      cyclePublished: isPublishedScheduleBlock(cycle),
       userId: therapistId,
       date,
       shiftType,

@@ -1,4 +1,5 @@
 import { addDays, dateFromKey, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
+import { isPublishedScheduleBlock, isReadOnlyScheduleBlock } from '@/lib/schedule-block-state'
 
 const SCHEDULE_BLOCK_DAY_COUNT = 42
 
@@ -238,8 +239,8 @@ export function isTherapistVisibleForAvailability(
   todayKey: string
 ): boolean {
   if (!cycle.availability_due_at) return false
-  if (cycle.archived_at || cycle.status === 'archived') return false
-  if (cycle.published || cycle.status === 'final' || cycle.status === 'offline') return false
+  if (isReadOnlyScheduleBlock(cycle)) return false
+  if (isPublishedScheduleBlock(cycle)) return false
   return cycle.end_date >= todayKey
 }
 
