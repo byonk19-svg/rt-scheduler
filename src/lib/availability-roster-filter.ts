@@ -12,7 +12,7 @@ const VALID_ROSTER_FILTERS = new Set<AvailabilityRosterFilter>([
   'has_requests',
 ])
 
-export function parseAvailabilityRosterFilter(
+function parseAvailabilityRosterFilter(
   value: string | null | undefined
 ): AvailabilityRosterFilter | null {
   return VALID_ROSTER_FILTERS.has(value as AvailabilityRosterFilter)

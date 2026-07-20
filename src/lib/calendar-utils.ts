@@ -45,7 +45,7 @@ export function toIsoDate(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-export const DEFAULT_SITE_TIME_ZONE = 'America/Chicago'
+const DEFAULT_SITE_TIME_ZONE = 'America/Chicago'
 
 export function siteLocalDateKey(
   date: Date = new Date(),

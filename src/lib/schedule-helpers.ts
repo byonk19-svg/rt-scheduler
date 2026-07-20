@@ -14,7 +14,7 @@ import type {
   ToastVariant,
 } from '@/app/schedule/types'
 
-export { toIsoDate as dateKeyFromDate, dateRange as buildDateRange, formatDateLabel as formatDate }
+export { dateRange as buildDateRange, formatDateLabel as formatDate }
 
 export function getWeekBoundsForDate(value: string): { weekStart: string; weekEnd: string } | null {
   const parsed = new Date(`${value}T00:00:00`)

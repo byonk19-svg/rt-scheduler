@@ -109,7 +109,7 @@ export function isCyclePublished(cycle: CycleRow): boolean {
   return cycle.published || cycle.status === 'final'
 }
 
-export function isCycleVisibleToStaff(cycle: CycleRow): boolean {
+function isCycleVisibleToStaff(cycle: CycleRow): boolean {
   return isCyclePublished(cycle) || cycle.status === 'preliminary'
 }
 
