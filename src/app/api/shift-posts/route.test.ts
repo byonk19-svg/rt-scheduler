@@ -575,6 +575,191 @@ describe('shift-post mutation API', () => {
     }
   })
 
+  it('responds to direct requests through the hardened response function', async () => {
+    const rpcMock = vi.fn(async () => ({
+      data: {
+        id: 'post-1',
+        status: 'denied',
+        visibility: 'direct',
+        recipient_response: 'declined',
+      },
+      error: null,
+    }))
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'therapist-1', role: 'therapist', siteId: 'site-a' })
+    )
+    createAdminClientMock.mockReturnValue(
+      makeReviewAdminClient({
+        rpc: rpcMock,
+        post: {
+          id: 'post-1',
+          type: 'swap',
+          status: 'pending',
+          created_at: '2099-05-01T12:00:00.000Z',
+          visibility: 'direct',
+          recipient_response: 'pending',
+          claimed_by: 'therapist-1',
+          shift_id: 'shift-1',
+          swap_shift_id: 'swap-shift-1',
+        },
+        shifts: [
+          { id: 'shift-1', site_id: 'site-a' },
+          { id: 'swap-shift-1', site_id: 'site-a' },
+        ],
+      })
+    )
+
+    const response = await POST(
+      makeRequest({
+        action: 'respond_direct_request',
+        requestId: 'post-1',
+        decision: 'declined',
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(rpcMock).toHaveBeenCalledWith('app_respond_direct_shift_post', {
+      p_actor_id: 'therapist-1',
+      p_post_id: 'post-1',
+      p_response: 'declined',
+    })
+  })
+
+  it('withdraws requester-owned requests through the hardened withdrawal function', async () => {
+    const rpcMock = vi.fn(async () => ({
+      data: { id: 'post-1', status: 'withdrawn' },
+      error: null,
+    }))
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'therapist-1', role: 'therapist', siteId: 'site-a' })
+    )
+    createAdminClientMock.mockReturnValue(
+      makeReviewAdminClient({
+        rpc: rpcMock,
+        post: {
+          id: 'post-1',
+          type: 'pickup',
+          status: 'pending',
+          created_at: '2099-05-01T12:00:00.000Z',
+          visibility: 'team',
+          recipient_response: null,
+          claimed_by: null,
+          shift_id: 'shift-1',
+          swap_shift_id: null,
+        },
+      })
+    )
+
+    const response = await POST(
+      makeRequest({
+        action: 'withdraw_request',
+        requestId: 'post-1',
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(rpcMock).toHaveBeenCalledWith('app_withdraw_shift_post', {
+      p_actor_id: 'therapist-1',
+      p_post_id: 'post-1',
+    })
+  })
+
+  it('expires stale requests before requester withdrawal reaches the withdrawal RPC', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-04T12:00:00.000Z'))
+    const rpcMock = vi.fn()
+    const adminClient = makeReviewAdminClient({
+      rpc: rpcMock,
+      post: {
+        id: 'post-1',
+        type: 'pickup',
+        status: 'pending',
+        created_at: '2026-05-02T11:59:59.000Z',
+        visibility: 'team',
+        recipient_response: null,
+        claimed_by: null,
+        shift_id: 'shift-1',
+        swap_shift_id: null,
+      },
+    })
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'therapist-1', role: 'therapist', siteId: 'site-a' })
+    )
+    createAdminClientMock.mockReturnValue(adminClient)
+
+    try {
+      const response = await POST(
+        makeRequest({
+          action: 'withdraw_request',
+          requestId: 'post-1',
+        })
+      )
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body.error).toContain('expired')
+      expect(rpcMock).not.toHaveBeenCalled()
+      expect(adminClient.shiftPostUpdates).toEqual([
+        {
+          payload: {
+            status: 'expired',
+            expired_at: '2026-05-04T12:00:00.000Z',
+          },
+          filters: [
+            ['id', 'post-1'],
+            ['status', 'pending'],
+          ],
+        },
+      ])
+      expect(adminClient.shiftPostInterestUpdates).toEqual([
+        {
+          payload: {
+            status: 'declined',
+            responded_at: '2026-05-04T12:00:00.000Z',
+          },
+          eqFilters: [['shift_post_id', 'post-1']],
+          inFilters: [['status', ['pending', 'selected']]],
+        },
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('withdraws pickup interests through the promotion-aware withdrawal function', async () => {
+    const rpcMock = vi.fn(async () => ({
+      data: [
+        {
+          shift_post_id: 'post-1',
+          withdrawn_interest_id: 'interest-1',
+          promoted_interest_id: 'interest-2',
+        },
+      ],
+      error: null,
+    }))
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'therapist-1', role: 'therapist' })
+    )
+    createAdminClientMock.mockReturnValue(makeReviewAdminClient({ rpc: rpcMock }))
+
+    const response = await POST(
+      makeRequest({
+        action: 'withdraw_interest',
+        interestId: 'interest-1',
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(rpcMock).toHaveBeenCalledWith('app_withdraw_shift_post_interest', {
+      p_actor_id: 'therapist-1',
+      p_interest_id: 'interest-1',
+    })
+  })
+
   it('blocks inactive actors before shift-post workflow mutations', async () => {
     const rpcMock = vi.fn(async () => ({
       data: null,
