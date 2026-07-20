@@ -82,8 +82,18 @@ Schedule grid status model:
 - Display status precedence is: matching active operational code, then `assignment_status`, then legacy `shifts.status` fallback, then scheduled staff/lead default.
 - Client mutation payload mapping for schedule-grid status choices is centralized in the same model so server display state and client update requests do not drift.
 - Schedule grid mutation failures use the app's non-blocking `FeedbackToast` pattern instead of browser alerts.
+
+Schedule grid action model:
+
+- `ScheduleGridTable` is the table-rendering module. Its interface is the `GridDataset`, `ScheduleInteractionMode`, and `onCellClick` callback. It decides whether a cell is actionable from role capabilities, assignment state, ineligibility, and pending mutation lock state, then renders a native button with the accessible cell label and `aria-haspopup="dialog"` only when the cell can open actions.
+- `ScheduleGrid` is the client orchestration module behind the `/schedule` action seam. It owns the active cell target, maps table clicks to `AssignCellPopover` or `StatusCellPopover`, calls `createCoverageShiftMutator()`, translates mutation failures into `FeedbackToast`, and refreshes the route after successful mutation. Keep new cell actions behind this module so permission checks, feedback, and refresh behavior stay local.
+- `AssignCellPopover` is the assign-action module for off cells. It shows Need Off context and can call only the assign mutation supplied by `ScheduleGrid`.
+- `StatusCellPopover` is the assigned-cell action module for operational status, unassign, and Designated Lead actions. It owns confirmation copy and transient status form state, while `ScheduleGrid` remains the only module that mutates schedule data.
+- The popover contents are intentionally named dialogs because actionable cells advertise a dialog affordance and keyboard users must be able to move from a focused cell to a named action surface. Do not replace them with generic floating content unless the cell affordance, focus behavior, and browser-backed keyboard tests are updated together.
+- Keep server lifecycle and authorization enforcement in the existing mutation routes and RPC-backed helpers. The grid modules are client-side adapters over those mutation interfaces, not the source of scheduling truth.
 - Focused verification:
   - `npm run test:unit -- schedule-status schedule-grid-data schedule-grid`
+  - `npx vitest run src/components/schedule-grid/ScheduleGrid.feedback.test.ts src/components/schedule-grid/StatusCellPopover.interaction.test.ts src/components/schedule-grid/ScheduleGridTable.test.ts`
   - `npx playwright test e2e/manager-schedule-roster.spec.ts --project=chromium --workers=1 --reporter=line`
   - `npx playwright test e2e/therapist-schedule-trust-smoke.spec.ts --project=chromium --workers=1 --reporter=line`
 
