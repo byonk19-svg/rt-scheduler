@@ -5,8 +5,11 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('@/components/ui/popover', () => ({
   Popover: ({ children }: { children?: ReactNode }) => createElement('div', null, children),
   PopoverAnchor: () => null,
-  PopoverContent: ({ children }: { children?: ReactNode }) =>
-    createElement('div', { 'data-testid': 'popover-content' }, children),
+  PopoverContent: ({
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children?: ReactNode }) =>
+    createElement('div', { ...props, 'data-testid': 'popover-content' }, children),
 }))
 
 import {
@@ -94,6 +97,8 @@ describe('StatusCellPopover', () => {
       canDesignateLead: true,
     })
 
+    expect(html).toContain('role="dialog"')
+    expect(html).toContain('aria-labelledby=')
     expect(html).toContain('On call')
     expect(html).toContain('Lead eligible')
     expect(html).toContain('Designate as lead')

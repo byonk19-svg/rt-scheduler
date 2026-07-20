@@ -305,8 +305,8 @@ function scheduleGridFeedbackPlugin(): Plugin {
               return null
             }
 
-            export function PopoverContent({ children }) {
-              return React.createElement('div', { 'data-testid': 'popover-content' }, children)
+            export function PopoverContent({ children, ...props }) {
+              return React.createElement('div', { ...props, 'data-testid': 'popover-content' }, children)
             }
           `,
         })
@@ -380,7 +380,7 @@ describe('ScheduleGrid feedback rendering', () => {
 
   afterAll(async () => {
     await browser.close()
-  })
+  }, PLAYWRIGHT_TEST_TIMEOUT)
 
   it(
     'renders readiness issue rows in the pre-flight panel',
@@ -440,6 +440,46 @@ describe('ScheduleGrid feedback rendering', () => {
         await page.getByText('Pre-flight summary').waitFor({ state: 'visible' })
 
         expect(duplicateKeyWarnings).toEqual([])
+      } finally {
+        await page.close()
+      }
+    },
+    PLAYWRIGHT_TEST_TIMEOUT
+  )
+
+  it(
+    'opens assign actions from a focused schedule cell with the keyboard',
+    async () => {
+      const page = await browser.newPage()
+      try {
+        await renderScheduleGridFeedbackHarness(page, {
+          cellStatus: 'off',
+          errors: {},
+        })
+
+        const cell = page.getByTestId('cell-therapist-1-2026-05-04')
+
+        await cell.focus()
+        expect(await cell.evaluate((element) => document.activeElement === element)).toBe(true)
+        await page.keyboard.press('Enter')
+
+        const dialog = page.getByRole('dialog', { name: 'Alice Johnson - May 4, 2026' })
+
+        await dialog.waitFor({ state: 'visible' })
+        await dialog.getByRole('button', { name: 'Assign' }).click()
+
+        const state = await page.evaluate(() => window.__scheduleGridTestState)
+
+        expect(state.assignCalls).toBe(1)
+        expect(state.lastAssignPayload).toMatchObject({
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          isoDate: '2026-05-04',
+          shiftType: 'day',
+          role: 'staff',
+        })
+        expect(state.refreshCalls).toBe(1)
+        expect(state.alertCalls).toBe(0)
       } finally {
         await page.close()
       }
