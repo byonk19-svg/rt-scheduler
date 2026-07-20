@@ -648,7 +648,7 @@ The `CoverageClientPage` (1,600 lines) handles:
 
 #### Current issues
 
-- The `StaffAttentionCard` (next-step action) and `MyScheduleCard` (upcoming shifts) are the most valuable elements — they should lead the page.
+- The next-step action and staff schedule summary are the most valuable elements — they should lead the page.
 - "Shift Swaps & Pickups" card links to the shift board but doesn't show current open opportunities inline.
 - "History" links to an unimplemented page. A dead link on the dashboard is a trust issue.
 
